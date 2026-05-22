@@ -1,0 +1,48 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: surmaderas_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: surmaderas
+      POSTGRES_USER: surmaderas
+      POSTGRES_PASSWORD: surmaderas2026
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  backend:
+    build: ./backend
+    container_name: surmaderas_api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://surmaderas:surmaderas2026@db:5432/surmaderas
+      SECRET_KEY: surmaderas-secret-key-2026
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    volumes:
+      - ./backend:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build: ./frontend
+    container_name: surmaderas_web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      VITE_API_URL: http://localhost:8000
+
+volumes:
+  pgdata:

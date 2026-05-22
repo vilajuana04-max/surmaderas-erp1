@@ -1,0 +1,40 @@
+# Sur Maderas ERP — Render Blueprint
+# Deploy con un click: https://render.com/deploy
+
+services:
+  # ── Backend FastAPI ──────────────────────────────────────────
+  - type: web
+    name: surmaderas-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false          # Se completa manualmente con la URL de Neon
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+      - key: FRONTEND_URL
+        sync: false          # URL del frontend en Vercel (ej: https://surmaderas.vercel.app)
+
+  # ── Frontend React (Static Site) ────────────────────────────
+  - type: web
+    name: surmaderas-web
+    runtime: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/dist
+    plan: free
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        sync: false          # URL del backend en Render (ej: https://surmaderas-api.onrender.com)

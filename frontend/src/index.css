@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-wood-50 text-wood-900 antialiased;
+  }
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-white rounded-2xl shadow-sm border border-wood-100 p-4;
+  }
+  .btn-primary {
+    @apply bg-wood-800 text-white rounded-xl px-4 py-2.5 text-sm font-medium
+           hover:bg-wood-700 active:scale-95 transition-all duration-150
+           flex items-center gap-2;
+  }
+  .btn-ghost {
+    @apply text-wood-700 rounded-xl px-4 py-2.5 text-sm font-medium
+           hover:bg-wood-100 active:scale-95 transition-all duration-150
+           flex items-center gap-2;
+  }
+  .input {
+    @apply w-full border border-wood-200 rounded-xl px-3 py-2.5 text-sm
+           focus:outline-none focus:ring-2 focus:ring-wood-500/40 focus:border-wood-500
+           bg-white placeholder-wood-400;
+  }
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+  .badge-green  { @apply badge bg-green-100 text-green-800; }
+  .badge-red    { @apply badge bg-red-100 text-red-700; }
+  .badge-amber  { @apply badge bg-amber-100 text-amber-800; }
+  .badge-wood   { @apply badge bg-wood-100 text-wood-800; }
+  .table-th     { @apply px-3 py-2.5 text-left text-xs font-semibold text-wood-600 uppercase tracking-wide; }
+  .table-td     { @apply px-3 py-3 text-sm text-wood-800; }
+  .table-tr     { @apply border-b border-wood-50 hover:bg-wood-50/60 transition-colors; }
+  .kpi-card     { @apply card flex flex-col gap-1; }
+  .kpi-label    { @apply text-xs text-wood-500 font-medium uppercase tracking-wide; }
+  .kpi-value    { @apply text-2xl font-bold text-wood-900; }
+  .kpi-sub      { @apply text-xs text-wood-500; }
+}
