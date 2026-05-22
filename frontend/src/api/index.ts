@@ -11,5 +11,7 @@ export const MONTHS = [
   'JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE',
 ]
 
-export const CURRENT_YEAR  = 2026
-export const CURRENT_MONTH = 'MAYO'
+const _now = new Date()
+export const CURRENT_YEAR       = _now.getFullYear()
+export const CURRENT_MONTH_IDX  = _now.getMonth()          // 0-based
+export const CURRENT_MONTH      = MONTHS[_now.getMonth()]
