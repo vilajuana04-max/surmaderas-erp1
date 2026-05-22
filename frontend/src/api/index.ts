@@ -1,7 +1,7 @@
 export { api } from './client'
 
 export const fmt$ = (n: number | null | undefined) =>
-  n == null ? '—' : `$ ${Math.round(n).toLocaleString('es-AR')}`
+  n == null ? '—' : `$ ${Number(n).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 export const fmtNum = (n: number | null | undefined) =>
   n == null ? '—' : n.toLocaleString('es-AR')

@@ -113,10 +113,38 @@ def close_month(year: int, month: str, db: Session = Depends(get_db)):
     return {"closed_records": updated, "month": month.upper(), "year": year}
 
 
+@router.get("/history/{year}")
+def yearly_history(year: int, db: Session = Depends(get_db)):
+    sales = db.query(DailySales).filter(DailySales.year == year).all()
+    buckets: dict = {}
+    for s in sales:
+        m = s.month_label
+        if m not in buckets:
+            buckets[m] = {"luro": 0.0, "indep": 0.0, "days": set()}
+        buckets[m]["days"].add(str(s.sale_date))
+        if s.branch_id == 1:
+            buckets[m]["luro"]  += float(s.total_amount or 0)
+        elif s.branch_id == 2:
+            buckets[m]["indep"] += float(s.total_amount or 0)
+
+    order = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO",
+             "JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"]
+    return [
+        {
+            "month":          m,
+            "luro_total":     buckets[m]["luro"],
+            "indep_total":    buckets[m]["indep"],
+            "combined":       buckets[m]["luro"] + buckets[m]["indep"],
+            "days_with_data": len(buckets[m]["days"]),
+        }
+        for m in order if m in buckets
+    ]
+
+
 @router.get("/pdf/{year}/{month}")
 def sales_pdf(
     year: int, month: str,
-    branch: str = Query("all", regex="^(all|luro|independencia)$"),
+    branch: str = Query("all"),
     db: Session = Depends(get_db)
 ):
     month = month.upper()
