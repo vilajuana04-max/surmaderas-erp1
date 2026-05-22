@@ -42,6 +42,113 @@ HEADER_HTML = """
 
 FOOTER_HTML = '<div class="footer">Sur Maderas · Mar del Plata · Sistema ERP v1.0</div>'
 
+NAVY  = "#070614"
+CORAL = "#C8603A"
+
+SALES_TEMPLATE = """
+<html><head><style>
+  {{ css }}
+  .branch-indep {{ background: """ + NAVY  + """; color: white; }}
+  .branch-luro  {{ background: """ + CORAL + """; color: white; }}
+  .sub-header td {{ background: #1a1a2e; color: rgba(255,255,255,0.6); font-size: 8pt; text-align: right; padding: 3px 8px; }}
+  .sub-header-luro td {{ background: #8B3A20; color: rgba(255,255,255,0.6); font-size: 8pt; text-align: right; padding: 3px 8px; }}
+  th {{ padding: 6px 8px; font-size: 9pt; text-align: right; }}
+  th:first-child, th:nth-child(2) {{ text-align: left; background: """ + NAVY + """; }}
+  td {{ text-align: right; }}
+  td:first-child, td:nth-child(2) {{ text-align: left; }}
+  .total-row td {{ font-weight: bold; background: """ + NAVY + """; color: white; }}
+  .week-section h2 {{ font-size: 10pt; margin-top: 16px; border-bottom: 2px solid """ + CORAL + """; }}
+</style></head><body>
+""" + HEADER_HTML + """
+<h1>Ventas Diarias — {{ branch_label }}</h1>
+<p class="subtitle">{{ month }} {{ year }} · {{ days_with_data }} días con ventas registradas</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align:left">Fecha</th>
+      <th style="text-align:left">Día</th>
+      {% if show_indep %}
+      <th class="branch-indep">INDEP Total $</th>
+      <th class="branch-indep">INDEP Tarjetas</th>
+      <th class="branch-indep">INDEP Tickets</th>
+      <th class="branch-indep">INDEP T.Prom $</th>
+      {% endif %}
+      {% if show_luro %}
+      <th class="branch-luro">LURO Total $</th>
+      <th class="branch-luro">LURO Tarjetas</th>
+      <th class="branch-luro">LURO Tickets</th>
+      <th class="branch-luro">LURO T.Prom $</th>
+      {% endif %}
+      <th style="background:#A84E2C;color:white">Total Día</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for row in rows %}
+  <tr>
+    <td style="text-align:left">{{ row.date }}</td>
+    <td style="text-align:left;color:#888">{{ row.weekday }}</td>
+    {% if show_indep %}
+    <td>{{ row.indep_total }}</td>
+    <td>{{ row.indep_cards }}</td>
+    <td>{{ row.indep_tickets }}</td>
+    <td>{{ row.indep_prom }}</td>
+    {% endif %}
+    {% if show_luro %}
+    <td>{{ row.luro_total }}</td>
+    <td>{{ row.luro_cards }}</td>
+    <td>{{ row.luro_tickets }}</td>
+    <td>{{ row.luro_prom }}</td>
+    {% endif %}
+    <td style="font-weight:bold">{{ row.day_total }}</td>
+  </tr>
+  {% endfor %}
+  <tr class="total-row">
+    <td colspan="2">TOTAL MES</td>
+    {% if show_indep %}
+    <td>{{ totals.indep_total }}</td>
+    <td>{{ totals.indep_cards }}</td>
+    <td>{{ totals.indep_tickets }}</td>
+    <td>{{ totals.indep_prom }}</td>
+    {% endif %}
+    {% if show_luro %}
+    <td>{{ totals.luro_total }}</td>
+    <td>{{ totals.luro_cards }}</td>
+    <td>{{ totals.luro_tickets }}</td>
+    <td>{{ totals.luro_prom }}</td>
+    {% endif %}
+    <td style="color:""" + CORAL + """">{{ totals.combined }}</td>
+  </tr>
+  </tbody>
+</table>
+
+<div class="week-section">
+  <h2>Reporte Semanal Comparativo</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="text-align:left">Semana</th>
+        <th>Días c/datos</th>
+        {% if show_indep %}<th>Indep Total</th><th>Indep Prom/día</th><th>Indep Tickets</th>{% endif %}
+        {% if show_luro  %}<th>Luro Total</th><th>Luro Prom/día</th><th>Luro Tickets</th>{% endif %}
+        <th>Total Semanal</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for w in weeks %}
+    <tr>
+      <td style="text-align:left">{{ w.label }}</td>
+      <td>{{ w.days }}</td>
+      {% if show_indep %}<td>{{ w.iT }}</td><td>{{ w.iProm }}</td><td>{{ w.iTk }}</td>{% endif %}
+      {% if show_luro  %}<td>{{ w.lT }}</td><td>{{ w.lProm }}</td><td>{{ w.lTk }}</td>{% endif %}
+      <td style="font-weight:bold">{{ w.total }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+""" + FOOTER_HTML + "</body></html>"
+
 PURCHASES_TEMPLATE = """
 <html><head><style>{{ css }}</style></head><body>
 """ + HEADER_HTML + """
@@ -234,6 +341,7 @@ _env = Environment(loader=DictLoader({
     "vacations":       VACATIONS_TEMPLATE,
     "shared_expenses": SHARED_EXPENSES_TEMPLATE,
     "luro_expenses":   LURO_EXPENSES_TEMPLATE,
+    "sales":           SALES_TEMPLATE,
 }))
 
 
@@ -288,3 +396,112 @@ def generate_luro_expenses_pdf(expenses, month: str, year: int) -> bytes:
     total = sum(float(e.amount or 0) for e in expenses)
     return _render("luro_expenses", expenses=expenses, month=month, year=year,
                    total=total, doc_title="Gastos Luro")
+
+
+def generate_sales_pdf(sales: list, year: int, month: str, branch: str = "all") -> bytes:
+    import calendar
+    from datetime import datetime
+
+    WEEKDAYS = ["lun","mar","mié","jue","vie","sáb","dom"]
+
+    show_indep = branch in ("all", "independencia")
+    show_luro  = branch in ("all", "luro")
+    branch_label = {
+        "all": "Ambas Sucursales",
+        "independencia": "Independencia",
+        "luro": "Luro",
+    }.get(branch, "Ambas Sucursales")
+
+    # Construir dict por fecha y sucursal
+    by_date: dict = {}
+    for s in sales:
+        d = str(s.sale_date)
+        if d not in by_date:
+            by_date[d] = {}
+        by_date[d][s.branch_id] = s
+
+    # Mes completo
+    month_idx = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO",
+                 "JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"].index(month)
+    days_count = calendar.monthrange(year, month_idx + 1)[1]
+
+    def fmt(v): return f"$ {int(v):,}".replace(",", ".") if v else "—"
+
+    rows = []
+    for d in range(1, days_count + 1):
+        date_str  = f"{year}-{month_idx+1:02d}-{d:02d}"
+        dt        = datetime(year, month_idx + 1, d)
+        weekday   = WEEKDAYS[dt.weekday()]
+        day_sales = by_date.get(date_str, {})
+
+        indep = day_sales.get(2)
+        luro  = day_sales.get(1)
+
+        iT  = float(indep.total_amount  or 0) if indep else 0
+        iC  = float(indep.card_payments or 0) if indep else 0
+        iTk = int(indep.ticket_count    or 0) if indep else 0
+        lT  = float(luro.total_amount   or 0) if luro  else 0
+        lC  = float(luro.card_payments  or 0) if luro  else 0
+        lTk = int(luro.ticket_count     or 0) if luro  else 0
+
+        row_total = (iT if show_indep else 0) + (lT if show_luro else 0)
+
+        rows.append({
+            "date": f"{d:02d}/{month_idx+1:02d}",
+            "weekday": weekday,
+            "indep_total":   fmt(iT),   "indep_cards": fmt(iC),
+            "indep_tickets": iTk or "—","indep_prom":  fmt(iT/iTk) if iTk else "—",
+            "luro_total":    fmt(lT),   "luro_cards":  fmt(lC),
+            "luro_tickets":  lTk or "—","luro_prom":   fmt(lT/lTk) if lTk else "—",
+            "day_total": fmt(row_total) if row_total else "—",
+        })
+
+    # Totales
+    all_sales = list(by_date.values())
+    iTotal = sum(float(v[2].total_amount  or 0) for v in all_sales if 2 in v)
+    iCards = sum(float(v[2].card_payments or 0) for v in all_sales if 2 in v)
+    iTicks = sum(int(v[2].ticket_count    or 0) for v in all_sales if 2 in v)
+    lTotal = sum(float(v[1].total_amount  or 0) for v in all_sales if 1 in v)
+    lCards = sum(float(v[1].card_payments or 0) for v in all_sales if 1 in v)
+    lTicks = sum(int(v[1].ticket_count    or 0) for v in all_sales if 1 in v)
+
+    totals = {
+        "indep_total": fmt(iTotal), "indep_cards": fmt(iCards),
+        "indep_tickets": iTicks or "—",
+        "indep_prom": fmt(iTotal/iTicks) if iTicks else "—",
+        "luro_total": fmt(lTotal), "luro_cards": fmt(lCards),
+        "luro_tickets": lTicks or "—",
+        "luro_prom": fmt(lTotal/lTicks) if lTicks else "—",
+        "combined": fmt(iTotal + lTotal),
+    }
+
+    # Semanas (grupos de 7 días)
+    week_rows = []
+    for wi in range(0, days_count, 7):
+        week_dates = [f"{year}-{month_idx+1:02d}-{d:02d}" for d in range(wi+1, min(wi+8, days_count+1))]
+        wSales = [s for s in sales if str(s.sale_date) in week_dates]
+        wIndep = [s for s in wSales if s.branch_id == 2]
+        wLuro  = [s for s in wSales if s.branch_id == 1]
+        wiT = sum(float(s.total_amount or 0) for s in wIndep)
+        wlT = sum(float(s.total_amount or 0) for s in wLuro)
+        wiTk = sum(int(s.ticket_count  or 0) for s in wIndep)
+        wlTk = sum(int(s.ticket_count  or 0) for s in wLuro)
+        days_with = len(set(str(s.sale_date) for s in wSales))
+        week_rows.append({
+            "label": f"Semana {len(week_rows)+1}",
+            "days": days_with or "—",
+            "iT": fmt(wiT), "iProm": fmt(wiT/days_with) if days_with else "—", "iTk": wiTk or "—",
+            "lT": fmt(wlT), "lProm": fmt(wlT/days_with) if days_with else "—", "lTk": wlTk or "—",
+            "total": fmt(wiT + wlT) if (wiT + wlT) else "—",
+        })
+
+    days_with_data = len(set(str(s.sale_date) for s in sales))
+
+    return _render(
+        "sales",
+        rows=rows, totals=totals, weeks=week_rows,
+        year=year, month=month, branch_label=branch_label,
+        show_indep=show_indep, show_luro=show_luro,
+        days_with_data=days_with_data,
+        doc_title=f"Ventas Diarias — {branch_label}",
+    )

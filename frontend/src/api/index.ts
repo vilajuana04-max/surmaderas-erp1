@@ -12,4 +12,4 @@ export const MONTHS = [
 ]
 
 export const CURRENT_YEAR  = 2026
-export const CURRENT_MONTH = 'ABRIL'
+export const CURRENT_MONTH = 'MAYO'

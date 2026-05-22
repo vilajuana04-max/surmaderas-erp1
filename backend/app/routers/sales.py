@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
 from typing import Optional
@@ -9,6 +10,7 @@ from app.database import get_db
 from app.models import DailySales, Branch
 from app.schemas import SaleCreate, SaleOut, SaleUpdate, MonthlySalesSummary
 from app.services.calculations import month_to_number
+from app.services.pdf_generator import generate_sales_pdf
 
 router = APIRouter(prefix="/sales", tags=["Ventas"])
 
@@ -109,6 +111,33 @@ def close_month(year: int, month: str, db: Session = Depends(get_db)):
     ).update({"closed": True})
     db.commit()
     return {"closed_records": updated, "month": month.upper(), "year": year}
+
+
+@router.get("/pdf/{year}/{month}")
+def sales_pdf(
+    year: int, month: str,
+    branch: str = Query("all", regex="^(all|luro|independencia)$"),
+    db: Session = Depends(get_db)
+):
+    month = month.upper()
+    q = db.query(DailySales).filter(
+        DailySales.year == year,
+        DailySales.month_label == month
+    )
+    if branch == "luro":
+        q = q.filter(DailySales.branch_id == 1)
+    elif branch == "independencia":
+        q = q.filter(DailySales.branch_id == 2)
+
+    sales = q.order_by(DailySales.sale_date, DailySales.branch_id).all()
+    pdf   = generate_sales_pdf(sales, year, month, branch)
+
+    filename = f"ventas-{month}-{year}-{branch}.pdf"
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 
 def _enrich(s: DailySales) -> dict:
