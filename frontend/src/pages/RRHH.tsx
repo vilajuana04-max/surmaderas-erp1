@@ -24,7 +24,10 @@ type VacRecord = {
 }
 type Employee = {
   id: number; name: string; branch_id: number; branch_name: string
-  hire_date: string; years_of_service: number; vacation_days_entitled: number
+  hire_date: string
+  months_of_service: number        // ROUNDDOWN(YEARFRAC*12, 0) — col C Excel
+  years_of_service: number         // months/12              — col D Excel
+  vacation_days_entitled: number   // IF(años<5,14,…)        — col E Excel
 }
 type VacLog = {
   id: number; registered_date: string | null; year: number; employee_id: number
@@ -36,12 +39,6 @@ type Receipt = {
   year: number; month: string; filename: string; uploaded_at: string | null
 }
 
-/* ── Helpers ────────────────────────────────────────────────── */
-function monthsFromDate(hireDate: string): number {
-  const hire = new Date(hireDate)
-  const now  = new Date()
-  return (now.getFullYear() - hire.getFullYear()) * 12 + (now.getMonth() - hire.getMonth())
-}
 
 /* ─────────────────────────────────────────────────────────────
    PÁGINA PRINCIPAL
@@ -95,7 +92,7 @@ function VacacionesTab() {
   const [records,   setRecords]   = useState<VacRecord[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
   const [logs,      setLogs]      = useState<VacLog[]>([])
-  const [editing,   setEditing]   = useState<Record<number, { taken: string; desc: string }>>({})
+  const [editing,   setEditing]   = useState<Record<number, { taken: string; entitled: string; desc: string }>>({})
   const [saving,    setSaving]    = useState<number | null>(null)
   const [showLogForm, setShowLogForm] = useState(false)
 
@@ -122,7 +119,13 @@ function VacacionesTab() {
     if (!edit) return
     setSaving(id)
     try {
-      await api.put(`/vacations/${id}?days_taken=${edit.taken}&description=${encodeURIComponent(edit.desc || '')}`, {})
+      // PUT body matches VacationRecordUpdate schema del backend
+      // (espejo de la hoja Excel: celdas editables C=entitled, D=taken, H=description)
+      await api.put(`/vacations/${id}`, {
+        days_taken:    parseInt(edit.taken)    || 0,
+        days_entitled: parseInt(edit.entitled) || 0,
+        description:   edit.desc || null,
+      })
       load()
       setEditing(prev => { const n = { ...prev }; delete n[id]; return n })
     } finally { setSaving(null) }
@@ -163,12 +166,13 @@ function VacacionesTab() {
     pending:     records.reduce((a, r) => a + (r.pending_current  ?? 0), 0),
   }
 
-  const setEdit = (r: VacRecord, field: 'taken' | 'desc', val: string) =>
+  const setEdit = (r: VacRecord, field: 'taken' | 'entitled' | 'desc', val: string) =>
     setEditing(prev => ({
       ...prev,
       [r.id]: {
-        taken: field === 'taken' ? val : (prev[r.id]?.taken ?? String(r.days_taken)),
-        desc:  field === 'desc'  ? val : (prev[r.id]?.desc  ?? r.description ?? ''),
+        taken:    field === 'taken'    ? val : (prev[r.id]?.taken    ?? String(r.days_taken)),
+        entitled: field === 'entitled' ? val : (prev[r.id]?.entitled ?? String(r.days_entitled ?? 0)),
+        desc:     field === 'desc'     ? val : (prev[r.id]?.desc     ?? r.description ?? ''),
       }
     }))
 
@@ -207,15 +211,17 @@ function VacacionesTab() {
         <>
           {/* ── SECCIÓN 1: Situación Actual ── */}
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div style={{ background: NAVY }} className="px-5 py-3">
-              <p className="text-white text-xs font-bold uppercase tracking-widest font-body">
-                Situación Actual — {year}
+            <div style={{ background: CORAL }} className="px-5 py-3">
+              <p className="text-white text-sm font-bold tracking-wide font-head">
+                📅 SITUACIÓN ACTUAL — {year}
               </p>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[860px] text-sm">
-                <thead style={{ background: '#f8f7f5' }}>
+              <table className="w-full min-w-[900px] text-sm">
+                <thead style={{ background: '#f5ede9' }}>
                   <tr>
+                    <th className="px-3 py-2.5 text-center text-[10px] font-bold uppercase tracking-widest border-b border-brand-border w-8"
+                      style={{ color: CORAL }}>N°</th>
                     {['Empleado','Vac. Corresponde','Vac. Tomadas','Pend. Año Ant.','Total Disponible',`Pendientes ${year}`,'Sucursal','Descripción',''].map(h => (
                       <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest border-b border-brand-border"
                         style={{ color: NAVY }}>{h}</th>
@@ -229,8 +235,10 @@ function VacacionesTab() {
                     const isBranchIndep = r.branch_name === 'INDEPENDENCIA'
                     return (
                       <tr key={r.id}
-                        className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}
+                        className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}
                         style={{ borderLeft: `3px solid ${isBranchIndep ? CORAL : NAVY}` }}>
+                        <td className="px-3 py-2 text-[10px] font-bold text-center font-body"
+                          style={{ color: CORAL }}>{i + 1}</td>
                         <td className="px-4 py-2 text-xs font-semibold text-gray-800 font-body">
                           <div className="flex items-center gap-1.5">
                             {r.pending_current === 0
@@ -239,31 +247,41 @@ function VacacionesTab() {
                             {r.employee_name}
                           </div>
                         </td>
-                        <td className="px-4 py-2 text-xs text-center font-body">{r.days_entitled} días</td>
+                        {/* Vac. Corresponde — editable (col C Excel) */}
                         <td className="px-2 py-1.5 text-center">
                           <input type="number" min={0}
-                            className="border border-gray-200 rounded-lg px-2 py-1 text-xs text-center w-14 focus:outline-none focus:border-gray-400"
+                            className="border border-gray-200 rounded-lg px-2 py-1 text-xs text-center w-14 focus:outline-none focus:border-coral font-body"
+                            value={edit?.entitled ?? r.days_entitled}
+                            onChange={e => setEdit(r, 'entitled', e.target.value)} />
+                        </td>
+                        {/* Vac. Tomadas — editable (col D Excel) */}
+                        <td className="px-2 py-1.5 text-center">
+                          <input type="number" min={0}
+                            className="border border-gray-200 rounded-lg px-2 py-1 text-xs text-center w-14 focus:outline-none focus:border-coral font-body"
                             value={edit?.taken ?? r.days_taken}
                             onChange={e => setEdit(r, 'taken', e.target.value)} />
                         </td>
-                        <td className="px-4 py-2 text-xs text-center text-brand-muted font-body">{r.pending_prev_year} días</td>
-                        <td className="px-4 py-2 text-xs text-center font-bold font-body">
-                          <span className="bg-amber-50 text-amber-800 px-2 py-0.5 rounded-full">
-                            {r.total_available} días
+                        {/* Pendientes año ant. — calculado automático (col E Excel: VLOOKUP año anterior) */}
+                        <td className="px-4 py-2 text-xs text-center text-brand-muted font-body">{r.pending_prev_year}</td>
+                        {/* Total Disponible — fórmula: C+E (col F Excel) */}
+                        <td className="px-4 py-2 text-xs text-center font-bold font-body"
+                          style={{ background: '#fef9c3' }}>
+                          <span className="text-amber-800 font-bold">{r.total_available}</span>
+                        </td>
+                        {/* Pendientes año actual — fórmula: F-D (col G Excel) */}
+                        <td className="px-4 py-2 text-xs text-center font-body"
+                          style={{ background: r.pending_current > 0 ? '#fef3c7' : '#dcfce7' }}>
+                          <span className={`font-bold ${r.pending_current > 0 ? 'text-amber-800' : 'text-green-800'}`}>
+                            {r.pending_current}
                           </span>
                         </td>
-                        <td className="px-4 py-2 text-xs text-center font-body">
-                          <span className={`px-2 py-0.5 rounded-full font-semibold ${r.pending_current > 0 ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'}`}>
-                            {r.pending_current} días
-                          </span>
-                        </td>
-                        <td className="px-4 py-2 text-xs font-body"
+                        <td className="px-4 py-2 text-xs font-semibold font-body"
                           style={{ color: isBranchIndep ? CORAL : NAVY }}>
                           {isBranchIndep ? 'Indep.' : 'Luro'}
                         </td>
                         <td className="px-2 py-1.5">
                           <input type="text" placeholder="Fechas tomadas…"
-                            className="border border-gray-200 rounded-lg px-2 py-1 text-xs w-full min-w-32 focus:outline-none focus:border-gray-400 font-body"
+                            className="border border-gray-200 rounded-lg px-2 py-1 text-xs w-full min-w-36 focus:outline-none focus:border-coral font-body"
                             value={edit?.desc ?? r.description ?? ''}
                             onChange={e => setEdit(r, 'desc', e.target.value)} />
                         </td>
@@ -282,12 +300,13 @@ function VacacionesTab() {
                 </tbody>
                 <tfoot>
                   <tr style={{ background: NAVY }}>
+                    <td className="px-3 py-2.5 text-white/40 text-[10px] text-center font-body">—</td>
                     <td className="px-4 py-2.5 text-white text-xs font-bold uppercase tracking-widest">TOTALES {year}</td>
-                    <td className="px-4 py-2.5 text-center text-xs font-bold" style={{ color: CORAL }}>{totals.entitled} días</td>
-                    <td className="px-4 py-2.5 text-center text-xs font-bold text-white">{totals.taken} días</td>
-                    <td className="px-4 py-2.5 text-center text-xs font-bold text-white">{totals.prev} días</td>
-                    <td className="px-4 py-2.5 text-center text-xs font-bold" style={{ color: CORAL }}>{totals.available} días</td>
-                    <td className="px-4 py-2.5 text-center text-xs font-bold" style={{ color: CORAL }}>{totals.pending} días</td>
+                    <td className="px-4 py-2.5 text-center text-xs font-bold" style={{ color: CORAL }}>{totals.entitled}</td>
+                    <td className="px-4 py-2.5 text-center text-xs font-bold text-white">{totals.taken}</td>
+                    <td className="px-4 py-2.5 text-center text-xs font-bold text-white">{totals.prev}</td>
+                    <td className="px-4 py-2.5 text-center text-xs font-bold" style={{ color: '#fde68a' }}>{totals.available}</td>
+                    <td className="px-4 py-2.5 text-center text-xs font-bold" style={{ color: totals.pending > 0 ? '#fde68a' : '#86efac' }}>{totals.pending}</td>
                     <td colSpan={3} />
                   </tr>
                 </tfoot>
@@ -298,14 +317,16 @@ function VacacionesTab() {
           {/* ── SECCIÓN 2: Datos Empleados ── */}
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <div style={{ background: CORAL }} className="px-5 py-3">
-              <p className="text-white text-xs font-bold uppercase tracking-widest font-body">
-                Datos Empleados — Antigüedad y Vacaciones por Convenio
+              <p className="text-white text-sm font-bold tracking-wide font-head">
+                👥 DATOS EMPLEADOS — ANTIGÜEDAD Y VACACIONES POR CONVENIO
               </p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[600px] text-sm">
-                <thead style={{ background: '#f8f7f5' }}>
+                <thead style={{ background: '#f5ede9' }}>
                   <tr>
+                    <th className="px-3 py-2.5 text-center text-[10px] font-bold uppercase tracking-widest border-b border-brand-border w-8"
+                      style={{ color: CORAL }}>N°</th>
                     {['Empleado','Fecha Ingreso','Meses','Años','Vac/Año (días)','Sucursal'].map(h => (
                       <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest border-b border-brand-border"
                         style={{ color: CORAL }}>{h}</th>
@@ -314,25 +335,33 @@ function VacacionesTab() {
                 </thead>
                 <tbody>
                   {employees.map((emp, i) => {
-                    const meses = monthsFromDate(emp.hire_date)
-                    const anos  = (meses / 12).toFixed(1)
+                    // Equivalentes a fórmulas de hoja EMPLEADOS del Excel:
+                    // Col C = ROUNDDOWN(YEARFRAC(B,TODAY())*12,0) → months_of_service (API)
+                    // Col D = C/12                                 → years_of_service  (API)
+                    // Col E = IF(D<5,14,IF(D<10,21,28))           → vacation_days_entitled (API)
+                    const meses   = emp.months_of_service ?? 0
+                    const anos    = (meses / 12).toFixed(2)
                     const isIndep = emp.branch_name === 'INDEPENDENCIA'
                     return (
                       <tr key={emp.id}
-                        className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}
+                        className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}
                         style={{ borderLeft: `3px solid ${isIndep ? CORAL : NAVY}` }}>
+                        <td className="px-3 py-2.5 text-[10px] font-bold text-center font-body"
+                          style={{ color: CORAL }}>{i + 1}</td>
                         <td className="px-4 py-2.5 text-xs font-semibold text-gray-800 font-body">{emp.name}</td>
                         <td className="px-4 py-2.5 text-xs text-brand-muted font-body">
                           {new Date(emp.hire_date).toLocaleDateString('es-AR')}
                         </td>
+                        {/* Col C — Meses (ROUNDDOWN YEARFRAC*12) */}
                         <td className="px-4 py-2.5 text-xs text-center font-body">{meses}</td>
+                        {/* Col D — Años (C/12) */}
                         <td className="px-4 py-2.5 text-xs text-center font-body">{anos}</td>
-                        <td className="px-4 py-2.5 text-xs text-center font-body">
-                          <span className="bg-amber-50 text-amber-800 px-2 py-0.5 rounded-full font-semibold">
-                            {emp.vacation_days_entitled} días
-                          </span>
+                        {/* Col E — Vac/Año IF(años<5,14,IF(años<10,21,28)) */}
+                        <td className="px-4 py-2.5 text-xs text-center font-body"
+                          style={{ background: '#fef9c3' }}>
+                          <span className="text-amber-800 font-bold">{emp.vacation_days_entitled} días</span>
                         </td>
-                        <td className="px-4 py-2.5 text-xs font-body" style={{ color: isIndep ? CORAL : NAVY }}>
+                        <td className="px-4 py-2.5 text-xs font-semibold font-body" style={{ color: isIndep ? CORAL : NAVY }}>
                           {isIndep ? 'Indep.' : 'Luro'}
                         </td>
                       </tr>
@@ -341,18 +370,18 @@ function VacacionesTab() {
                 </tbody>
               </table>
             </div>
-            <div className="px-5 py-2.5 bg-gray-50/60 border-t border-brand-border">
-              <p className="text-[10px] text-brand-muted font-body">
-                ⚖️ Convenio: &lt; 5 años = 14 días · 5–10 años = 21 días · ≥ 10 años = 28 días
+            <div className="px-5 py-3 border-t border-brand-border" style={{ background: '#fef9c3' }}>
+              <p className="text-[11px] text-amber-800 font-body font-semibold">
+                ⚖️ Fórmula convenio: &lt; 5 años = 14 días &nbsp;·&nbsp; 5 a 10 años = 21 días &nbsp;·&nbsp; ≥ 10 años = 28 días
               </p>
             </div>
           </div>
 
           {/* ── SECCIÓN 3: Solicitudes ── */}
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div style={{ background: NAVY }} className="px-5 py-3 flex items-center justify-between">
-              <p className="text-white text-xs font-bold uppercase tracking-widest font-body">
-                Solicitudes y Vacaciones Aprobadas — {year}
+            <div style={{ background: NAVY }} className="px-5 py-3.5 flex items-center justify-between">
+              <p className="text-white text-sm font-bold tracking-wide font-head">
+                📋 DETALLE DE SOLICITUDES Y VACACIONES APROBADAS — {year}
               </p>
               <button onClick={() => setShowLogForm(!showLogForm)}
                 style={{ background: CORAL }}
@@ -363,7 +392,8 @@ function VacacionesTab() {
 
             {showLogForm && (
               <form onSubmit={addLog}
-                className="px-5 py-4 bg-gray-50/60 border-b border-brand-border grid grid-cols-2 md:grid-cols-6 gap-3">
+                className="px-5 py-4 border-b border-brand-border grid grid-cols-2 md:grid-cols-6 gap-3"
+                style={{ background: '#f5ede9' }}>
                 <div className="col-span-2 md:col-span-1">
                   <label className="text-[10px] font-bold uppercase text-brand-muted block mb-1 font-body">Empleado *</label>
                   <select required
@@ -417,10 +447,12 @@ function VacacionesTab() {
             )}
 
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[700px] text-sm">
+              <table className="w-full min-w-[760px] text-sm">
                 <thead style={{ background: '#f8f7f5' }}>
                   <tr>
-                    {['Fecha Solicitud','Empleado','Desde','Hasta','Días','Estado','Aprobado Por','Notas',''].map(h => (
+                    <th className="px-3 py-2.5 text-center text-[10px] font-bold uppercase tracking-widest border-b border-brand-border w-8"
+                      style={{ color: NAVY }}>N°</th>
+                    {['Fecha Registro','Empleado','Desde','Hasta','Días','Estado','Aprobado Por','Notas',''].map(h => (
                       <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest border-b border-brand-border"
                         style={{ color: NAVY }}>{h}</th>
                     ))}
@@ -428,7 +460,8 @@ function VacacionesTab() {
                 </thead>
                 <tbody>
                   {logs.map((l, i) => (
-                    <tr key={l.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}>
+                    <tr key={l.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}>
+                      <td className="px-3 py-2 text-[10px] font-bold text-center text-brand-muted font-body">{i + 1}</td>
                       <td className="px-4 py-2 text-xs text-brand-muted font-body">
                         {l.registered_date
                           ? new Date(l.registered_date).toLocaleDateString('es-AR')
@@ -437,10 +470,11 @@ function VacacionesTab() {
                       <td className="px-4 py-2 text-xs font-semibold font-body text-gray-800">{l.employee_name ?? '—'}</td>
                       <td className="px-4 py-2 text-xs font-body text-gray-600">{l.date_from?.slice(0, 10) ?? '—'}</td>
                       <td className="px-4 py-2 text-xs font-body text-gray-600">{l.date_to?.slice(0, 10) ?? '—'}</td>
-                      <td className="px-4 py-2 text-xs text-center font-body font-semibold">{l.days}</td>
-                      <td className="px-4 py-2 text-xs">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-body ${
-                          l.status === 'Aprobado' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
+                      <td className="px-4 py-2 text-xs text-center font-body font-bold">{l.days}</td>
+                      <td className="px-4 py-2 text-xs"
+                        style={{ background: l.status === 'Aprobado' ? '#dcfce7' : '#fef3c7' }}>
+                        <span className={`text-[10px] font-bold font-body ${
+                          l.status === 'Aprobado' ? 'text-green-800' : 'text-amber-800'
                         }`}>{l.status}</span>
                       </td>
                       <td className="px-4 py-2 text-xs text-brand-muted font-body">{l.approved_by ?? '—'}</td>
@@ -455,11 +489,13 @@ function VacacionesTab() {
                       </td>
                     </tr>
                   ))}
-                  {logs.length === 0 && (
-                    <tr><td colSpan={9} className="px-4 py-10 text-center text-brand-muted text-sm font-body">
-                      Sin solicitudes para {year}
-                    </td></tr>
-                  )}
+                  {/* Empty rows to always show at least 8 rows */}
+                  {Array.from({ length: Math.max(0, 8 - logs.length) }).map((_, i) => (
+                    <tr key={`empty-${i}`} className={(logs.length + i) % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}>
+                      <td className="px-3 py-2.5 text-[10px] text-center text-gray-200 font-body">{logs.length + i + 1}</td>
+                      <td colSpan={9} className="px-4 py-2.5 border-b border-gray-50" />
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

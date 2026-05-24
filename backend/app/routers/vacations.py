@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 from typing import Optional
 from datetime import date
 
@@ -8,6 +9,12 @@ from app.models import VacationRecord, VacationLog, Employee
 from app.schemas import VacationRecordOut, VacationLogCreate, VacationLogOut
 from app.services.calculations import vacation_days_by_seniority
 from app.services.pdf_generator import generate_vacations_pdf
+
+
+class VacationRecordUpdate(BaseModel):
+    days_taken:    int
+    days_entitled: Optional[int] = None   # permite override manual, igual que Excel
+    description:   Optional[str] = None
 
 router = APIRouter(prefix="/vacations", tags=["Vacaciones"])
 
@@ -55,15 +62,22 @@ def init_year(year: int, db: Session = Depends(get_db)):
 @router.put("/{record_id}")
 def update_vacation_record(
     record_id: int,
-    days_taken: int,
-    description: Optional[str] = None,
+    data: VacationRecordUpdate,
     db: Session = Depends(get_db)
 ):
+    """
+    Actualiza un registro de vacaciones.
+    Acepta days_taken (VAC. TOMADAS), days_entitled (VAC. CORRESPONDE, override manual)
+    y description (DESCRIPCIÓN), igual que las celdas editables de la hoja Excel 2026.
+    total_available y pending_current se recalculan automáticamente como propiedades.
+    """
     record = db.query(VacationRecord).filter(VacationRecord.id == record_id).first()
     if not record:
         raise HTTPException(404, "Registro no encontrado")
-    record.days_taken  = days_taken
-    record.description = description
+    record.days_taken  = data.days_taken
+    record.description = data.description
+    if data.days_entitled is not None:
+        record.days_entitled = data.days_entitled
     db.commit()
     db.refresh(record)
     return _enrich_record(record)

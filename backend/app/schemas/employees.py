@@ -10,7 +10,8 @@ class EmployeeOut(BaseModel):
     branch_name:    Optional[str] = None
     hire_date:      date
     is_active:      bool
-    years_of_service: Optional[float] = None
-    vacation_days_entitled: Optional[int] = None
+    months_of_service:      Optional[int]   = None   # ROUNDDOWN(YEARFRAC*12, 0) — col C Excel
+    years_of_service:       Optional[float] = None   # months/12 — col D Excel
+    vacation_days_entitled: Optional[int]   = None   # IF(años<5,14,IF(años<10,21,28))
 
     model_config = {"from_attributes": True}
