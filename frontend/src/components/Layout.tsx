@@ -1,80 +1,132 @@
-import { NavLink, useLocation } from 'react-router-dom'
+import React, { useState } from 'react'
+import { NavLink } from 'react-router-dom'
 import {
-  LayoutDashboard, ShoppingCart, Package, Users, Umbrella, Receipt, ChevronLeft,
+  LayoutDashboard, ShoppingCart, Package,
+  Users, Umbrella, Receipt, Menu, X,
 } from 'lucide-react'
-import clsx from 'clsx'
+
+const NAVY  = '#070614'
+const CORAL = '#C8603A'
 
 const NAV = [
-  { to: '/',           icon: LayoutDashboard, label: 'Dashboard'  },
-  { to: '/ventas',     icon: ShoppingCart,    label: 'Ventas'     },
-  { to: '/compras',    icon: Package,         label: 'Compras'    },
-  { to: '/sueldos',    icon: Users,           label: 'Sueldos'    },
-  { to: '/vacaciones', icon: Umbrella,        label: 'Vacaciones' },
-  { to: '/gastos',     icon: Receipt,         label: 'Gastos'     },
+  { to: '/',           icon: LayoutDashboard, label: 'Dashboard',  num: '01' },
+  { to: '/ventas',     icon: ShoppingCart,    label: 'Ventas',     num: '02' },
+  { to: '/compras',    icon: Package,         label: 'Compras',    num: '03' },
+  { to: '/sueldos',    icon: Users,           label: 'Sueldos',    num: '04' },
+  { to: '/vacaciones', icon: Umbrella,        label: 'Vacaciones', num: '05' },
+  { to: '/gastos',     icon: Receipt,         label: 'Gastos',     num: '06' },
 ]
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+/* ── Sidebar content (shared desktop/mobile) ─────────────────── */
+function SidebarContent({ onClose }: { onClose?: () => void }) {
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Top bar — mobile */}
-      <header className="sticky top-0 z-30 bg-wood-800 text-white shadow-lg md:hidden">
-        <div className="flex items-center gap-3 px-4 py-3">
-          <span className="text-2xl">🌲</span>
-          <div>
-            <p className="font-bold text-sm leading-none">SUR MADERAS</p>
-            <p className="text-wood-400 text-[10px]">Sistema ERP</p>
-          </div>
-        </div>
-        {/* Mobile nav — horizontal scroll */}
-        <nav className="flex overflow-x-auto gap-1 px-2 pb-2 scrollbar-none">
-          {NAV.map(({ to, icon: Icon, label }) => (
-            <NavLink
-              key={to} to={to} end={to === '/'}
-              className={({ isActive }) => clsx(
-                'flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl text-[10px] whitespace-nowrap transition-colors',
-                isActive ? 'bg-wood-500 text-white' : 'text-wood-300 hover:bg-wood-700'
-              )}
-            >
-              <Icon size={18} />
-              {label}
-            </NavLink>
-          ))}
-        </nav>
-      </header>
-
-      <div className="flex flex-1">
-        {/* Sidebar — desktop */}
-        <aside className="hidden md:flex flex-col w-56 bg-wood-800 text-white min-h-screen sticky top-0 h-screen">
-          <div className="px-5 py-6 border-b border-wood-700">
-            <p className="font-bold text-lg tracking-wide">SUR MADERAS</p>
-            <p className="text-wood-400 text-xs mt-0.5">Sistema ERP v1.0</p>
-          </div>
-          <nav className="flex flex-col gap-1 p-3 flex-1">
-            {NAV.map(({ to, icon: Icon, label }) => (
-              <NavLink
-                key={to} to={to} end={to === '/'}
-                className={({ isActive }) => clsx(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors',
-                  isActive ? 'bg-wood-500 text-white font-semibold' : 'text-wood-300 hover:bg-wood-700 hover:text-white'
-                )}
-              >
-                <Icon size={18} />
-                {label}
-              </NavLink>
-            ))}
-          </nav>
-          <div className="px-5 py-4 border-t border-wood-700 text-wood-500 text-[10px]">
-            Mar del Plata · 2026
-          </div>
-        </aside>
-
-        {/* Main */}
-        <main className="flex-1 overflow-x-hidden">
-          <div className="max-w-5xl mx-auto px-4 py-6">
-            {children}
-          </div>
-        </main>
+    <div className="flex flex-col h-full">
+      {/* Brand */}
+      <div className="px-7 py-8 border-b" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
+        <p style={{ color: CORAL }}
+          className="text-[11px] font-bold tracking-[3px] uppercase font-body mb-1">
+          Sur Maderas
+        </p>
+        <p className="text-white text-lg font-bold leading-tight font-head">
+          Sistema ERP
+        </p>
+        <p className="text-white/30 text-[11px] tracking-[1.5px] uppercase mt-1.5 font-body">
+          Mar del Plata · 2026
+        </p>
       </div>
+
+      {/* Nav */}
+      <nav className="flex-1 py-6">
+        {NAV.map(({ to, icon: Icon, label, num }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={to === '/'}
+            onClick={onClose}
+            className={({ isActive }) =>
+              [
+                'flex items-center gap-3 px-7 py-3 text-sm font-semibold font-body',
+                'border-l-[3px] transition-all duration-200 tracking-wide',
+                isActive
+                  ? 'text-white border-l-coral bg-white/5'
+                  : 'text-white/40 border-l-transparent hover:text-white/80 hover:bg-white/5',
+              ].join(' ')
+            }
+            style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}
+          >
+            <span className="font-body text-[10px] font-bold tracking-[1.5px]"
+              style={{ color: CORAL }}>
+              {num}
+            </span>
+            <Icon size={16} strokeWidth={2} />
+            <span className="tracking-[1px] uppercase text-[12px]">{label}</span>
+          </NavLink>
+        ))}
+      </nav>
+
+      {/* Footer */}
+      <div className="px-7 py-5 border-t" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
+        <p className="text-white/20 text-[10px] font-body tracking-wide uppercase">
+          v1.0 · Sistema interno
+        </p>
+      </div>
+    </div>
+  )
+}
+
+/* ── Layout principal ────────────────────────────────────────── */
+export default function Layout({ children }: { children: React.ReactNode }) {
+  const [mobileOpen, setMobileOpen] = useState(false)
+
+  return (
+    <div className="min-h-screen flex" style={{ background: '#f8f7f5' }}>
+
+      {/* ── SIDEBAR DESKTOP ── */}
+      <aside
+        className="hidden md:flex flex-col w-60 flex-shrink-0 sticky top-0 h-screen overflow-y-auto"
+        style={{ background: NAVY }}>
+        <SidebarContent />
+      </aside>
+
+      {/* ── MOBILE HAMBURGER ── */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="md:hidden fixed top-4 left-4 z-50 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg"
+        style={{ background: CORAL }}>
+        <Menu size={20} color="white" />
+      </button>
+
+      {/* ── MOBILE DRAWER ── */}
+      {mobileOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+            onClick={() => setMobileOpen(false)} />
+          {/* Drawer */}
+          <aside
+            className="md:hidden fixed top-0 left-0 h-full w-64 z-50 overflow-y-auto flex flex-col"
+            style={{ background: NAVY }}>
+            <button
+              onClick={() => setMobileOpen(false)}
+              className="absolute top-4 right-4 text-white/40 hover:text-white">
+              <X size={20} />
+            </button>
+            <SidebarContent onClose={() => setMobileOpen(false)} />
+          </aside>
+        </>
+      )}
+
+      {/* ── MAIN CONTENT ── */}
+      <main className="flex-1 min-w-0 overflow-x-hidden">
+        {/* Top bar mobile — spacer so content doesn't hide under hamburger */}
+        <div className="md:hidden h-16" />
+
+        <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 md:py-8">
+          {children}
+        </div>
+      </main>
+
     </div>
   )
 }

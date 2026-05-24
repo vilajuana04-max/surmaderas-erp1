@@ -3,45 +3,85 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    font-family: 'Montserrat', sans-serif;
+    scroll-behavior: smooth;
+  }
   body {
-    @apply bg-wood-50 text-wood-900 antialiased;
+    background: #f8f7f5;
+    color: #2c2c2c;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Poppins', sans-serif;
   }
   * {
-    -webkit-tap-highlight-color: transparent;
+    box-sizing: border-box;
   }
 }
 
 @layer components {
+  /* ── Cards ── */
   .card {
-    @apply bg-white rounded-2xl shadow-sm border border-wood-100 p-4;
+    @apply bg-white rounded-2xl shadow-card border border-brand-border p-5;
   }
+
+  /* ── Buttons ── */
   .btn-primary {
-    @apply bg-wood-800 text-white rounded-xl px-4 py-2.5 text-sm font-medium
-           hover:bg-wood-700 active:scale-95 transition-all duration-150
+    @apply bg-navy text-white rounded-xl px-4 py-2.5 text-sm font-semibold font-body
+           hover:opacity-80 active:scale-95 transition-all duration-150
            flex items-center gap-2;
+  }
+  .btn-coral {
+    @apply text-white rounded-xl px-4 py-2.5 text-sm font-semibold font-body
+           hover:opacity-90 active:scale-95 transition-all duration-150
+           flex items-center gap-2;
+    background-color: #C8603A;
   }
   .btn-ghost {
-    @apply text-wood-700 rounded-xl px-4 py-2.5 text-sm font-medium
-           hover:bg-wood-100 active:scale-95 transition-all duration-150
-           flex items-center gap-2;
+    @apply text-brand-muted rounded-xl px-4 py-2.5 text-sm font-medium font-body
+           hover:bg-brand-off-white active:scale-95 transition-all duration-150
+           flex items-center gap-2 border border-brand-border;
   }
+
+  /* ── Inputs ── */
   .input {
-    @apply w-full border border-wood-200 rounded-xl px-3 py-2.5 text-sm
-           focus:outline-none focus:ring-2 focus:ring-wood-500/40 focus:border-wood-500
-           bg-white placeholder-wood-400;
+    @apply w-full border border-brand-border rounded-xl px-3 py-2.5 text-sm font-body
+           focus:outline-none focus:border-brand-charcoal
+           bg-white placeholder-brand-muted text-brand-body;
   }
-  .badge {
-    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+
+  /* ── Table ── */
+  .table-th {
+    @apply px-4 py-3 text-left text-[11px] font-bold text-white uppercase tracking-widest;
   }
-  .badge-green  { @apply badge bg-green-100 text-green-800; }
-  .badge-red    { @apply badge bg-red-100 text-red-700; }
-  .badge-amber  { @apply badge bg-amber-100 text-amber-800; }
-  .badge-wood   { @apply badge bg-wood-100 text-wood-800; }
-  .table-th     { @apply px-3 py-2.5 text-left text-xs font-semibold text-wood-600 uppercase tracking-wide; }
-  .table-td     { @apply px-3 py-3 text-sm text-wood-800; }
-  .table-tr     { @apply border-b border-wood-50 hover:bg-wood-50/60 transition-colors; }
-  .kpi-card     { @apply card flex flex-col gap-1; }
-  .kpi-label    { @apply text-xs text-wood-500 font-medium uppercase tracking-wide; }
-  .kpi-value    { @apply text-2xl font-bold text-wood-900; }
-  .kpi-sub      { @apply text-xs text-wood-500; }
+  .table-td  { @apply px-4 py-2.5 text-sm text-brand-body font-body; }
+  .table-tr  { @apply border-b border-brand-border/40 hover:bg-brand-off-white/60 transition-colors; }
+
+  /* ── KPI cards ── */
+  .kpi-card  { @apply card flex flex-col gap-1; }
+  .kpi-label { @apply text-[11px] font-bold uppercase tracking-widest text-brand-muted font-body; }
+  .kpi-value { @apply text-2xl font-bold font-head text-brand-body; }
+  .kpi-sub   { @apply text-xs text-brand-muted font-body; }
+
+  /* ── Badges ── */
+  .badge       { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold font-body; }
+  .badge-green { @apply badge bg-green-100 text-green-800; }
+  .badge-red   { @apply badge bg-red-100 text-red-700; }
+  .badge-amber { @apply badge bg-amber-100 text-amber-800; }
+  .badge-navy  { @apply badge text-white; background-color: #070614; }
+
+  /* ── Section label (eyebrow) ── */
+  .eyebrow {
+    @apply text-[11px] font-bold uppercase tracking-[3px] font-body;
+    color: #C8603A;
+  }
 }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar        { width: 5px; height: 5px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: #e8e5e0; border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: #C8603A; }

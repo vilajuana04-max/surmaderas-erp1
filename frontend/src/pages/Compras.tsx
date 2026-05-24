@@ -185,7 +185,7 @@ export default function Compras() {
     if (isNaN(amt)) return
     setArcaSaving(true)
     try {
-      await api.post(`/purchases/arca/${year}/${month}`, amt)
+      await api.post(`/purchases/arca/${year}/${month}?amount=${amt}`, {})
       setArcaAmount(amt)
     } finally { setArcaSaving(false) }
   }
