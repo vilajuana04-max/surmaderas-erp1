@@ -157,14 +157,22 @@ function VacacionesTab() {
     catch (err: any) { alert('Error PDF: ' + err.message) }
   }
 
-  // Totales
-  const totals = {
-    entitled:    records.reduce((a, r) => a + (r.days_entitled    ?? 0), 0),
-    taken:       records.reduce((a, r) => a + (r.days_taken       ?? 0), 0),
-    prev:        records.reduce((a, r) => a + (r.pending_prev_year ?? 0), 0),
-    available:   records.reduce((a, r) => a + (r.total_available  ?? 0), 0),
-    pending:     records.reduce((a, r) => a + (r.pending_current  ?? 0), 0),
-  }
+  // Totales — usan valores en vivo (edit state si hay cambios pendientes)
+  const totals = records.reduce((acc, r) => {
+    const edit      = editing[r.id]
+    const entitled  = edit ? (parseInt(edit.entitled) || 0) : (r.days_entitled    ?? 0)
+    const taken     = edit ? (parseInt(edit.taken)    || 0) : (r.days_taken       ?? 0)
+    const prev      = r.pending_prev_year ?? 0
+    const available = entitled + prev
+    const pending   = available - taken
+    return {
+      entitled:  acc.entitled  + entitled,
+      taken:     acc.taken     + taken,
+      prev:      acc.prev      + prev,
+      available: acc.available + available,
+      pending:   acc.pending   + pending,
+    }
+  }, { entitled: 0, taken: 0, prev: 0, available: 0, pending: 0 })
 
   const setEdit = (r: VacRecord, field: 'taken' | 'entitled' | 'desc', val: string) =>
     setEditing(prev => ({
@@ -232,6 +240,19 @@ function VacacionesTab() {
                   {records.map((r, i) => {
                     const edit    = editing[r.id]
                     const isDirty = !!edit
+
+                    // ── Cálculo en vivo — igual que fórmulas Excel ──────────
+                    // Col C: Vac. Corresponde (editable)
+                    const liveEntitled  = edit ? (parseInt(edit.entitled) || 0) : (r.days_entitled  ?? 0)
+                    // Col D: Vac. Tomadas (editable)
+                    const liveTaken     = edit ? (parseInt(edit.taken)    || 0) : (r.days_taken     ?? 0)
+                    // Col E: Pendientes año ant. (automático — VLOOKUP año anterior)
+                    const livePrev      = r.pending_prev_year ?? 0
+                    // Col F: Total Disponible = C + E  (fórmula Excel: =C+E)
+                    const liveAvailable = liveEntitled + livePrev
+                    // Col G: Pendientes año actual = F - D  (fórmula Excel: =F-D)
+                    const livePending   = liveAvailable - liveTaken
+
                     const isBranchIndep = r.branch_name === 'INDEPENDENCIA'
                     return (
                       <tr key={r.id}
@@ -241,38 +262,38 @@ function VacacionesTab() {
                           style={{ color: CORAL }}>{i + 1}</td>
                         <td className="px-4 py-2 text-xs font-semibold text-gray-800 font-body">
                           <div className="flex items-center gap-1.5">
-                            {r.pending_current === 0
+                            {livePending === 0
                               ? <CheckCircle size={12} className="text-green-500 shrink-0" />
                               : <Clock size={12} className="text-amber-500 shrink-0" />}
                             {r.employee_name}
                           </div>
                         </td>
-                        {/* Vac. Corresponde — editable (col C Excel) */}
+                        {/* Col C — Vac. Corresponde editable */}
                         <td className="px-2 py-1.5 text-center">
                           <input type="number" min={0}
                             className="border border-gray-200 rounded-lg px-2 py-1 text-xs text-center w-14 focus:outline-none focus:border-coral font-body"
                             value={edit?.entitled ?? r.days_entitled}
                             onChange={e => setEdit(r, 'entitled', e.target.value)} />
                         </td>
-                        {/* Vac. Tomadas — editable (col D Excel) */}
+                        {/* Col D — Vac. Tomadas editable */}
                         <td className="px-2 py-1.5 text-center">
                           <input type="number" min={0}
                             className="border border-gray-200 rounded-lg px-2 py-1 text-xs text-center w-14 focus:outline-none focus:border-coral font-body"
                             value={edit?.taken ?? r.days_taken}
                             onChange={e => setEdit(r, 'taken', e.target.value)} />
                         </td>
-                        {/* Pendientes año ant. — calculado automático (col E Excel: VLOOKUP año anterior) */}
-                        <td className="px-4 py-2 text-xs text-center text-brand-muted font-body">{r.pending_prev_year}</td>
-                        {/* Total Disponible — fórmula: C+E (col F Excel) */}
+                        {/* Col E — Pendientes año ant. (solo lectura, VLOOKUP año anterior) */}
+                        <td className="px-4 py-2 text-xs text-center text-brand-muted font-body">{livePrev}</td>
+                        {/* Col F — Total Disponible = C+E  (recalcula en vivo) */}
                         <td className="px-4 py-2 text-xs text-center font-bold font-body"
                           style={{ background: '#fef9c3' }}>
-                          <span className="text-amber-800 font-bold">{r.total_available}</span>
+                          <span className="text-amber-800 font-bold">{liveAvailable}</span>
                         </td>
-                        {/* Pendientes año actual — fórmula: F-D (col G Excel) */}
+                        {/* Col G — Pendientes = F-D  (recalcula en vivo) */}
                         <td className="px-4 py-2 text-xs text-center font-body"
-                          style={{ background: r.pending_current > 0 ? '#fef3c7' : '#dcfce7' }}>
-                          <span className={`font-bold ${r.pending_current > 0 ? 'text-amber-800' : 'text-green-800'}`}>
-                            {r.pending_current}
+                          style={{ background: livePending > 0 ? '#fef3c7' : '#dcfce7' }}>
+                          <span className={`font-bold ${livePending > 0 ? 'text-amber-800' : 'text-green-800'}`}>
+                            {livePending}
                           </span>
                         </td>
                         <td className="px-4 py-2 text-xs font-semibold font-body"
