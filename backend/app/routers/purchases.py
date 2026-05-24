@@ -129,6 +129,23 @@ def close_month(year: int, month: str, db: Session = Depends(get_db)):
     return {"closed_records": updated}
 
 
+@router.get("/history/{year}")
+def purchases_history(year: int, db: Session = Depends(get_db)):
+    rows = (
+        db.query(Purchase.month_label, func.sum(Purchase.total_amount), func.count(Purchase.id))
+        .filter(Purchase.year == year)
+        .group_by(Purchase.month_label)
+        .all()
+    )
+    order = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO",
+             "JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"]
+    buckets = {r[0]: {"total": float(r[1]), "count": r[2]} for r in rows}
+    return [
+        {"month": m, "total": buckets[m]["total"], "count": buckets[m]["count"]}
+        for m in order if m in buckets
+    ]
+
+
 @router.get("/arca/{year}/{month}")
 def get_arca(year: int, month: str, db: Session = Depends(get_db)):
     key    = f"arca_{year}_{month.upper()}"
