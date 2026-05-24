@@ -113,6 +113,35 @@ def close_month(year: int, month: str, db: Session = Depends(get_db)):
     return {"closed_records": updated, "month": month.upper(), "year": year}
 
 
+@router.get("/compare/{year}/{month}")
+def compare_with_prev(year: int, month: str, db: Session = Depends(get_db)):
+    month = month.upper()
+    idx   = MONTHS.index(month) if month in MONTHS else -1
+
+    prev_month = MONTHS[idx - 1] if idx > 0 else "DICIEMBRE"
+    prev_year  = year if idx > 0 else year - 1
+
+    def branch_totals(sales):
+        luro  = sum(float(s.total_amount or 0) for s in sales if s.branch_id == 1)
+        indep = sum(float(s.total_amount or 0) for s in sales if s.branch_id == 2)
+        return {"luro": luro, "indep": indep, "combined": luro + indep}
+
+    curr = branch_totals(db.query(DailySales).filter(
+        DailySales.year == year, DailySales.month_label == month).all())
+    prev = branch_totals(db.query(DailySales).filter(
+        DailySales.year == prev_year, DailySales.month_label == prev_month).all())
+
+    def pct(c, p): return round((c - p) / p * 100, 1) if p else None
+
+    return {
+        "current": curr, "previous": prev,
+        "prev_month": prev_month, "prev_year": prev_year,
+        "luro_pct":     pct(curr["luro"],     prev["luro"]),
+        "indep_pct":    pct(curr["indep"],     prev["indep"]),
+        "combined_pct": pct(curr["combined"],  prev["combined"]),
+    }
+
+
 @router.get("/history/{year}")
 def yearly_history(year: int, db: Session = Depends(get_db)):
     sales = db.query(DailySales).filter(DailySales.year == year).all()

@@ -1,6 +1,30 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react'
-import { FileDown, Lock, ChevronDown, History, X, Unlock } from 'lucide-react'
+import { FileDown, Lock, ChevronDown, History, X, Unlock, TrendingUp, TrendingDown } from 'lucide-react'
 import { api, fmt$, MONTHS, CURRENT_YEAR, CURRENT_MONTH_IDX } from '../api'
+
+// ── Componente KPI con variación mensual ──────────────────────────────────
+function KpiCard({ label, value, pct, sub, accent }: {
+  label: string; value: string; pct?: number | null; sub?: string; accent: string
+}) {
+  const hasChange = pct != null
+  const up   = hasChange && pct! > 0
+  const down = hasChange && pct! < 0
+  return (
+    <div style={{ borderTop: `3px solid ${accent}` }} className="bg-white rounded-xl p-4 shadow-sm">
+      <span className="text-xs text-gray-400 font-semibold uppercase tracking-wide block mb-1">{label}</span>
+      <span className="text-xl font-bold text-gray-800 block">{value}</span>
+      {hasChange && (
+        <div className={`flex items-center gap-1 mt-1.5 text-xs font-semibold
+          ${up ? 'text-green-600' : down ? 'text-red-500' : 'text-gray-400'}`}>
+          {up   ? <TrendingUp size={13}  /> : null}
+          {down ? <TrendingDown size={13} /> : null}
+          <span>{up ? '+' : ''}{pct}%</span>
+          {sub && <span className="font-normal text-gray-400 ml-1">{sub}</span>}
+        </div>
+      )}
+    </div>
+  )
+}
 
 const NAVY      = '#070614'
 const CORAL     = '#C8603A'
@@ -60,6 +84,7 @@ export default function Ventas() {
   const [branchFilter, setBranchFilter] = useState('AMBAS')
 
   // Historial
+  const [compare, setCompare] = useState<any>(null)
   const [showHistory, setShowHistory] = useState(false)
   const [history, setHistory]         = useState<MonthHistory[]>([])
   const [histYear, setHistYear]       = useState(CURRENT_YEAR)
@@ -87,6 +112,8 @@ export default function Ventas() {
   const load = useCallback(() => {
     api.get<Sale[]>(`/sales/?month=${month}&year=${year}`)
       .then(setSales).catch(() => setSales([]))
+    api.get(`/sales/compare/${year}/${month}`)
+      .then(setCompare).catch(() => setCompare(null))
   }, [month, year])
 
   useEffect(() => { load() }, [load])
@@ -282,17 +309,36 @@ export default function Ventas() {
 
       {/* ── KPI CARDS ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { label: 'Total Mes',     value: fmt$(luroTotal + indepTotal), accent: NAVY  },
-          { label: 'Independencia', value: fmt$(indepTotal),             accent: NAVY  },
-          { label: 'Luro',          value: fmt$(luroTotal),              accent: CORAL },
-          { label: 'T.Prom Indep.', value: indepTicks ? fmt$(indepTotal / indepTicks) : '—', accent: '#464545' },
-        ].map(c => (
-          <div key={c.label} style={{ borderTop: `3px solid ${c.accent}` }} className="bg-white rounded-xl p-4 shadow-sm">
-            <span className="text-xs text-gray-400 font-semibold uppercase tracking-wide block mb-1">{c.label}</span>
-            <span className="text-xl font-bold text-gray-800">{c.value}</span>
-          </div>
-        ))}
+        {/* Total Mes */}
+        <KpiCard
+          label="Total Mes"
+          value={fmt$(luroTotal + indepTotal)}
+          pct={compare?.combined_pct}
+          sub={compare ? `vs ${compare.prev_month}` : undefined}
+          accent={NAVY}
+        />
+        {/* Independencia */}
+        <KpiCard
+          label="Independencia"
+          value={fmt$(indepTotal)}
+          pct={compare?.indep_pct}
+          sub={compare ? `vs ${compare.prev_month}` : undefined}
+          accent={NAVY}
+        />
+        {/* Luro */}
+        <KpiCard
+          label="Luro"
+          value={fmt$(luroTotal)}
+          pct={compare?.luro_pct}
+          sub={compare ? `vs ${compare.prev_month}` : undefined}
+          accent={CORAL}
+        />
+        {/* T.Prom */}
+        <KpiCard
+          label="T.Prom Indep."
+          value={indepTicks ? fmt$(indepTotal / indepTicks) : '—'}
+          accent="#464545"
+        />
       </div>
 
       {/* ── TABLA PRINCIPAL ── */}
@@ -559,6 +605,7 @@ export default function Ventas() {
       )}
 
       {/* ── MODAL PIN ── */}
+
       {showPin && (
         <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">

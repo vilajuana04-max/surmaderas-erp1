@@ -45,19 +45,26 @@ FOOTER_HTML = '<div class="footer">Sur Maderas · Mar del Plata · Sistema ERP v
 NAVY  = "#070614"
 CORAL = "#C8603A"
 
+# CSS de ventas construido como f-string Python ({{ }} = literal { } en el output)
+_SALES_EXTRA_CSS = f"""
+  .indep-hdr  {{ background: {NAVY};   color: white; text-align: center; padding: 5px 8px; font-size: 9pt; font-weight: bold; }}
+  .luro-hdr   {{ background: {CORAL};  color: white; text-align: center; padding: 5px 8px; font-size: 9pt; font-weight: bold; }}
+  .total-day  {{ background: #A84E2C;  color: white; font-weight: bold; text-align: right; }}
+  .sub-hdr    {{ background: #1a1a2e;  color: rgba(255,255,255,0.65); font-size: 8pt; text-align: right; padding: 3px 6px; }}
+  .sub-hdr-l  {{ background: #8B3A20;  color: rgba(255,255,255,0.65); font-size: 8pt; text-align: right; padding: 3px 6px; }}
+  .sunday     {{ background: #f5f5f5;  color: #bbb; }}
+  .total-row td  {{ background: {NAVY}; color: white; font-weight: bold; }}
+  .accent     {{ color: {CORAL}; font-weight: bold; }}
+  th {{ padding: 5px 8px; font-size: 9pt; text-align: right; }}
+  td {{ text-align: right; padding: 4px 8px; }}
+  td:first-child, td:nth-child(2) {{ text-align: left; }}
+  .week-title {{ font-size: 10pt; font-weight: bold; margin-top: 16px;
+                 border-bottom: 2px solid {CORAL}; padding-bottom: 3px; color: {NAVY}; }}
+"""
+
 SALES_TEMPLATE = """
 <html><head><style>
   {{ css }}
-  .branch-indep {{ background: """ + NAVY  + """; color: white; }}
-  .branch-luro  {{ background: """ + CORAL + """; color: white; }}
-  .sub-header td {{ background: #1a1a2e; color: rgba(255,255,255,0.6); font-size: 8pt; text-align: right; padding: 3px 8px; }}
-  .sub-header-luro td {{ background: #8B3A20; color: rgba(255,255,255,0.6); font-size: 8pt; text-align: right; padding: 3px 8px; }}
-  th {{ padding: 6px 8px; font-size: 9pt; text-align: right; }}
-  th:first-child, th:nth-child(2) {{ text-align: left; background: """ + NAVY + """; }}
-  td {{ text-align: right; }}
-  td:first-child, td:nth-child(2) {{ text-align: left; }}
-  .total-row td {{ font-weight: bold; background: """ + NAVY + """; color: white; }}
-  .week-section h2 {{ font-size: 10pt; margin-top: 16px; border-bottom: 2px solid """ + CORAL + """; }}
 </style></head><body>
 """ + HEADER_HTML + """
 <h1>Ventas Diarias — {{ branch_label }}</h1>
@@ -497,8 +504,12 @@ def generate_sales_pdf(sales: list, year: int, month: str, branch: str = "all") 
 
     days_with_data = len(set(str(s.sale_date) for s in sales))
 
+    # CSS combinado: base + extra de ventas (sin llaves Jinja2)
+    sales_css = BASE_CSS + _SALES_EXTRA_CSS
+
     return _render(
         "sales",
+        css=sales_css,          # sobreescribe el css por defecto
         rows=rows, totals=totals, weeks=week_rows,
         year=year, month=month, branch_label=branch_label,
         show_indep=show_indep, show_luro=show_luro,

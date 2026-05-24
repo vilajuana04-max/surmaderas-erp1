@@ -4,7 +4,7 @@ from sqlalchemy import func
 from typing import Optional
 
 from app.database import get_db
-from app.models import Provider, Purchase
+from app.models import Provider, Purchase, AppConfig
 from app.schemas import PurchaseCreate, PurchaseOut, ProviderOut, PurchaseSummary
 from app.services.pdf_generator import generate_purchases_pdf
 
@@ -127,6 +127,25 @@ def close_month(year: int, month: str, db: Session = Depends(get_db)):
     ).update({"closed": True})
     db.commit()
     return {"closed_records": updated}
+
+
+@router.get("/arca/{year}/{month}")
+def get_arca(year: int, month: str, db: Session = Depends(get_db)):
+    key    = f"arca_{year}_{month.upper()}"
+    config = db.query(AppConfig).filter(AppConfig.key == key).first()
+    return {"amount": float(config.value) if config else 0.0}
+
+
+@router.post("/arca/{year}/{month}")
+def set_arca(year: int, month: str, amount: float, db: Session = Depends(get_db)):
+    key    = f"arca_{year}_{month.upper()}"
+    config = db.query(AppConfig).filter(AppConfig.key == key).first()
+    if config:
+        config.value = str(amount)
+    else:
+        db.add(AppConfig(key=key, value=str(amount)))
+    db.commit()
+    return {"amount": amount}
 
 
 def _enrich(p: Purchase) -> dict:
