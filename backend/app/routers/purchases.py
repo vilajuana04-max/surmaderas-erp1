@@ -1,7 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Optional
+from pydantic import BaseModel
+
+class ArcaIn(BaseModel):
+    amount: float
 
 from app.database import get_db
 from app.models import Provider, Purchase, AppConfig
@@ -154,15 +158,15 @@ def get_arca(year: int, month: str, db: Session = Depends(get_db)):
 
 
 @router.post("/arca/{year}/{month}")
-def set_arca(year: int, month: str, amount: float, db: Session = Depends(get_db)):
+def set_arca(year: int, month: str, data: ArcaIn, db: Session = Depends(get_db)):
     key    = f"arca_{year}_{month.upper()}"
     config = db.query(AppConfig).filter(AppConfig.key == key).first()
     if config:
-        config.value = str(amount)
+        config.value = str(data.amount)
     else:
-        db.add(AppConfig(key=key, value=str(amount)))
+        db.add(AppConfig(key=key, value=str(data.amount)))
     db.commit()
-    return {"amount": amount}
+    return {"amount": data.amount}
 
 
 def _enrich(p: Purchase) -> dict:

@@ -13,6 +13,30 @@ const NAVY      = '#070614'
 const CORAL     = '#C8603A'
 const ALL_YEARS = [2024, 2025, 2026, 2027]
 
+/* ── Colores por proveedor (hash determinístico) ─────────────── */
+const PROV_PALETTE = [
+  '#C8603A', // coral
+  '#2563eb', // blue
+  '#16a34a', // green
+  '#9333ea', // purple
+  '#ca8a04', // amber
+  '#0891b2', // cyan
+  '#dc2626', // red
+  '#059669', // emerald
+  '#d97706', // orange
+  '#7c3aed', // violet
+  '#0f766e', // teal
+  '#b45309', // brown-amber
+]
+function providerColor(name: string): string {
+  if (!name) return '#888580'
+  let h = 0
+  for (let i = 0; i < name.length; i++) {
+    h = Math.imul(31, h) + name.charCodeAt(i) | 0
+  }
+  return PROV_PALETTE[Math.abs(h) % PROV_PALETTE.length]
+}
+
 /* ── Proveedores preset (localStorage) ─────────────────────────────── */
 const DEFAULT_PROVIDERS = [
   'DEL CENTRO', 'CLARO', 'DECOFORMA', 'GONZALEZ TUDANCA',
@@ -185,9 +209,21 @@ export default function Compras() {
     if (isNaN(amt)) return
     setArcaSaving(true)
     try {
-      await api.post(`/purchases/arca/${year}/${month}?amount=${amt}`, {})
-      setArcaAmount(amt)
-    } finally { setArcaSaving(false) }
+      await api.post(`/purchases/arca/${year}/${month}`, { amount: amt })
+      setArcaAmount(amt)   // update local state immediately
+    } catch (err: any) {
+      alert(`Error al guardar ARCA: ${err.message}`)
+    } finally {
+      setArcaSaving(false)
+    }
+  }
+
+  const handlePdf = async (path: string, filename: string) => {
+    try {
+      await api.pdf(path, filename)
+    } catch (err: any) {
+      alert(`Error al generar PDF:\n${err.message}`)
+    }
   }
 
   const toggleSort = (field: typeof sortField) => {
@@ -246,7 +282,7 @@ export default function Compras() {
             {MONTHS.map(m => <option key={m} className="text-black">{m}</option>)}
           </select>
           <button
-            onClick={() => api.pdf(`/purchases/pdf/${year}/${month}`, `compras_${month}_${year}.pdf`)}
+            onClick={() => handlePdf(`/purchases/pdf/${year}/${month}`, `compras_${month}_${year}.pdf`)}
             className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white border border-white/20 px-3 py-2 rounded-lg text-sm">
             <FileDown size={15} /> PDF
           </button>
@@ -438,22 +474,34 @@ export default function Compras() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <tbody>
-              {summary.slice(0, 8).map((s: any) => (
-                <tr key={s.provider_name} className="border-t border-gray-50 hover:bg-gray-50">
-                  <td className="px-5 py-2.5 font-semibold text-gray-700 text-sm">{s.provider_name}</td>
-                  <td className="px-3 py-2.5 text-right text-gray-700 font-semibold text-sm">{fmt$(s.total)}</td>
-                  <td className="px-4 py-2.5 w-40">
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 bg-gray-100 rounded-full h-1.5">
-                        <div className="h-1.5 rounded-full transition-all"
-                          style={{ background: CORAL, width: `${Math.min(s.percentage, 100)}%` }} />
+              {summary.slice(0, 8).map((s: any) => {
+                const pc = providerColor(s.provider_name)
+                return (
+                  <tr key={s.provider_name}
+                    className="border-t border-gray-50 hover:bg-gray-50 transition-colors"
+                    style={{ borderLeft: `3px solid ${pc}` }}>
+                    <td className="px-5 py-2.5 font-semibold text-gray-700 text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0"
+                          style={{ background: pc }} />
+                        {s.provider_name}
                       </div>
-                      <span className="text-xs text-gray-400 w-10 text-right">{s.percentage}%</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-2.5 text-right text-gray-400 text-xs">{s.count} fact.</td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-bold text-sm"
+                      style={{ color: pc }}>{fmt$(s.total)}</td>
+                    <td className="px-4 py-2.5 w-44">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 bg-gray-100 rounded-full h-1.5">
+                          <div className="h-1.5 rounded-full transition-all"
+                            style={{ background: pc, width: `${Math.min(s.percentage, 100)}%` }} />
+                        </div>
+                        <span className="text-xs text-gray-400 w-10 text-right">{s.percentage}%</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-2.5 text-right text-gray-400 text-xs">{s.count} fact.</td>
+                  </tr>
+                )
+              })}
               {summary.length === 0 && (
                 <tr>
                   <td colSpan={4} className="px-5 py-6 text-gray-400 text-center text-sm">
@@ -552,14 +600,24 @@ export default function Compras() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((p, i) => (
-                <tr key={p.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/80'}>
-                  <td className="px-4 py-2 text-xs text-gray-600">
+              {filtered.map((p, i) => {
+                const pc = providerColor(p.provider_name ?? '')
+                return (
+                <tr key={p.id}
+                  className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}
+                  style={{ borderLeft: `3px solid ${pc}` }}>
+                  <td className="px-4 py-2.5 text-xs text-gray-600">
                     {p.purchase_date ?? <span className="text-amber-500">Sin fecha</span>}
                   </td>
-                  <td className="px-3 py-2 text-xs text-gray-500">{p.invoice_number ?? '—'}</td>
-                  <td className="px-3 py-2 text-xs font-semibold text-gray-700">{p.provider_name ?? '—'}</td>
-                  <td className={`px-3 py-2 text-xs text-right font-semibold ${p.total_amount < 0 ? 'text-red-600' : 'text-gray-800'}`}>
+                  <td className="px-3 py-2.5 text-xs text-gray-400">{p.invoice_number ?? '—'}</td>
+                  <td className="px-3 py-2.5 text-xs font-bold" style={{ color: pc }}>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                        style={{ background: pc }} />
+                      {p.provider_name ?? '—'}
+                    </div>
+                  </td>
+                  <td className={`px-3 py-2.5 text-xs text-right font-bold ${p.total_amount < 0 ? 'text-red-600' : 'text-gray-800'}`}>
                     {fmt$(p.total_amount)}
                   </td>
                   <td className="px-3 py-2 text-xs">
@@ -573,7 +631,7 @@ export default function Compras() {
                       <span className="bg-gray-100 text-gray-400 rounded px-1.5 py-0.5 text-[10px]">Cerrado</span>
                     )}
                   </td>
-                  <td className="px-2 py-2 text-right">
+                  <td className="px-2 py-2.5 text-right">
                     {!p.closed && (
                       <button onClick={() => handleDelete(p.id)} className="text-red-400 hover:text-red-600 p-1">
                         <Trash2 size={14} />
@@ -581,7 +639,8 @@ export default function Compras() {
                     )}
                   </td>
                 </tr>
-              ))}
+                )
+              })}
               {filtered.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-10 text-center text-gray-400">
@@ -733,7 +792,7 @@ export default function Compras() {
                 {MONTHS.map(m => <option key={m}>{m}</option>)}
               </select>
               <button
-                onClick={() => api.pdf(`/purchases/pdf/${histYear}/${histMonth}`, `compras_${histMonth}_${histYear}.pdf`)}
+                onClick={() => handlePdf(`/purchases/pdf/${histYear}/${histMonth}`, `compras_${histMonth}_${histYear}.pdf`)}
                 className="flex items-center gap-2 border border-gray-200 text-gray-600 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm">
                 <FileDown size={14} /> PDF
               </button>

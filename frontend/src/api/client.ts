@@ -23,9 +23,22 @@ export const api = {
   delete: <T>(path: string)               => req<T>(path, { method: 'DELETE' }),
 
   pdf: async (path: string, filename: string) => {
-    const url  = `${BASE}${path}`
-    const res  = await fetch(url)
-    if (!res.ok) throw new Error(`Error al generar PDF: ${res.status}`)
+    const url = `${BASE}${path}`
+    let res: Response
+    try {
+      res = await fetch(url)
+    } catch {
+      throw new Error('No se pudo conectar con el servidor. Verificá tu conexión.')
+    }
+    if (!res.ok) {
+      const text = await res.text().catch(() => res.statusText)
+      throw new Error(`Error del servidor (${res.status}): ${text.slice(0, 200)}`)
+    }
+    const contentType = res.headers.get('content-type') ?? ''
+    if (!contentType.includes('pdf')) {
+      const text = await res.text().catch(() => '')
+      throw new Error(`El servidor no devolvió un PDF. Respuesta: ${text.slice(0, 200)}`)
+    }
     const blob = await res.blob()
     const link = URL.createObjectURL(blob)
     const a    = document.createElement('a')
