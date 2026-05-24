@@ -22,6 +22,16 @@ export const api = {
   put:    <T>(path: string, body: unknown) => req<T>(path, { method: 'PUT',    body: JSON.stringify(body) }),
   delete: <T>(path: string)               => req<T>(path, { method: 'DELETE' }),
 
+  upload: async <T>(path: string, formData: FormData): Promise<T> => {
+    const url = `${BASE}${path}`
+    const res = await fetch(url, { method: 'POST', body: formData })
+    if (!res.ok) {
+      const text = await res.text().catch(() => res.statusText)
+      throw new Error(`${res.status}: ${text}`)
+    }
+    return res.json()
+  },
+
   pdf: async (path: string, filename: string) => {
     const url = `${BASE}${path}`
     let res: Response

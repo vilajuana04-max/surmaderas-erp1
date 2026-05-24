@@ -5,3 +5,4 @@ from .vacations import router as vacations_router
 from .expenses import router as expenses_router
 from .dashboard import router as dashboard_router
 from .employees import router as employees_router
+from .receipts import router as receipts_router

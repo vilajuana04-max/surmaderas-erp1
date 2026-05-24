@@ -5,6 +5,7 @@ from .purchases import Provider, Purchase
 from .payroll import PayrollPeriod, PayrollItem
 from .vacations import VacationRecord, VacationLog
 from .expenses import SharedExpenseItem, SharedExpense, ExpenseCategory, LuroExpense
+from .receipts import PayslipUpload
 
 __all__ = [
     "Branch", "AppConfig",
@@ -14,4 +15,5 @@ __all__ = [
     "PayrollPeriod", "PayrollItem",
     "VacationRecord", "VacationLog",
     "SharedExpenseItem", "SharedExpense", "ExpenseCategory", "LuroExpense",
+    "PayslipUpload",
 ]

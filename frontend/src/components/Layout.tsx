@@ -2,19 +2,18 @@ import React, { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingCart, Package,
-  Users, Umbrella, Receipt, Menu, X,
+  Users, Receipt, Menu, X,
 } from 'lucide-react'
 
 const NAVY  = '#070614'
 const CORAL = '#C8603A'
 
 const NAV = [
-  { to: '/',           icon: LayoutDashboard, label: 'Dashboard',  num: '01' },
-  { to: '/ventas',     icon: ShoppingCart,    label: 'Ventas',     num: '02' },
-  { to: '/compras',    icon: Package,         label: 'Compras',    num: '03' },
-  { to: '/sueldos',    icon: Users,           label: 'Sueldos',    num: '04' },
-  { to: '/vacaciones', icon: Umbrella,        label: 'Vacaciones', num: '05' },
-  { to: '/gastos',     icon: Receipt,         label: 'Gastos',     num: '06' },
+  { to: '/',        icon: LayoutDashboard, label: 'Dashboard',       num: '01' },
+  { to: '/ventas',  icon: ShoppingCart,    label: 'Ventas',          num: '02' },
+  { to: '/compras', icon: Package,         label: 'Compras',         num: '03' },
+  { to: '/rrhh',    icon: Users,           label: 'Recursos Humanos',num: '04' },
+  { to: '/gastos',  icon: Receipt,         label: 'Gastos',          num: '05' },
 ]
 
 /* ── Sidebar content (shared desktop/mobile) ─────────────────── */
