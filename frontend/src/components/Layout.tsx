@@ -1,23 +1,45 @@
 import React, { useState } from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingCart, Package,
-  Users, Receipt, Menu, X,
+  Users, Receipt, Menu, X, ChevronDown,
 } from 'lucide-react'
 
 const NAVY  = '#070614'
 const CORAL = '#C8603A'
 
-const NAV = [
-  { to: '/',        icon: LayoutDashboard, label: 'Dashboard',       num: '01' },
-  { to: '/ventas',  icon: ShoppingCart,    label: 'Ventas',          num: '02' },
-  { to: '/compras', icon: Package,         label: 'Compras',         num: '03' },
-  { to: '/rrhh',    icon: Users,           label: 'Recursos Humanos',num: '04' },
-  { to: '/gastos',  icon: Receipt,         label: 'Gastos',          num: '05' },
+const NAV_MAIN = [
+  { to: '/',        icon: LayoutDashboard, label: 'Dashboard', num: '01' },
+  { to: '/ventas',  icon: ShoppingCart,    label: 'Ventas',    num: '02' },
+  { to: '/compras', icon: Package,         label: 'Compras',   num: '03' },
+]
+const NAV_AFTER = [
+  { to: '/gastos',  icon: Receipt,         label: 'Gastos',    num: '05' },
+]
+const RRHH_SUB = [
+  { tab: 'vacaciones', label: '🌴 Vacaciones' },
+  { tab: 'calendario', label: '📅 Calendario'  },
+  { tab: 'sueldos',    label: '💰 Sueldos'     },
+  { tab: 'recibos',    label: '📎 Recibos'     },
 ]
 
 /* ── Sidebar content (shared desktop/mobile) ─────────────────── */
 function SidebarContent({ onClose }: { onClose?: () => void }) {
+  const location = useLocation()
+  const isRRHH   = location.pathname === '/rrhh' || location.pathname.startsWith('/rrhh')
+  const [rrhhOpen, setRrhhOpen] = useState(isRRHH)
+
+  // Tab activo desde query params
+  const activeTab = new URLSearchParams(location.search).get('tab') ?? 'vacaciones'
+
+  const navLinkClass = (isActive: boolean) => [
+    'flex items-center gap-3 px-7 py-3 text-sm font-semibold font-body',
+    'border-l-[3px] transition-all duration-200 tracking-wide',
+    isActive
+      ? 'text-white border-l-coral bg-white/5'
+      : 'text-white/40 border-l-transparent hover:text-white/80 hover:bg-white/5',
+  ].join(' ')
+
   return (
     <div className="flex flex-col h-full">
       {/* Brand */}
@@ -36,27 +58,71 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
 
       {/* Nav */}
       <nav className="flex-1 py-6">
-        {NAV.map(({ to, icon: Icon, label, num }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === '/'}
+        {/* Items antes de RRHH */}
+        {NAV_MAIN.map(({ to, icon: Icon, label, num }) => (
+          <NavLink key={to} to={to} end={to === '/'}
             onClick={onClose}
-            className={({ isActive }) =>
-              [
-                'flex items-center gap-3 px-7 py-3 text-sm font-semibold font-body',
-                'border-l-[3px] transition-all duration-200 tracking-wide',
-                isActive
-                  ? 'text-white border-l-coral bg-white/5'
-                  : 'text-white/40 border-l-transparent hover:text-white/80 hover:bg-white/5',
-              ].join(' ')
-            }
-            style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}
-          >
-            <span className="font-body text-[10px] font-bold tracking-[1.5px]"
-              style={{ color: CORAL }}>
-              {num}
-            </span>
+            className={({ isActive }) => navLinkClass(isActive)}
+            style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
+            <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>{num}</span>
+            <Icon size={16} strokeWidth={2} />
+            <span className="tracking-[1px] uppercase text-[12px]">{label}</span>
+          </NavLink>
+        ))}
+
+        {/* ── RRHH con submenú desplegable ── */}
+        <button
+          onClick={() => setRrhhOpen(o => !o)}
+          className={[
+            'w-full flex items-center gap-3 px-7 py-3 text-sm font-semibold font-body',
+            'border-l-[3px] transition-all duration-200 tracking-wide',
+            isRRHH
+              ? 'text-white bg-white/5'
+              : 'text-white/40 border-l-transparent hover:text-white/80 hover:bg-white/5',
+          ].join(' ')}
+          style={{ borderLeftColor: isRRHH ? CORAL : 'transparent' }}>
+          <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>04</span>
+          <Users size={16} strokeWidth={2} />
+          <span className="tracking-[1px] uppercase text-[12px] flex-1 text-left">Rec. Humanos</span>
+          <ChevronDown
+            size={14}
+            className="transition-transform duration-200 shrink-0"
+            style={{ transform: rrhhOpen ? 'rotate(180deg)' : 'rotate(0deg)', opacity: 0.6 }}
+          />
+        </button>
+
+        {/* Sub-items */}
+        {rrhhOpen && (
+          <div className="pb-1" style={{ background: 'rgba(255,255,255,0.03)' }}>
+            {RRHH_SUB.map(({ tab, label }) => {
+              const isActive = isRRHH && activeTab === tab
+              return (
+                <NavLink
+                  key={tab}
+                  to={`/rrhh?tab=${tab}`}
+                  onClick={onClose}
+                  className={[
+                    'flex items-center gap-2 pl-14 pr-7 py-2 text-[11px] font-semibold font-body',
+                    'border-l-[3px] transition-all duration-150',
+                    isActive
+                      ? 'text-white bg-white/5'
+                      : 'text-white/35 border-l-transparent hover:text-white/70 hover:bg-white/5',
+                  ].join(' ')}
+                  style={{ borderLeftColor: isActive ? CORAL : 'transparent' }}>
+                  <span className="tracking-wide">{label}</span>
+                </NavLink>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Items después de RRHH */}
+        {NAV_AFTER.map(({ to, icon: Icon, label, num }) => (
+          <NavLink key={to} to={to}
+            onClick={onClose}
+            className={({ isActive }) => navLinkClass(isActive)}
+            style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
+            <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>{num}</span>
             <Icon size={16} strokeWidth={2} />
             <span className="tracking-[1px] uppercase text-[12px]">{label}</span>
           </NavLink>

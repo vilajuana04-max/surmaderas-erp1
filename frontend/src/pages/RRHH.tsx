@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   FileDown, RefreshCw, Plus, Lock, Trash2,
-  Upload, CheckCircle, Clock, X, ChevronDown, ChevronUp,
+  Upload, CheckCircle, Clock, X, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { api, fmt$, MONTHS, CURRENT_YEAR, CURRENT_MONTH_IDX } from '../api'
 
@@ -14,7 +15,7 @@ const BRANCHES  = [
 ]
 
 /* ── Tipos ──────────────────────────────────────────────────── */
-type Tab = 'vacaciones' | 'sueldos' | 'recibos'
+type Tab = 'vacaciones' | 'sueldos' | 'recibos' | 'calendario'
 
 type VacRecord = {
   id: number; year: number; employee_id: number; employee_name: string
@@ -44,7 +45,18 @@ type Receipt = {
    PÁGINA PRINCIPAL
 ───────────────────────────────────────────────────────────── */
 export default function RRHH() {
-  const [tab, setTab] = useState<Tab>('vacaciones')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tab = (searchParams.get('tab') ?? 'vacaciones') as Tab
+
+  const setTab = (t: Tab) => setSearchParams({ tab: t }, { replace: true })
+
+  const TABS: { id: Tab; label: string; subtitle: string }[] = [
+    { id: 'vacaciones', label: '🌴 Vacaciones', subtitle: 'Días tomados y disponibles' },
+    { id: 'calendario', label: '📅 Calendario', subtitle: 'Superposición visual'       },
+    { id: 'sueldos',    label: '💰 Sueldos',    subtitle: 'Liquidación mensual'        },
+    { id: 'recibos',    label: '📎 Recibos',    subtitle: 'PDFs por empleado'          },
+  ]
+  const current = TABS.find(t => t.id === tab) ?? TABS[0]
 
   return (
     <div className="space-y-5">
@@ -55,19 +67,15 @@ export default function RRHH() {
             Sur Maderas · ERP
           </p>
           <h1 className="text-2xl font-bold text-white font-head">Recursos Humanos</h1>
-          <p className="text-white/50 text-sm font-body">Vacaciones · Sueldos · Recibos</p>
+          <p className="text-white/50 text-sm font-body">{current.subtitle}</p>
         </div>
       </div>
 
       {/* Tabs */}
       <div className="flex gap-1 bg-white rounded-xl p-1 shadow-sm border border-brand-border">
-        {([
-          { id: 'vacaciones', label: '🌴 Vacaciones' },
-          { id: 'sueldos',    label: '💰 Sueldos'    },
-          { id: 'recibos',    label: '📎 Recibos'    },
-        ] as { id: Tab; label: string }[]).map(t => (
+        {TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            className="flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold font-body transition-all"
+            className="flex-1 py-2.5 px-3 rounded-lg text-xs font-semibold font-body transition-all"
             style={tab === t.id
               ? { background: NAVY, color: 'white' }
               : { color: '#888580' }}>
@@ -78,6 +86,7 @@ export default function RRHH() {
 
       {/* Content */}
       {tab === 'vacaciones' && <VacacionesTab />}
+      {tab === 'calendario' && <CalendarioTab />}
       {tab === 'sueldos'    && <SueldosTab />}
       {tab === 'recibos'    && <RecibosTab />}
     </div>
@@ -528,7 +537,255 @@ function VacacionesTab() {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   TAB 2: SUELDOS
+   TAB 2: CALENDARIO — Gantt de vacaciones
+───────────────────────────────────────────────────────────── */
+const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                     'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+const DAY_NAMES   = ['D','L','M','X','J','V','S']
+
+// Paleta determinista por empleado (misma lógica que proveedores en Compras)
+function empColor(name: string): string {
+  const PALETTE = [
+    '#C8603A','#070614','#3b82f6','#10b981','#8b5cf6',
+    '#f59e0b','#ef4444','#06b6d4','#84cc16','#ec4899','#6366f1',
+  ]
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = Math.imul(31, h) + name.charCodeAt(i) | 0
+  return PALETTE[Math.abs(h) % PALETTE.length]
+}
+
+function CalendarioTab() {
+  const [year,      setYear]      = useState(CURRENT_YEAR)
+  const [monthIdx,  setMonthIdx]  = useState(CURRENT_MONTH_IDX)
+  const [logs,      setLogs]      = useState<VacLog[]>([])
+  const [employees, setEmployees] = useState<Employee[]>([])
+
+  useEffect(() => {
+    api.get<VacLog[]>(`/vacations/log?year=${year}`).then(setLogs).catch(() => setLogs([]))
+  }, [year])
+  useEffect(() => {
+    api.get<Employee[]>('/employees/').then(setEmployees).catch(() => setEmployees([]))
+  }, [])
+
+  const daysInMonth = new Date(year, monthIdx + 1, 0).getDate()
+
+  // Verifica si un empleado tiene vacación aprobada en un día puntual
+  const getLog = (empId: number, day: number): VacLog | undefined => {
+    const d = new Date(year, monthIdx, day)
+    return logs.find(l => {
+      if (l.employee_id !== empId || !l.date_from || !l.date_to) return false
+      const from = new Date(String(l.date_from).slice(0, 10))
+      const to   = new Date(String(l.date_to).slice(0, 10))
+      return d >= from && d <= to
+    })
+  }
+
+  // Días que tienen AL MENOS 2 empleados en vacación (superposición)
+  const overlapDays = new Set(
+    Array.from({ length: daysInMonth }, (_, i) => i + 1).filter(day =>
+      employees.filter(e => getLog(e.id, day)).length >= 2
+    )
+  )
+
+  const prevMonth = () => {
+    if (monthIdx === 0) { setMonthIdx(11); setYear(y => y - 1) }
+    else setMonthIdx(m => m - 1)
+  }
+  const nextMonth = () => {
+    if (monthIdx === 11) { setMonthIdx(0); setYear(y => y + 1) }
+    else setMonthIdx(m => m + 1)
+  }
+
+  // Empleados que tienen algún log en el mes visible
+  const activeEmps = employees.filter(emp =>
+    Array.from({ length: daysInMonth }, (_, i) => i + 1).some(d => getLog(emp.id, d))
+  )
+  // Resto de empleados (sin log en este mes)
+  const inactiveEmps = employees.filter(emp => !activeEmps.includes(emp))
+
+  const renderGrid = (emps: Employee[], dimmed = false) => (
+    emps.map(emp => {
+      const color = empColor(emp.name)
+      const isIndep = emp.branch_name === 'INDEPENDENCIA'
+      return (
+        <tr key={emp.id} className="hover:bg-gray-50/60 transition-colors">
+          {/* Empleado */}
+          <td className="px-3 py-1.5 text-xs font-semibold font-body whitespace-nowrap sticky left-0 bg-white z-10 border-r border-brand-border"
+            style={{ borderLeft: `3px solid ${isIndep ? CORAL : NAVY}`, opacity: dimmed ? 0.35 : 1 }}>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+              <span className="text-gray-700">{emp.name}</span>
+              <span className="text-[10px] font-normal" style={{ color: isIndep ? CORAL : NAVY }}>
+                {isIndep ? 'Indep.' : 'Luro'}
+              </span>
+            </div>
+          </td>
+          {/* Días */}
+          {Array.from({ length: daysInMonth }, (_, i) => {
+            const day = i + 1
+            const log = getLog(emp.id, day)
+            const dow = new Date(year, monthIdx, day).getDay() // 0=Dom, 6=Sáb
+            const isWeekend = dow === 0 || dow === 6
+            const isOverlap = overlapDays.has(day) && !!log
+            return (
+              <td key={day}
+                title={log ? `${emp.name}: ${String(log.date_from).slice(0,10)} → ${String(log.date_to).slice(0,10)} (${log.days} días)` : undefined}
+                className="p-0 text-center"
+                style={{
+                  minWidth: '26px',
+                  background: log
+                    ? isOverlap ? '#fde68a' : color   // amarillo si hay superposición
+                    : isWeekend ? '#f8f7f5' : 'white',
+                  opacity: dimmed && !log ? 0.25 : 1,
+                }}>
+                {log && (
+                  <div className="w-full h-6 flex items-center justify-center">
+                    {isOverlap && <span className="text-[8px] font-bold text-amber-700">!</span>}
+                  </div>
+                )}
+                {!log && <div className="w-full h-6" />}
+              </td>
+            )
+          })}
+        </tr>
+      )
+    })
+  )
+
+  return (
+    <div className="space-y-5">
+      {/* Controles de mes */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-1 bg-white border border-brand-border rounded-xl shadow-sm px-1 py-1">
+          <button onClick={prevMonth}
+            className="p-1.5 rounded-lg hover:bg-gray-100 text-brand-muted transition-colors">
+            <ChevronLeft size={16} />
+          </button>
+          <span className="px-3 text-sm font-bold font-head min-w-36 text-center" style={{ color: NAVY }}>
+            {MONTH_NAMES[monthIdx]} {year}
+          </span>
+          <button onClick={nextMonth}
+            className="p-1.5 rounded-lg hover:bg-gray-100 text-brand-muted transition-colors">
+            <ChevronRight size={16} />
+          </button>
+        </div>
+        {/* Leyenda */}
+        <div className="flex items-center gap-4 bg-white border border-brand-border rounded-xl px-4 py-2 shadow-sm text-xs font-body">
+          <div className="flex items-center gap-1.5">
+            <span className="w-4 h-4 rounded" style={{ background: CORAL }} />
+            <span className="text-brand-muted">En vacaciones</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-4 h-4 rounded bg-amber-200" />
+            <span className="text-brand-muted">Superposición !</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-4 h-4 rounded bg-gray-100" />
+            <span className="text-brand-muted">Fin de semana</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Grid Gantt */}
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div style={{ background: NAVY }} className="px-5 py-3 flex items-center justify-between">
+          <p className="text-white text-sm font-bold font-head">
+            📅 CALENDARIO — {MONTH_NAMES[monthIdx].toUpperCase()} {year}
+          </p>
+          {overlapDays.size > 0 && (
+            <span className="text-xs font-semibold font-body bg-amber-400 text-amber-900 px-2.5 py-1 rounded-full">
+              ⚠️ {overlapDays.size} día{overlapDays.size > 1 ? 's' : ''} con superposición
+            </span>
+          )}
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="text-xs border-collapse" style={{ minWidth: `${180 + daysInMonth * 26}px` }}>
+            <thead>
+              <tr style={{ background: '#f5ede9' }}>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-widest border-b border-r border-brand-border sticky left-0 z-10 min-w-44"
+                  style={{ color: NAVY, background: '#f5ede9' }}>
+                  Empleado
+                </th>
+                {Array.from({ length: daysInMonth }, (_, i) => {
+                  const day = i + 1
+                  const dow = new Date(year, monthIdx, day).getDay()
+                  const isWeekend = dow === 0 || dow === 6
+                  const isOverlap = overlapDays.has(day)
+                  return (
+                    <th key={day}
+                      className="py-1 text-center border-b border-brand-border font-body"
+                      style={{
+                        minWidth: '26px',
+                        color: isOverlap ? '#b45309' : isWeekend ? '#aaa' : NAVY,
+                        background: isOverlap ? '#fef9c3' : '#f5ede9',
+                        fontWeight: isOverlap ? 800 : 600,
+                      }}>
+                      <div className="text-[10px]">{day}</div>
+                      <div style={{ color: isWeekend ? '#ccc' : CORAL, fontSize: '8px' }}>
+                        {DAY_NAMES[dow]}
+                      </div>
+                    </th>
+                  )
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {activeEmps.length > 0
+                ? renderGrid(activeEmps)
+                : (
+                  <tr>
+                    <td colSpan={daysInMonth + 1}
+                      className="px-5 py-10 text-center text-brand-muted font-body text-sm">
+                      No hay vacaciones registradas en {MONTH_NAMES[monthIdx]} {year}.
+                      <br />
+                      <span className="text-xs">Agregá solicitudes desde la pestaña Vacaciones.</span>
+                    </td>
+                  </tr>
+                )
+              }
+              {/* Separador si hay empleados sin vacaciones */}
+              {activeEmps.length > 0 && inactiveEmps.length > 0 && (
+                <tr>
+                  <td colSpan={daysInMonth + 1}
+                    className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-brand-muted border-t border-b border-brand-border font-body"
+                    style={{ background: '#f8f7f5' }}>
+                    Sin vacaciones este mes
+                  </td>
+                </tr>
+              )}
+              {inactiveEmps.length > 0 && renderGrid(inactiveEmps, true)}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Resumen del mes */}
+      {activeEmps.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {activeEmps.map(emp => {
+            const days = Array.from({ length: daysInMonth }, (_, i) => i + 1)
+              .filter(d => getLog(emp.id, d)).length
+            const color = empColor(emp.name)
+            return (
+              <div key={emp.id} className="bg-white rounded-xl border border-brand-border px-4 py-3 shadow-sm"
+                style={{ borderLeft: `4px solid ${color}` }}>
+                <p className="text-xs font-semibold font-body text-gray-700 truncate">{emp.name}</p>
+                <p className="text-2xl font-bold font-head mt-0.5" style={{ color }}>
+                  {days}
+                </p>
+                <p className="text-[10px] text-brand-muted font-body">días en {MONTH_NAMES[monthIdx]}</p>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────
+   TAB 3: SUELDOS
 ───────────────────────────────────────────────────────────── */
 function SueldosTab() {
   const [month,   setMonth]   = useState(MONTHS[CURRENT_MONTH_IDX])
