@@ -794,20 +794,35 @@ function CalendarioTab() {
 type SueldosVista = 'luro' | 'independencia' | 'ambas'
 
 function SueldosTab() {
-  const [month,    setMonth]    = useState(MONTHS[CURRENT_MONTH_IDX])
-  const [year]                  = useState(CURRENT_YEAR)
-  const [periods,  setPeriods]  = useState<any[]>([])
-  const [creating, setCreating] = useState(false)
-  const [vista,    setVista]    = useState<SueldosVista>('luro')
+  const [month,      setMonth]      = useState(MONTHS[CURRENT_MONTH_IDX])
+  const [year]                      = useState(CURRENT_YEAR)
+  const [periods,    setPeriods]    = useState<any[]>([])
+  const [creating,   setCreating]   = useState(false)
+  const [vista,      setVista]      = useState<SueldosVista>('luro')
+  // Estado de edición local — actualiza los cálculos sin esperar al servidor
+  const [localEdits, setLocalEdits] = useState<Record<number, Record<string, any>>>({})
 
   const load = useCallback(() => {
-    api.get<any[]>(`/payroll/periods?year=${year}`).then(setPeriods)
+    api.get<any[]>(`/payroll/periods?year=${year}`).then(r => {
+      setPeriods(r)
+      setLocalEdits({})   // limpiar edits al recargar
+    })
   }, [year])
 
   useEffect(() => { load() }, [load])
 
   const getPeriod = (branchId: number) =>
     periods.find(p => p.branch_id === branchId && p.month === month && p.year === year)
+
+  /* Devuelve el item fusionado con las ediciones locales en curso */
+  const merged = (item: any) => ({ ...item, ...(localEdits[item.id] ?? {}) })
+
+  /* Actualiza un campo en el estado local INMEDIATAMENTE (para cálculos en vivo) */
+  const setField = (itemId: number, field: string, val: any) =>
+    setLocalEdits(prev => ({
+      ...prev,
+      [itemId]: { ...(prev[itemId] ?? {}), [field]: val },
+    }))
 
   const createPeriod = async (branchId: number) => {
     setCreating(true)
@@ -817,17 +832,18 @@ function SueldosTab() {
     } finally { setCreating(false) }
   }
 
-  const updateItem = async (itemId: number, field: string, val: string | number | null, item: any) => {
-    const updated = { ...item, [field]: val }
+  /* Guarda al servidor cuando el usuario sale del campo (onBlur) */
+  const saveItem = async (itemId: number, item: any) => {
+    const m = merged(item)
     await api.put(`/payroll/items/${itemId}`, {
-      employee_id:        updated.employee_id,
-      inasistencias_desc: updated.inasistencias_desc || null,
-      adelanto:           parseFloat(updated.adelanto)    || 0,
-      deposito_banco:     parseFloat(updated.deposito_banco) || 0,
-      horas:              updated.horas      ? parseFloat(updated.horas)      : null,
-      precio_hora:        updated.precio_hora ? parseFloat(updated.precio_hora) : null,
-      plus_factor:        updated.plus_factor ? parseFloat(updated.plus_factor) : null,
-      bruto_manual:       updated.bruto_manual ? parseFloat(updated.bruto_manual) : null,
+      employee_id:        m.employee_id,
+      inasistencias_desc: m.inasistencias_desc || null,
+      adelanto:           parseFloat(m.adelanto)    || 0,
+      deposito_banco:     parseFloat(m.deposito_banco) || 0,
+      horas:              m.horas       ? parseFloat(m.horas)       : null,
+      precio_hora:        m.precio_hora ? parseFloat(m.precio_hora) : null,
+      plus_factor:        m.plus_factor ? parseFloat(m.plus_factor) : null,
+      bruto_manual:       m.bruto_manual ? parseFloat(m.bruto_manual) : null,
     })
     load()
   }
@@ -838,9 +854,177 @@ function SueldosTab() {
     load()
   }
 
-  const handlePdf = async (path: string, filename: string) => {
-    try { await api.pdf(path, filename) }
-    catch (err: any) { alert('Error PDF: ' + err.message) }
+  /* ── Generación de PDF client-side (sin depender del servidor) ── */
+  const fmtARS = (n: number) =>
+    `$ ${Math.round(n).toLocaleString('es-AR')}`
+
+  const pdfCSS = `
+    @page { margin: 1cm; }
+    body { font-family: Arial, sans-serif; font-size: 10pt; color: #222; margin: 0; }
+    @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  `
+
+  /* Recibo individual de un empleado */
+  const printPayslip = (item: any, branchName: string) => {
+    const m     = merged(item)
+    const bruto = calcBruto(m)
+    const plusP = calcPlusP(m)
+    const perc  = calcPerc(m)
+    const dep   = parseFloat(m.deposito_banco) || 0
+    const adel  = parseFloat(m.adelanto)        || 0
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Recibo — ${m.employee_name}</title>
+<style>
+${pdfCSS}
+.card{border:1px solid #ccc;border-radius:8px;overflow:hidden;max-width:320px;margin:24px auto}
+.hdr{background:#070614;color:#fff;padding:16px 18px}
+.co{font-size:14pt;font-weight:bold;letter-spacing:1px}
+.doc{font-size:8pt;color:rgba(255,255,255,.5);margin-top:2px}
+.emp{font-size:13pt;font-weight:bold;color:#C8603A;margin-top:8px}
+.per{font-size:9pt;color:rgba(255,255,255,.45);margin-top:3px}
+.bd{padding:8px 18px 2px}
+.ln{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f0eeeb;font-size:9.5pt}
+.bruto{background:#FFF3CD;padding:8px 18px;display:flex;justify-content:space-between;font-weight:bold;font-size:11pt;border-top:2px solid #F0C040}
+.perc{background:#C8603A;padding:10px 18px;display:flex;justify-content:space-between;font-weight:bold;font-size:12pt;color:#fff}
+.firmas{padding:16px 18px;display:flex;gap:16px}
+.firma{flex:1;border-top:1px solid #aaa;padding-top:4px;font-size:8pt;color:#888;text-align:center}
+</style></head><body>
+<div class="card">
+  <div class="hdr">
+    <div class="co">SUR MADERAS</div>
+    <div class="doc">RECIBO DE SUELDO</div>
+    <div class="emp">${m.employee_name}</div>
+    <div class="per">${month} ${year} · ${branchName}</div>
+  </div>
+  <div class="bd">
+    ${m.inasistencias_desc ? `<div class="ln"><span style="color:#c00">Inasistencias</span><span style="color:#c00;font-weight:bold">${m.inasistencias_desc}</span></div>` : ''}
+    ${plusP > 0 ? `<div class="ln"><span>(+) Plus × ${m.plus_factor}</span><span style="font-weight:bold">${fmtARS(plusP)}</span></div>` : ''}
+  </div>
+  <div class="bruto"><span>TOTAL BRUTO</span><span>${fmtARS(bruto)}</span></div>
+  <div class="bd">
+    ${dep > 0 ? `<div class="ln"><span>(−) Depósito banco</span><span style="font-weight:bold">${fmtARS(dep)}</span></div>` : ''}
+    ${adel > 0 ? `<div class="ln"><span>(−) Adelanto</span><span style="font-weight:bold">${fmtARS(adel)}</span></div>` : ''}
+  </div>
+  <div class="perc"><span>TOTAL PERCIBIDO</span><span>${fmtARS(perc)}</span></div>
+  <div class="firmas">
+    <div class="firma">Firma empleado</div>
+    <div class="firma">Fecha recibido</div>
+  </div>
+</div>
+<script>window.onload=function(){window.print()}</script>
+</body></html>`
+
+    const win = window.open('', '_blank', 'width=480,height=700')
+    if (win) { win.document.write(html); win.document.close() }
+  }
+
+  /* Planilla completa de una sucursal (todos los empleados) */
+  const printPlanilla = (period: any, branchName: string) => {
+    if (!period) return
+    const items: any[] = period.items ?? []
+    const totBruto = items.reduce((a: number, i: any) => a + calcBruto(merged(i)), 0)
+    const totPerc  = items.reduce((a: number, i: any) => a + calcPerc(merged(i)),  0)
+
+    const rows = items.map((item, idx) => {
+      const m = merged(item)
+      return `<tr style="background:${idx%2===0?'#fff':'#fafaf8'}">
+        <td style="text-align:center;color:#C8603A;font-weight:bold">${idx+1}</td>
+        <td>${m.employee_name}</td>
+        <td>${m.inasistencias_desc||'—'}</td>
+        <td style="text-align:right">${parseFloat(m.adelanto)>0?fmtARS(parseFloat(m.adelanto)):'—'}</td>
+        <td style="text-align:right">${parseFloat(m.deposito_banco)>0?fmtARS(parseFloat(m.deposito_banco)):'—'}</td>
+        <td style="text-align:center">${m.plus_factor||'—'}</td>
+        <td style="text-align:right">${calcPlusP(m)>0?fmtARS(calcPlusP(m)):'—'}</td>
+        <td style="text-align:right;background:#FFFBEB;color:#92400E;font-weight:bold">${fmtARS(calcBruto(m))}</td>
+        <td style="text-align:right;background:#ECFDF5;color:#065F46;font-weight:bold">${fmtARS(calcPerc(m))}</td>
+      </tr>`
+    }).join('')
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Sueldos ${branchName} ${month} ${year}</title>
+<style>
+${pdfCSS}
+h1{color:#070614;font-size:14pt;margin-bottom:4px}
+p{color:#666;font-size:9pt;margin:0 0 12px}
+table{width:100%;border-collapse:collapse}
+th{background:#070614;color:#fff;padding:6px 8px;font-size:8pt;text-align:left}
+td{padding:5px 8px;border-bottom:1px solid #eee;font-size:9pt}
+.tot td{background:#070614;color:#fff;font-weight:bold}
+</style></head><body>
+<h1>Liquidación de Sueldos — ${branchName}</h1>
+<p>${month} ${year}</p>
+<table>
+<thead><tr>
+<th>N°</th><th>Empleado</th><th>Inasistencias</th><th style="text-align:right">Adelantos</th>
+<th style="text-align:right">Dep. Banco</th><th style="text-align:center">Plus</th>
+<th style="text-align:right">Plus $</th><th style="text-align:right;background:#92400E">Total Bruto</th>
+<th style="text-align:right;background:#065F46">Total Percibido</th>
+</tr></thead>
+<tbody>${rows}
+<tr class="tot">
+<td colspan="7">TOTALES</td>
+<td style="text-align:right">${fmtARS(totBruto)}</td>
+<td style="text-align:right">${fmtARS(totPerc)}</td>
+</tr></tbody></table>
+<p style="margin-top:12px;font-size:8pt;color:#999">
+Total bruto = Dep.×2 (con Plus) ó Horas×$×Hora · Percibido = Bruto×Plus − Adelantos − Dep.
+</p>
+<script>window.onload=function(){window.print()}</script>
+</body></html>`
+
+    const win = window.open('', '_blank', 'width=900,height=700')
+    if (win) { win.document.write(html); win.document.close() }
+  }
+
+  /* Todos los recibos de una sucursal en una sola ventana */
+  const printAllPayslips = (period: any, branchName: string) => {
+    if (!period) return
+    const items: any[] = period.items ?? []
+
+    const cards = items.map(item => {
+      const m = merged(item)
+      const bruto = calcBruto(m); const plusP = calcPlusP(m); const perc = calcPerc(m)
+      const dep = parseFloat(m.deposito_banco)||0; const adel = parseFloat(m.adelanto)||0
+      return `<div class="card">
+  <div class="hdr"><div class="co">SUR MADERAS</div><div class="doc">RECIBO DE SUELDO</div>
+    <div class="emp">${m.employee_name}</div><div class="per">${month} ${year} · ${branchName}</div></div>
+  <div class="bd">
+    ${m.inasistencias_desc?`<div class="ln"><span style="color:#c00">Inasistencias</span><span style="color:#c00;font-weight:bold">${m.inasistencias_desc}</span></div>`:''}
+    ${plusP>0?`<div class="ln"><span>(+) Plus × ${m.plus_factor}</span><span style="font-weight:bold">${fmtARS(plusP)}</span></div>`:''}
+  </div>
+  <div class="bruto"><span>TOTAL BRUTO</span><span>${fmtARS(bruto)}</span></div>
+  <div class="bd">
+    ${dep>0?`<div class="ln"><span>(−) Depósito banco</span><span style="font-weight:bold">${fmtARS(dep)}</span></div>`:''}
+    ${adel>0?`<div class="ln"><span>(−) Adelanto</span><span style="font-weight:bold">${fmtARS(adel)}</span></div>`:''}
+  </div>
+  <div class="perc"><span>TOTAL PERCIBIDO</span><span>${fmtARS(perc)}</span></div>
+  <div class="firmas"><div class="firma">Firma empleado</div><div class="firma">Fecha recibido</div></div>
+</div>`
+    }).join('')
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Recibos ${branchName} ${month} ${year}</title>
+<style>
+${pdfCSS}
+.card{border:1px solid #ccc;border-radius:8px;overflow:hidden;max-width:300px;margin:12px auto;page-break-inside:avoid}
+.hdr{background:#070614;color:#fff;padding:12px 16px}
+.co{font-size:12pt;font-weight:bold;letter-spacing:1px}
+.doc{font-size:8pt;color:rgba(255,255,255,.5);margin-top:1px}
+.emp{font-size:11pt;font-weight:bold;color:#C8603A;margin-top:6px}
+.per{font-size:8pt;color:rgba(255,255,255,.4);margin-top:2px}
+.bd{padding:6px 16px 2px}
+.ln{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f0eeeb;font-size:9pt}
+.bruto{background:#FFF3CD;padding:7px 16px;display:flex;justify-content:space-between;font-weight:bold;font-size:10pt;border-top:2px solid #F0C040}
+.perc{background:#C8603A;padding:8px 16px;display:flex;justify-content:space-between;font-weight:bold;font-size:11pt;color:#fff}
+.firmas{padding:12px 16px;display:flex;gap:12px}
+.firma{flex:1;border-top:1px solid #aaa;padding-top:3px;font-size:7pt;color:#888;text-align:center}
+</style></head><body>${cards}
+<script>window.onload=function(){window.print()}</script>
+</body></html>`
+
+    const win = window.open('', '_blank')
+    if (win) { win.document.write(html); win.document.close() }
   }
 
   const VISTA_BTNS: { id: SueldosVista; label: string }[] = [
@@ -849,39 +1033,26 @@ function SueldosTab() {
     { id: 'ambas',         label: 'Ambas'         },
   ]
 
-  /* ─── Helpers de cálculo en vivo (espeja las @property del backend) ─── */
-  const calcBruto = (item: any): number => {
-    if (item.horas && item.precio_hora) return item.horas * item.precio_hora
-    if (item.bruto_manual && item.bruto_manual !== 0) return item.bruto_manual
-    const dep = parseFloat(item.deposito_banco) || 0
-    if (dep > 0 && item.plus_factor && parseFloat(item.plus_factor) > 1) return dep * 2
+  /* ─── Helpers de cálculo — usan el item YA MERGEADO con localEdits ─── */
+  const calcBruto = (m: any): number => {
+    const h = parseFloat(m.horas) || 0
+    const ph = parseFloat(m.precio_hora) || 0
+    if (h > 0 && ph > 0) return h * ph
+    const bm = parseFloat(m.bruto_manual) || 0
+    if (bm !== 0) return bm
+    const dep = parseFloat(m.deposito_banco) || 0
+    const pf = parseFloat(m.plus_factor) || 0
+    if (dep > 0 && pf > 1) return dep * 2
     return dep
   }
-  const calcPlusP = (item: any): number => {
-    const f = parseFloat(item.plus_factor) || 0
-    if (f <= 1) return 0
-    return calcBruto(item) * (f - 1)
+  const calcPlusP = (m: any): number => {
+    const f = parseFloat(m.plus_factor) || 0
+    return f > 1 ? calcBruto(m) * (f - 1) : 0
   }
-  const calcPerc = (item: any): number => {
-    const bruto = calcBruto(item)
-    const f = parseFloat(item.plus_factor) || 0
+  const calcPerc = (m: any): number => {
+    const f = parseFloat(m.plus_factor) || 0
     const factor = f > 1 ? f : 1
-    return bruto * factor - (parseFloat(item.adelanto) || 0) - (parseFloat(item.deposito_banco) || 0)
-  }
-
-  /* ── Texto de input inline (para inasistencias) ── */
-  function TextInput({ value, onBlur, disabled, placeholder }: {
-    value: string | null; onBlur: (v: string) => void; disabled?: boolean; placeholder?: string
-  }) {
-    const [v, setV] = React.useState(value ?? '')
-    React.useEffect(() => { setV(value ?? '') }, [value])
-    return (
-      <input type="text" placeholder={placeholder}
-        className="border border-gray-200 rounded-lg py-1 px-1.5 text-[11px] w-24 focus:outline-none disabled:opacity-40 font-body"
-        disabled={disabled} value={v}
-        onChange={e => setV(e.target.value)}
-        onBlur={() => onBlur(v)} />
-    )
+    return calcBruto(m) * factor - (parseFloat(m.adelanto) || 0) - (parseFloat(m.deposito_banco) || 0)
   }
 
   /* ── Render single-branch full table ── */
@@ -890,10 +1061,10 @@ function SueldosTab() {
     const items    = period?.items ?? []
     const isClosed = period?.status === 'CLOSED'
 
-    // Totals calculados en frontend (para actualización en tiempo real)
-    const totBruto = items.reduce((a: number, i: any) => a + calcBruto(i), 0)
-    const totPlusP = items.reduce((a: number, i: any) => a + calcPlusP(i), 0)
-    const totPerc  = items.reduce((a: number, i: any) => a + calcPerc(i),  0)
+    // Totals usando items mergeados con ediciones locales
+    const totBruto = items.reduce((a: number, i: any) => a + calcBruto(merged(i)), 0)
+    const totPlusP = items.reduce((a: number, i: any) => a + calcPlusP(merged(i)), 0)
+    const totPerc  = items.reduce((a: number, i: any) => a + calcPerc(merged(i)),  0)
 
     const TH = ({ children, right = false, style = {} }: { children: React.ReactNode; right?: boolean; style?: React.CSSProperties }) => (
       <th className={`px-2.5 py-2.5 text-[10px] font-bold uppercase tracking-widest border-b border-gray-200 ${right ? 'text-right' : 'text-left'}`}
@@ -928,11 +1099,11 @@ function SueldosTab() {
             )}
             {period && (
               <>
-                <button onClick={() => handlePdf(`/payroll/periods/${period.id}/pdf`, `sueldos_${branchName}_${month}_${year}.pdf`)}
+                <button onClick={() => printPlanilla(period, branchName)}
                   className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-xs font-semibold font-body flex items-center gap-1">
                   <FileDown size={12} /> Planilla PDF
                 </button>
-                <button onClick={() => handlePdf(`/payroll/periods/${period.id}/payslips`, `recibos_${branchName}_${month}_${year}.pdf`)}
+                <button onClick={() => printAllPayslips(period, branchName)}
                   className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-xs font-semibold font-body flex items-center gap-1">
                   <FileDown size={12} /> Todos los recibos
                 </button>
@@ -967,67 +1138,73 @@ function SueldosTab() {
               </thead>
               <tbody>
                 {items.map((item: any, i: number) => {
-                  const liveBruto = calcBruto(item)
-                  const livePlusP = calcPlusP(item)
-                  const livePerc  = calcPerc(item)
+                  const m         = merged(item)   // item + ediciones locales en curso
+                  const liveBruto = calcBruto(m)
+                  const livePlusP = calcPlusP(m)
+                  const livePerc  = calcPerc(m)
                   return (
                     <tr key={item.id} style={{ background: i % 2 === 0 ? 'white' : '#fafaf8' }}>
                       {/* N° */}
                       <td className="px-2 py-1.5 text-center text-[11px] font-bold font-body" style={{ color: CORAL }}>{i + 1}</td>
                       {/* Empleado */}
-                      <td className="px-3 py-1.5 text-xs font-semibold font-body text-gray-800 whitespace-nowrap">{item.employee_name}</td>
+                      <td className="px-3 py-1.5 text-xs font-semibold font-body text-gray-800 whitespace-nowrap">{m.employee_name}</td>
                       {/* Inasistencias — texto libre */}
                       <td className="px-2 py-1.5">
-                        <TextInput disabled={isClosed} value={item.inasistencias_desc} placeholder="—"
-                          onBlur={v => updateItem(item.id, 'inasistencias_desc', v || null, item)} />
+                        <TextInput disabled={isClosed} value={m.inasistencias_desc} placeholder="—"
+                          onChange={v => setField(item.id, 'inasistencias_desc', v || null)}
+                          onBlur={_v => saveItem(item.id, item)} />
                       </td>
                       {/* Adelantos */}
                       <td className="px-2 py-1.5">
-                        <NumInput disabled={isClosed} value={item.adelanto}
-                          onBlur={v => updateItem(item.id, 'adelanto', v, item)} />
+                        <NumInput disabled={isClosed} value={m.adelanto}
+                          onChange={v => setField(item.id, 'adelanto', v)}
+                          onBlur={_v => saveItem(item.id, item)} />
                       </td>
                       {/* Deposito banco */}
                       <td className="px-2 py-1.5">
-                        <NumInput disabled={isClosed} value={item.deposito_banco}
-                          onBlur={v => updateItem(item.id, 'deposito_banco', v, item)} />
+                        <NumInput disabled={isClosed} value={m.deposito_banco}
+                          onChange={v => setField(item.id, 'deposito_banco', v)}
+                          onBlur={_v => saveItem(item.id, item)} />
                       </td>
                       {/* Horas */}
                       <td className="px-2 py-1.5">
-                        <NumInput disabled={isClosed} value={item.horas} step={0.5}
-                          onBlur={v => updateItem(item.id, 'horas', v, item)} />
+                        <NumInput disabled={isClosed} value={m.horas} step={0.5}
+                          onChange={v => setField(item.id, 'horas', v)}
+                          onBlur={_v => saveItem(item.id, item)} />
                       </td>
-                      {/* $ × Hora — solo Luro (donde está Ariel) */}
+                      {/* $ × Hora — solo Luro */}
                       {branchId === 1 && (
                         <td className="px-2 py-1.5">
-                          <NumInput disabled={isClosed} value={item.precio_hora}
-                            onBlur={v => updateItem(item.id, 'precio_hora', v, item)} />
+                          <NumInput disabled={isClosed} value={m.precio_hora}
+                            onChange={v => setField(item.id, 'precio_hora', v)}
+                            onBlur={_v => saveItem(item.id, item)} />
                         </td>
                       )}
                       {/* Plus factor (1.3, 1.2, 1.1) */}
                       <td className="px-2 py-1.5">
-                        <NumInput disabled={isClosed} value={item.plus_factor} step={0.1}
-                          onBlur={v => updateItem(item.id, 'plus_factor', v, item)} />
+                        <NumInput disabled={isClosed} value={m.plus_factor} step={0.1}
+                          onChange={v => setField(item.id, 'plus_factor', v)}
+                          onBlur={_v => saveItem(item.id, item)} />
                       </td>
-                      {/* Plus $ — auto */}
+                      {/* Plus $ — calculado en vivo */}
                       <td className="px-3 py-1.5 text-xs text-right font-body whitespace-nowrap"
                         style={{ background: '#FFFDE7', color: '#78350F' }}>
                         {livePlusP > 0 ? fmt$(livePlusP) : '—'}
                       </td>
-                      {/* Total bruto — auto (amber) */}
+                      {/* Total bruto — calculado en vivo, fondo amarillo */}
                       <td className="px-3 py-1.5 text-xs text-right font-bold font-body whitespace-nowrap"
                         style={{ background: '#FFFBEB', color: '#92400E' }}>
                         {fmt$(liveBruto)}
                       </td>
-                      {/* Total percibido — auto (green) */}
+                      {/* Total percibido — calculado en vivo, fondo verde */}
                       <td className="px-3 py-1.5 text-xs text-right font-bold font-body whitespace-nowrap"
                         style={{ background: '#ECFDF5', color: '#065F46' }}>
                         {fmt$(livePerc)}
                       </td>
-                      {/* PDF recibo individual */}
+                      {/* PDF recibo individual — client-side */}
                       <td className="px-2 py-1.5 text-center">
-                        <button title="Exportar recibo individual"
-                          onClick={() => handlePdf(`/payroll/items/${item.id}/payslip`,
-                            `recibo_${(item.employee_name || 'emp').replace(/[,. ]+/g,'_')}_${month}_${year}.pdf`)}
+                        <button title="Imprimir recibo individual"
+                          onClick={() => printPayslip(item, branchName)}
                           className="text-gray-300 transition-colors"
                           onMouseOver={e => (e.currentTarget.style.color = CORAL)}
                           onMouseOut={e => (e.currentTarget.style.color = '#d1d5db')}>
@@ -1084,9 +1261,9 @@ function SueldosTab() {
       ...(periodLuro?.items  ?? []).map((i: any) => ({ ...i, _branch: 'LURO'          })),
       ...(periodIndep?.items ?? []).map((i: any) => ({ ...i, _branch: 'INDEPENDENCIA' })),
     ]
-    const totBruto = allItems.reduce((a, i) => a + calcBruto(i), 0)
-    const totPlusP = allItems.reduce((a, i) => a + calcPlusP(i), 0)
-    const totPerc  = allItems.reduce((a, i) => a + calcPerc(i),  0)
+    const totBruto = allItems.reduce((a, i) => a + calcBruto(merged(i)), 0)
+    const totPlusP = allItems.reduce((a, i) => a + calcPlusP(merged(i)), 0)
+    const totPerc  = allItems.reduce((a, i) => a + calcPerc(merged(i)),  0)
 
     return (
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -1115,45 +1292,47 @@ function SueldosTab() {
               </tr>
             </thead>
             <tbody>
-              {allItems.map((item, i) => (
-                <tr key={item.id} style={{ background: i % 2 === 0 ? 'white' : '#fafaf8' }}>
-                  <td className="px-3 py-2 text-center text-[11px] font-bold font-body" style={{ color: CORAL }}>{i + 1}</td>
-                  <td className="px-3 py-2 text-xs font-semibold font-body text-gray-800 whitespace-nowrap">{item.employee_name}</td>
-                  <td className="px-3 py-2">
-                    <span className="px-2 py-0.5 rounded-full text-white text-[10px] font-bold"
-                      style={{ background: item._branch === 'LURO' ? NAVY : CORAL }}>
-                      {item._branch}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-xs text-right font-body text-gray-600 whitespace-nowrap">
-                    {parseFloat(item.deposito_banco) > 0 ? fmt$(item.deposito_banco) : '—'}
-                  </td>
-                  <td className="px-3 py-2 text-xs text-right font-body text-gray-600 whitespace-nowrap">
-                    {item.plus_factor ? `×${item.plus_factor}` : '—'}
-                  </td>
-                  <td className="px-3 py-2 text-xs text-right font-body whitespace-nowrap" style={{ color: '#78350F' }}>
-                    {calcPlusP(item) > 0 ? fmt$(calcPlusP(item)) : '—'}
-                  </td>
-                  <td className="px-3 py-2 text-xs text-right font-bold font-body whitespace-nowrap"
-                    style={{ background: '#FFFBEB', color: '#92400E' }}>
-                    {fmt$(calcBruto(item))}
-                  </td>
-                  <td className="px-3 py-2 text-xs text-right font-bold font-body whitespace-nowrap"
-                    style={{ background: '#ECFDF5', color: '#065F46' }}>
-                    {fmt$(calcPerc(item))}
-                  </td>
-                  <td className="px-2 py-1.5 text-center">
-                    <button title="Exportar recibo"
-                      onClick={() => handlePdf(`/payroll/items/${item.id}/payslip`,
-                        `recibo_${(item.employee_name || 'emp').replace(/[,. ]+/g,'_')}_${month}_${year}.pdf`)}
-                      className="text-gray-300 transition-colors"
-                      onMouseOver={e => (e.currentTarget.style.color = CORAL)}
-                      onMouseOut={e => (e.currentTarget.style.color = '#d1d5db')}>
-                      <FileDown size={13} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {allItems.map((item, i) => {
+                const m = merged(item)
+                return (
+                  <tr key={item.id} style={{ background: i % 2 === 0 ? 'white' : '#fafaf8' }}>
+                    <td className="px-3 py-2 text-center text-[11px] font-bold font-body" style={{ color: CORAL }}>{i + 1}</td>
+                    <td className="px-3 py-2 text-xs font-semibold font-body text-gray-800 whitespace-nowrap">{m.employee_name}</td>
+                    <td className="px-3 py-2">
+                      <span className="px-2 py-0.5 rounded-full text-white text-[10px] font-bold"
+                        style={{ background: m._branch === 'LURO' ? NAVY : CORAL }}>
+                        {m._branch}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-xs text-right font-body text-gray-600 whitespace-nowrap">
+                      {parseFloat(m.deposito_banco) > 0 ? fmt$(m.deposito_banco) : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-right font-body text-gray-600 whitespace-nowrap">
+                      {m.plus_factor ? `×${m.plus_factor}` : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-right font-body whitespace-nowrap" style={{ color: '#78350F' }}>
+                      {calcPlusP(m) > 0 ? fmt$(calcPlusP(m)) : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-right font-bold font-body whitespace-nowrap"
+                      style={{ background: '#FFFBEB', color: '#92400E' }}>
+                      {fmt$(calcBruto(m))}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-right font-bold font-body whitespace-nowrap"
+                      style={{ background: '#ECFDF5', color: '#065F46' }}>
+                      {fmt$(calcPerc(m))}
+                    </td>
+                    <td className="px-2 py-1.5 text-center">
+                      <button title="Imprimir recibo"
+                        onClick={() => printPayslip(item, m._branch === 'LURO' ? 'LURO' : 'INDEPENDENCIA')}
+                        className="text-gray-300 transition-colors"
+                        onMouseOver={e => (e.currentTarget.style.color = CORAL)}
+                        onMouseOut={e => (e.currentTarget.style.color = '#d1d5db')}>
+                        <FileDown size={13} />
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
               {allItems.length === 0 && (
                 <tr>
                   <td colSpan={9} className="px-4 py-10 text-center text-gray-400 text-sm font-body">
@@ -1433,8 +1612,13 @@ function RecibosTab() {
 /* ─────────────────────────────────────────────────────────────
    Helpers compartidos
 ───────────────────────────────────────────────────────────── */
-function NumInput({ value, onBlur, disabled, integer = false, step = 1 }: {
-  value: any; onBlur: (v: string) => void; disabled?: boolean; integer?: boolean; step?: number
+function NumInput({ value, onBlur, onChange, disabled, integer = false, step = 1 }: {
+  value: any
+  onBlur:   (v: string) => void
+  onChange?: (v: string) => void   // ← para actualizar cálculos en tiempo real
+  disabled?: boolean
+  integer?:  boolean
+  step?:     number
 }) {
   const [v, setV] = useState(value ?? '')
   useEffect(() => { setV(value ?? '') }, [value])
@@ -1442,8 +1626,24 @@ function NumInput({ value, onBlur, disabled, integer = false, step = 1 }: {
     <input type="number" step={step}
       className="border border-gray-200 rounded-lg py-1 px-1.5 text-xs text-right w-20 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed font-body"
       disabled={disabled} value={v}
-      onChange={e => setV(e.target.value)}
+      onChange={e => { setV(e.target.value); onChange?.(e.target.value) }}
       onBlur={() => onBlur(v)}
     />
+  )
+}
+
+/* TextInput reutilizable (fuera de SueldosTab para no remontarse en cada render) */
+function TextInput({ value, onBlur, onChange, disabled, placeholder }: {
+  value: string | null; onBlur: (v: string) => void; onChange?: (v: string) => void
+  disabled?: boolean; placeholder?: string
+}) {
+  const [v, setV] = useState(value ?? '')
+  useEffect(() => { setV(value ?? '') }, [value])
+  return (
+    <input type="text" placeholder={placeholder ?? ''}
+      className="border border-gray-200 rounded-lg py-1 px-1.5 text-[11px] w-24 focus:outline-none disabled:opacity-40 font-body"
+      disabled={disabled} value={v}
+      onChange={e => { setV(e.target.value); onChange?.(e.target.value) }}
+      onBlur={() => onBlur(v)} />
   )
 }
