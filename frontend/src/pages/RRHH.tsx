@@ -803,11 +803,14 @@ function SueldosTab() {
   const [localEdits, setLocalEdits] = useState<Record<number, Record<string, any>>>({})
 
   const load = useCallback(() => {
-    api.get<any[]>(`/payroll/periods?year=${year}`).then(r => {
-      setPeriods(r)
-      setLocalEdits({})   // limpiar edits al recargar
-    })
+    api.get<any[]>(`/payroll/periods?year=${year}`).then(setPeriods)
+    // No limpiar localEdits acá: si el usuario está tipando en otro campo
+    // mientras se guarda el anterior, los valores locales se perderían.
+    // localEdits se resetea solo cuando cambia el mes (useEffect de month).
   }, [year])
+
+  // Limpiar edits locales solo cuando cambia el mes seleccionado
+  useEffect(() => { setLocalEdits({}) }, [month])
 
   useEffect(() => { load() }, [load])
 
