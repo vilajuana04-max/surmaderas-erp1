@@ -1515,8 +1515,131 @@ ${cards}
       {vista === 'independencia' && renderBranchTable(2, 'INDEPENDENCIA')}
       {vista === 'ambas'         && renderAmbasView()}
       {vista === 'historial'     && renderHistorial()}
+
+      {/* Panel Resumen de Pagos — visible en todas las vistas excepto historial */}
+      {vista !== 'historial' && renderResumenPagos()}
     </div>
   )
+
+  /* ── Resumen de Pagos (banco + efectivo) ── */
+  function renderResumenPagos() {
+    // Unir items de ambas sucursales para el mes seleccionado
+    const luroPeriod  = getPeriod(1)
+    const indepPeriod = getPeriod(2)
+    const allItems: any[] = [
+      ...(luroPeriod?.items  ?? []),
+      ...(indepPeriod?.items ?? []),
+    ]
+    if (allItems.length === 0) return null
+
+    const empName = (item: any) => (item.employee_name ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+
+    // ── Banco ────────────────────────────────────────────────────────────
+    // Usar deposito_banco para la mayoría; total_percibido para Avila.
+    // Excluir explícitamente a Vivas.
+    const isBankEmployee = (n: string) =>
+      n.includes('vazquez') ||
+      (n.includes('vila') && n.includes('cecilia')) ||
+      (n.includes('viejo') && n.includes('marcelo')) ||
+      n.includes('lalli') ||
+      n.includes('ponasso') ||
+      n.includes('salinas') ||
+      n.includes('avila')
+
+    const bankItems = allItems.filter(item => isBankEmployee(empName(item)))
+
+    const bankLines = bankItems.map(item => {
+      const m = merged(item)
+      const n = empName(item)
+      const usesPercibido = n.includes('avila')
+      const amount = usesPercibido ? calcPerc(m) : (parseFloat(m.deposito_banco) || 0)
+      return { name: item.employee_name, amount, note: usesPercibido ? 'percibido' : 'depósito' }
+    })
+    const bankTotal = bankLines.reduce((s, l) => s + l.amount, 0)
+
+    // ── Efectivo ─────────────────────────────────────────────────────────
+    // Usar total_percibido para todos.
+    const isCashEmployee = (n: string) =>
+      n.includes('vazquez') ||
+      (n.includes('vila') && n.includes('cecilia')) ||
+      (n.includes('viejo') && n.includes('marcelo')) ||
+      n.includes('lalli') ||
+      n.includes('scatizzi') ||
+      n.includes('zicavo') ||
+      n.includes('rojo')
+
+    const cashItems = allItems.filter(item => isCashEmployee(empName(item)))
+
+    const cashLines = cashItems.map(item => {
+      const m = merged(item)
+      return { name: item.employee_name, amount: calcPerc(m) }
+    })
+    const cashTotal = cashLines.reduce((s, l) => s + l.amount, 0)
+
+    const LineItem = ({ label, amount, note }: { label: string; amount: number; note?: string }) => (
+      <div className="flex items-baseline justify-between py-1 border-b border-gray-50 last:border-0">
+        <span className="text-xs text-gray-500 font-body flex items-center gap-1.5">
+          {label}
+          {note && <span className="text-[9px] text-gray-300 italic">{note}</span>}
+        </span>
+        <span className="text-xs font-semibold text-gray-700 font-body tabular-nums">{fmtARS(amount)}</span>
+      </div>
+    )
+
+    return (
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        {/* Header */}
+        <div style={{ background: NAVY }} className="px-5 py-3">
+          <p className="text-white text-sm font-bold font-head tracking-wide">
+            RESUMEN DE PAGOS — {month} {year}
+          </p>
+          <p className="text-white/45 text-[11px] font-body mt-0.5">
+            Montos necesarios para liquidar el mes
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
+
+          {/* Banco */}
+          <div className="p-5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 font-body mb-1">
+              Necesario en Banco
+            </p>
+            <p className="text-2xl font-bold font-head mb-4" style={{ color: NAVY }}>
+              {fmtARS(bankTotal)}
+            </p>
+            <div className="space-y-0.5">
+              {bankLines.map((l, i) => (
+                <LineItem key={i} label={l.name} amount={l.amount} note={l.note} />
+              ))}
+              {bankLines.length === 0 && (
+                <p className="text-xs text-gray-400 font-body">Sin datos para este mes.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Efectivo */}
+          <div className="p-5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 font-body mb-1">
+              Necesario en Efectivo
+            </p>
+            <p className="text-2xl font-bold font-head mb-4" style={{ color: CORAL }}>
+              {fmtARS(cashTotal)}
+            </p>
+            <div className="space-y-0.5">
+              {cashLines.map((l, i) => (
+                <LineItem key={i} label={l.name} amount={l.amount} />
+              ))}
+              {cashLines.length === 0 && (
+                <p className="text-xs text-gray-400 font-body">Sin datos para este mes.</p>
+              )}
+            </div>
+          </div>
+
+        </div>
+      </div>
+    )
+  }
 
   /* ── Vista Historial ── */
   function renderHistorial() {
