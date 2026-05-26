@@ -54,40 +54,56 @@ class PayrollItem(Base):
     def total_bruto(self) -> float:
         """
         Col I — Total bruto.
-        Prioridad:
-          1. horas × precio_hora  (empleados por hora, ej: Viejo Ariel)
-          2. bruto_manual         (entrada directa del usuario)
-          3. deposito_banco × 2   (fórmula automática Excel =D×2 cuando hay Plus)
-          4. deposito_banco       (fallback sin plus)
+        Prioridad y fórmulas:
+          1. horas × precio_hora          (Rojo Matias, Zicavo Valentina — por hora, sin plus)
+          2. bruto_manual × plus_factor   (Scatizzi Patricia — sueldo base + plus si hay)
+          3. deposito_banco × 2 × plus_factor  (estándar — SIEMPRE ×2, plus incluido)
         """
+        pf = float(self.plus_factor) if self.plus_factor and float(self.plus_factor) > 1 else 1.0
+        # 1. Por horas — sin plus
         if self.horas and self.precio_hora:
             return round(float(self.horas) * float(self.precio_hora), 2)
+        # 2. Sueldo base manual (Patricia) — plus se aplica sobre el sueldo base
         if self.bruto_manual and float(self.bruto_manual) != 0:
-            return float(self.bruto_manual)
+            return round(float(self.bruto_manual) * pf, 2)
+        # 3. Estándar — deposito × 2 (SIEMPRE), factor aplica el plus
         dep = float(self.deposito_banco or 0)
-        if dep > 0 and self.plus_factor and float(self.plus_factor) > 1:
-            return round(dep * 2, 2)
-        return dep
+        return round(dep * 2 * pf, 2)
 
     @property
     def plus_pesos(self) -> float:
-        """Col H — Plus en $: total_bruto × (plus_factor − 1), solo si Plus > 1."""
+        """
+        Col H — Plus en $.
+          Estándar:    dep × 2 × (plus_factor − 1)
+          Sueldo base: bruto_manual × (plus_factor − 1)
+          Por horas:   0  (no aplica plus)
+        """
         if not self.plus_factor or float(self.plus_factor) <= 1:
             return 0.0
-        return round(self.total_bruto * (float(self.plus_factor) - 1), 2)
+        pf = float(self.plus_factor)
+        # Por horas: sin plus
+        if self.horas and self.precio_hora:
+            return 0.0
+        # Sueldo base manual
+        if self.bruto_manual and float(self.bruto_manual) != 0:
+            return round(float(self.bruto_manual) * (pf - 1), 2)
+        # Estándar
+        dep = float(self.deposito_banco or 0)
+        return round(dep * 2 * (pf - 1), 2)
 
     @property
     def total_percibido(self) -> float:
         """
         Col J — Total percibido.
-        Fórmula Excel: =(I × G) − C − D   [cuando hay Plus]
-        Sin Plus:        = I − C − D
-        Solo deposito:   = D − C           (Avila / Guillermo)
-        Unificado: total_bruto × factor − adelanto − deposito
-        donde factor = plus_factor (>=1) ó 1.0 si no hay plus
+          Por horas:     bruto − adelantos                    (sin restar depósito)
+          Sueldo base:   bruto − adelantos                    (sin restar depósito)
+          Estándar:      bruto − deposito_banco − adelantos
         """
-        bruto   = self.total_bruto
-        factor  = float(self.plus_factor) if self.plus_factor and float(self.plus_factor) > 1 else 1.0
+        bruto    = self.total_bruto
         adelanto = float(self.adelanto or 0)
+        # Por horas o sueldo base manual: solo se resta el adelanto
+        if (self.horas and self.precio_hora) or (self.bruto_manual and float(self.bruto_manual) != 0):
+            return round(bruto - adelanto, 2)
+        # Estándar: se resta el depósito y el adelanto
         deposito = float(self.deposito_banco or 0)
-        return round(bruto * factor - adelanto - deposito, 2)
+        return round(bruto - deposito - adelanto, 2)

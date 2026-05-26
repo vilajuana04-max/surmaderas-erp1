@@ -1037,25 +1037,54 @@ ${pdfCSS}
   ]
 
   /* ─── Helpers de cálculo — usan el item YA MERGEADO con localEdits ─── */
+
   const calcBruto = (m: any): number => {
-    const h = parseFloat(m.horas) || 0
+    const pf  = parseFloat(m.plus_factor) || 0
+    const factor = pf > 1 ? pf : 1.0
+    // 1. Por horas (Rojo Matias, Zicavo Valentina) — sin plus
+    const h  = parseFloat(m.horas)       || 0
     const ph = parseFloat(m.precio_hora) || 0
     if (h > 0 && ph > 0) return h * ph
+    // 2. Sueldo base manual (Patricia) — plus se aplica sobre el sueldo base
     const bm = parseFloat(m.bruto_manual) || 0
-    if (bm !== 0) return bm
+    if (bm !== 0) return bm * factor
+    // 3. Estándar — deposito × 2 SIEMPRE, factor aplica el plus
     const dep = parseFloat(m.deposito_banco) || 0
-    const pf = parseFloat(m.plus_factor) || 0
-    if (dep > 0 && pf > 1) return dep * 2
-    return dep
+    return dep * 2 * factor
   }
+
   const calcPlusP = (m: any): number => {
-    const f = parseFloat(m.plus_factor) || 0
-    return f > 1 ? calcBruto(m) * (f - 1) : 0
+    const pf = parseFloat(m.plus_factor) || 0
+    if (pf <= 1) return 0
+    // Por horas: sin plus
+    const h  = parseFloat(m.horas)       || 0
+    const ph = parseFloat(m.precio_hora) || 0
+    if (h > 0 && ph > 0) return 0
+    // Sueldo base manual
+    const bm = parseFloat(m.bruto_manual) || 0
+    if (bm !== 0) return bm * (pf - 1)
+    // Estándar: plus sobre dep × 2
+    const dep = parseFloat(m.deposito_banco) || 0
+    return dep * 2 * (pf - 1)
   }
+
   const calcPerc = (m: any): number => {
-    const f = parseFloat(m.plus_factor) || 0
-    const factor = f > 1 ? f : 1
-    return calcBruto(m) * factor - (parseFloat(m.adelanto) || 0) - (parseFloat(m.deposito_banco) || 0)
+    const bruto   = calcBruto(m)
+    const adelanto = parseFloat(m.adelanto) || 0
+    // Por horas o sueldo base: solo se resta el adelanto
+    const h  = parseFloat(m.horas)        || 0
+    const ph = parseFloat(m.precio_hora)  || 0
+    const bm = parseFloat(m.bruto_manual) || 0
+    if ((h > 0 && ph > 0) || bm !== 0) return bruto - adelanto
+    // Estándar: se resta depósito y adelanto
+    const dep = parseFloat(m.deposito_banco) || 0
+    return bruto - dep - adelanto
+  }
+
+  /* Convierte factor almacenado (1.30) a porcentaje para mostrar (30) */
+  const factorToPct = (pf: any): string => {
+    const f = parseFloat(pf) || 0
+    return f > 1 ? String(Math.round((f - 1) * 100)) : ''
   }
 
   /* ── Render single-branch full table ── */
@@ -1069,8 +1098,8 @@ ${pdfCSS}
     const totPlusP = items.reduce((a: number, i: any) => a + calcPlusP(merged(i)), 0)
     const totPerc  = items.reduce((a: number, i: any) => a + calcPerc(merged(i)),  0)
 
-    const TH = ({ children, right = false, style = {} }: { children: React.ReactNode; right?: boolean; style?: React.CSSProperties }) => (
-      <th className={`px-2.5 py-2.5 text-[10px] font-bold uppercase tracking-widest border-b border-gray-200 ${right ? 'text-right' : 'text-left'}`}
+    const TH = ({ children, right = false, style = {}, title }: { children: React.ReactNode; right?: boolean; style?: React.CSSProperties; title?: string }) => (
+      <th title={title} className={`px-2.5 py-2.5 text-[10px] font-bold uppercase tracking-widest border-b border-gray-200 ${right ? 'text-right' : 'text-left'}`}
         style={{ color: NAVY, background: '#f0eeeb', ...style }}>
         {children}
       </th>
@@ -1122,7 +1151,7 @@ ${pdfCSS}
               Luro:  Empleado | Inasistencias | Adelantos | Deposito | Horas | $×Hora | Plus | Plus $ | Total Bruto | Total Percibido
               Indep: Empleado | Inasistencias | Adelantos | Deposito | Horas |         Plus | Plus $ | Total Bruto | Total Percibido
             */}
-            <table className="w-full min-w-[900px] text-sm border-collapse">
+            <table className="w-full min-w-[960px] text-sm border-collapse">
               <thead>
                 <tr>
                   <TH style={{ width: 28, textAlign: 'center' }}>N°</TH>
@@ -1132,7 +1161,8 @@ ${pdfCSS}
                   <TH right>Dep. Banco</TH>
                   <TH right style={{ width: 70 }}>Horas</TH>
                   {branchId === 1 && <TH right style={{ width: 80 }}>$ × Hora</TH>}
-                  <TH right style={{ width: 70 }}>Plus</TH>
+                  <TH right style={{ width: 90 }} title="Sueldo base fijo (Patricia). El plus se aplica sobre este monto.">Sueldo Base</TH>
+                  <TH right style={{ width: 60 }} title="Porcentaje de plus sobre el bruto (ej: 30 = 30%)">Plus %</TH>
                   <TH right style={{ background: '#FFF8E1', color: '#92400E' }}>Plus $</TH>
                   <TH right style={{ background: '#FFF3CD', color: '#92400E' }}>Total Bruto</TH>
                   <TH right style={{ background: '#D1FAE5', color: '#065F46' }}>Total Percibido</TH>
@@ -1183,11 +1213,29 @@ ${pdfCSS}
                             onBlur={_v => saveItem(item.id, item)} />
                         </td>
                       )}
-                      {/* Plus factor (1.3, 1.2, 1.1) */}
+                      {/* Sueldo Base — para empleados con sueldo fijo (Patricia) */}
                       <td className="px-2 py-1.5">
-                        <NumInput disabled={isClosed} value={m.plus_factor} step={0.1}
-                          onChange={v => setField(item.id, 'plus_factor', v)}
+                        <NumInput disabled={isClosed} value={m.bruto_manual}
+                          onChange={v => setField(item.id, 'bruto_manual', v)}
                           onBlur={_v => saveItem(item.id, item)} />
+                      </td>
+                      {/* Plus % — el usuario ingresa 30 (= 30%), guardamos factor 1.30 */}
+                      <td className="px-2 py-1.5">
+                        <div className="flex items-center gap-0.5">
+                          <NumInput
+                            disabled={isClosed}
+                            value={factorToPct(m.plus_factor)}
+                            step={5}
+                            integer
+                            onChange={v => {
+                              const pct = parseFloat(v)
+                              setField(item.id, 'plus_factor',
+                                !isNaN(pct) && pct > 0 ? (1 + pct / 100) : null)
+                            }}
+                            onBlur={_v => saveItem(item.id, item)}
+                          />
+                          <span className="text-[10px] text-gray-400 select-none">%</span>
+                        </div>
                       </td>
                       {/* Plus $ — calculado en vivo */}
                       <td className="px-3 py-1.5 text-xs text-right font-body whitespace-nowrap"
@@ -1220,7 +1268,7 @@ ${pdfCSS}
 
                 {/* Fila TOTALES */}
                 <tr style={{ background: NAVY }}>
-                  <td colSpan={branchId === 1 ? 8 : 7}
+                  <td colSpan={branchId === 1 ? 9 : 8}
                     className="px-3 py-2.5 text-white text-[11px] font-bold uppercase tracking-widest">
                     TOTALES
                   </td>
@@ -1239,9 +1287,9 @@ ${pdfCSS}
             </table>
 
             <p className="px-4 py-2 text-[10px] text-gray-400 font-body border-t border-gray-100">
-              Total bruto = Dep. × 2 (si hay Plus) ó Horas × $×Hora ·
-              Plus $ = Bruto × (Plus − 1) ·
-              Total percibido = Bruto × Plus − Adelantos − Dep.
+              Estándar: Bruto = Dep.×2 + Plus$ · Plus$ = Dep.×2×(Plus%) · Percibido = Bruto − Dep. − Adelantos ·
+              Sueldo base: Bruto = Base + Plus$ · Percibido = Bruto − Adelantos ·
+              Por horas: Bruto = Horas × $×Hora · Percibido = Bruto − Adelantos
             </p>
           </div>
         ) : (
@@ -1311,7 +1359,7 @@ ${pdfCSS}
                       {parseFloat(m.deposito_banco) > 0 ? fmt$(m.deposito_banco) : '—'}
                     </td>
                     <td className="px-3 py-2 text-xs text-right font-body text-gray-600 whitespace-nowrap">
-                      {m.plus_factor ? `×${m.plus_factor}` : '—'}
+                      {factorToPct(m.plus_factor) ? `+${factorToPct(m.plus_factor)}%` : '—'}
                     </td>
                     <td className="px-3 py-2 text-xs text-right font-body whitespace-nowrap" style={{ color: '#78350F' }}>
                       {calcPlusP(m) > 0 ? fmt$(calcPlusP(m)) : '—'}
