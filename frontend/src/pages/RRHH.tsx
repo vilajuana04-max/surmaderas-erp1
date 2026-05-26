@@ -348,69 +348,6 @@ function VacacionesTab() {
             </div>
           </div>
 
-          {/* ── SECCIÓN 2: Datos Empleados ── */}
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div style={{ background: CORAL }} className="px-5 py-3">
-              <p className="text-white text-sm font-bold tracking-wide font-head">
-                DATOS EMPLEADOS — ANTIGUEDAD Y VACACIONES POR CONVENIO
-              </p>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[600px] text-sm">
-                <thead style={{ background: '#f5ede9' }}>
-                  <tr>
-                    <th className="px-3 py-2.5 text-center text-[10px] font-bold uppercase tracking-widest border-b border-brand-border w-8"
-                      style={{ color: CORAL }}>N°</th>
-                    {['Empleado','Fecha Ingreso','Meses','Años','Vac/Año (días)','Sucursal'].map(h => (
-                      <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest border-b border-brand-border"
-                        style={{ color: CORAL }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {employees.map((emp, i) => {
-                    // Equivalentes a fórmulas de hoja EMPLEADOS del Excel:
-                    // Col C = ROUNDDOWN(YEARFRAC(B,TODAY())*12,0) → months_of_service (API)
-                    // Col D = C/12                                 → years_of_service  (API)
-                    // Col E = IF(D<5,14,IF(D<10,21,28))           → vacation_days_entitled (API)
-                    const meses   = emp.months_of_service ?? 0
-                    const anos    = (meses / 12).toFixed(2)
-                    const isIndep = emp.branch_name === 'INDEPENDENCIA'
-                    return (
-                      <tr key={emp.id}
-                        className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}
-                        style={{ borderLeft: `3px solid ${isIndep ? CORAL : NAVY}` }}>
-                        <td className="px-3 py-2.5 text-[10px] font-bold text-center font-body"
-                          style={{ color: CORAL }}>{i + 1}</td>
-                        <td className="px-4 py-2.5 text-xs font-semibold text-gray-800 font-body">{emp.name}</td>
-                        <td className="px-4 py-2.5 text-xs text-brand-muted font-body">
-                          {new Date(emp.hire_date).toLocaleDateString('es-AR')}
-                        </td>
-                        {/* Col C — Meses (ROUNDDOWN YEARFRAC*12) */}
-                        <td className="px-4 py-2.5 text-xs text-center font-body">{meses}</td>
-                        {/* Col D — Años (C/12) */}
-                        <td className="px-4 py-2.5 text-xs text-center font-body">{anos}</td>
-                        {/* Col E — Vac/Año IF(años<5,14,IF(años<10,21,28)) */}
-                        <td className="px-4 py-2.5 text-xs text-center font-body"
-                          style={{ background: '#fef9c3' }}>
-                          <span className="text-amber-800 font-bold">{emp.vacation_days_entitled} días</span>
-                        </td>
-                        <td className="px-4 py-2.5 text-xs font-semibold font-body" style={{ color: isIndep ? CORAL : NAVY }}>
-                          {isIndep ? 'Indep.' : 'Luro'}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <div className="px-5 py-3 border-t border-brand-border" style={{ background: '#fef9c3' }}>
-              <p className="text-[11px] text-amber-800 font-body font-semibold">
-                Formula convenio: &lt; 5 años = 14 días &nbsp;·&nbsp; 5 a 10 años = 21 días &nbsp;·&nbsp; &gt;= 10 años = 28 días
-              </p>
-            </div>
-          </div>
-
           {/* ── SECCIÓN 2b: Resumen Anual ── */}
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <div style={{ background: NAVY }} className="px-5 py-3">
@@ -2569,6 +2506,61 @@ function AjustesTab() {
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* ── Tabla Antigüedad y Vacaciones por Convenio ── */}
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div style={{ background: CORAL }} className="px-5 py-3">
+          <p className="text-white text-sm font-bold tracking-wide font-head">
+            ANTIGUEDAD Y VACACIONES POR CONVENIO
+          </p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[600px] text-sm">
+            <thead style={{ background: '#f5ede9' }}>
+              <tr>
+                <th className="px-3 py-2.5 text-center text-[10px] font-bold uppercase tracking-widest border-b border-brand-border w-8"
+                  style={{ color: CORAL }}>N°</th>
+                {['Empleado', 'Fecha Ingreso', 'Meses', 'Años', 'Vac/Año (días)', 'Sucursal'].map(h => (
+                  <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest border-b border-brand-border"
+                    style={{ color: CORAL }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {employees.filter(e => e.is_active).map((emp, i) => {
+                const meses   = emp.months_of_service ?? 0
+                const anos    = (meses / 12).toFixed(2)
+                const isIndep = emp.branch_name === 'INDEPENDENCIA'
+                return (
+                  <tr key={emp.id}
+                    className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}
+                    style={{ borderLeft: `3px solid ${isIndep ? CORAL : NAVY}` }}>
+                    <td className="px-3 py-2.5 text-[10px] font-bold text-center font-body"
+                      style={{ color: CORAL }}>{i + 1}</td>
+                    <td className="px-4 py-2.5 text-xs font-semibold text-gray-800 font-body">{emp.name}</td>
+                    <td className="px-4 py-2.5 text-xs text-brand-muted font-body">
+                      {new Date(emp.hire_date).toLocaleDateString('es-AR')}
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-center font-body">{meses}</td>
+                    <td className="px-4 py-2.5 text-xs text-center font-body">{anos}</td>
+                    <td className="px-4 py-2.5 text-xs text-center font-body" style={{ background: '#fef9c3' }}>
+                      <span className="text-amber-800 font-bold">{emp.vacation_days_entitled} días</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-xs font-semibold font-body" style={{ color: isIndep ? CORAL : NAVY }}>
+                      {isIndep ? 'Indep.' : 'Luro'}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="px-5 py-3 border-t border-brand-border" style={{ background: '#fef9c3' }}>
+          <p className="text-[11px] text-amber-800 font-body font-semibold">
+            Formula convenio: &lt; 5 años = 14 días &nbsp;·&nbsp; 5 a 10 años = 21 días &nbsp;·&nbsp; &gt;= 10 años = 28 días
+          </p>
         </div>
       </div>
     </div>

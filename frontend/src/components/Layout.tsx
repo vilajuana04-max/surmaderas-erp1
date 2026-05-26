@@ -17,10 +17,12 @@ const NAV_AFTER = [
   { to: '/gastos',  icon: Receipt,         label: 'Gastos',    num: '05' },
 ]
 const RRHH_SUB = [
-  { tab: 'vacaciones', label: '🌴 Vacaciones' },
-  { tab: 'calendario', label: '📅 Calendario'  },
-  { tab: 'sueldos',    label: '💰 Sueldos'     },
-  { tab: 'recibos',    label: '📎 Recibos'     },
+  { tab: 'vacaciones', label: 'Vacaciones' },
+  { tab: 'calendario', label: 'Calendario' },
+  { tab: 'sueldos',    label: 'Sueldos'    },
+  { tab: 'recibos',    label: 'Recibos'    },
+  { tab: 'dashboard',  label: 'Dashboard'  },
+  { tab: 'ajustes',    label: 'Ajustes'    },
 ]
 
 /* ── Sidebar content (shared desktop/mobile) ─────────────────── */
