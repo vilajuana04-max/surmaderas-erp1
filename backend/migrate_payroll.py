@@ -29,6 +29,9 @@ with engine.connect() as conn:
         "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS precio_hora      NUMERIC(15,2)",
         "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS plus_factor      NUMERIC(5,3)",
         "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS bruto_manual     NUMERIC(15,2)",
+        # Comisión / incentivo / hora extra
+        "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS comision         NUMERIC(15,2) DEFAULT 0",
+        "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS comision_desc    VARCHAR",
     ]
     for s in stmts:
         conn.execute(text(s))

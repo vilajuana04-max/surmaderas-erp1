@@ -81,6 +81,8 @@ def update_payroll_item(item_id: int, data: PayrollItemCreate, db: Session = Dep
     item.precio_hora        = data.precio_hora
     item.plus_factor        = data.plus_factor
     item.bruto_manual       = data.bruto_manual
+    item.comision           = data.comision
+    item.comision_desc      = data.comision_desc
 
     db.commit()
     db.refresh(item)
@@ -159,6 +161,8 @@ def _enrich_item(i: PayrollItem) -> dict:
         "precio_hora":        i.precio_hora,
         "plus_factor":        i.plus_factor,
         "bruto_manual":       i.bruto_manual,
+        "comision":           i.comision,
+        "comision_desc":      i.comision_desc,
         # Calculados
         "total_bruto":       i.total_bruto,
         "plus_pesos":        i.plus_pesos,

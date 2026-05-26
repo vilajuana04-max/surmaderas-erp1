@@ -791,14 +791,16 @@ function CalendarioTab() {
      Plus en $      = Total bruto × (Plus − 1)
      Total percibido= (Total bruto × Plus) − Adelantos − Deposito
 ───────────────────────────────────────────────────────────── */
-type SueldosVista = 'luro' | 'independencia' | 'ambas'
+type SueldosVista = 'luro' | 'independencia' | 'ambas' | 'historial'
 
 function SueldosTab() {
-  const [month,      setMonth]      = useState(MONTHS[CURRENT_MONTH_IDX])
-  const [year]                      = useState(CURRENT_YEAR)
-  const [periods,    setPeriods]    = useState<any[]>([])
-  const [creating,   setCreating]   = useState(false)
-  const [vista,      setVista]      = useState<SueldosVista>('luro')
+  const [month,          setMonth]          = useState(MONTHS[CURRENT_MONTH_IDX])
+  const [year]                              = useState(CURRENT_YEAR)
+  const [periods,        setPeriods]        = useState<any[]>([])
+  const [historyPeriods, setHistoryPeriods] = useState<any[]>([])
+  const [creating,       setCreating]       = useState(false)
+  const [vista,          setVista]          = useState<SueldosVista>('luro')
+  const [histExpanded,   setHistExpanded]   = useState<number | null>(null)
   // Estado de edición local — actualiza los cálculos sin esperar al servidor
   const [localEdits, setLocalEdits] = useState<Record<number, Record<string, any>>>({})
 
@@ -809,10 +811,15 @@ function SueldosTab() {
     // localEdits se resetea solo cuando cambia el mes (useEffect de month).
   }, [year])
 
+  const loadHistory = useCallback(() => {
+    api.get<any[]>('/payroll/periods').then(setHistoryPeriods)
+  }, [])
+
   // Limpiar edits locales solo cuando cambia el mes seleccionado
   useEffect(() => { setLocalEdits({}) }, [month])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => { if (vista === 'historial') loadHistory() }, [vista, loadHistory])
 
   const getPeriod = (branchId: number) =>
     periods.find(p => p.branch_id === branchId && p.month === month && p.year === year)
@@ -841,12 +848,14 @@ function SueldosTab() {
     await api.put(`/payroll/items/${itemId}`, {
       employee_id:        m.employee_id,
       inasistencias_desc: m.inasistencias_desc || null,
-      adelanto:           parseFloat(m.adelanto)    || 0,
+      adelanto:           parseFloat(m.adelanto)       || 0,
       deposito_banco:     parseFloat(m.deposito_banco) || 0,
-      horas:              m.horas       ? parseFloat(m.horas)       : null,
-      precio_hora:        m.precio_hora ? parseFloat(m.precio_hora) : null,
-      plus_factor:        m.plus_factor ? parseFloat(m.plus_factor) : null,
+      horas:              m.horas        ? parseFloat(m.horas)        : null,
+      precio_hora:        m.precio_hora  ? parseFloat(m.precio_hora)  : null,
+      plus_factor:        m.plus_factor  ? parseFloat(m.plus_factor)  : null,
       bruto_manual:       m.bruto_manual ? parseFloat(m.bruto_manual) : null,
+      comision:           m.comision     ? parseFloat(m.comision)     : null,
+      comision_desc:      m.comision_desc || null,
     })
     load()
   }
@@ -867,58 +876,111 @@ function SueldosTab() {
     @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
   `
 
-  /* Recibo individual de un empleado */
-  const printPayslip = (item: any, branchName: string) => {
-    const m     = merged(item)
-    const bruto = calcBruto(m)
+  /* ── Construye el HTML de un recibo individual — formato exacto de las tarjetas ── */
+  const buildPayslipCard = (item: any, branchName: string) => {
+    const m    = merged(item)
+    const h    = parseFloat(m.horas)        || 0
+    const ph   = parseFloat(m.precio_hora)  || 0
+    const bm   = parseFloat(m.bruto_manual) || 0
+    const dep  = parseFloat(m.deposito_banco) || 0
+    const adel = parseFloat(m.adelanto)     || 0
+    const pf   = parseFloat(m.plus_factor)  || 0
+    const com  = parseFloat(m.comision)     || 0
+    const comLabel = m.comision_desc || 'Comisión'
     const plusP = calcPlusP(m)
+    const bruto = calcBruto(m)
     const perc  = calcPerc(m)
-    const dep   = parseFloat(m.deposito_banco) || 0
-    const adel  = parseFloat(m.adelanto)        || 0
 
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-<title>Recibo — ${m.employee_name}</title>
-<style>
-${pdfCSS}
-.card{border:1px solid #ccc;border-radius:8px;overflow:hidden;max-width:320px;margin:24px auto}
-.hdr{background:#070614;color:#fff;padding:16px 18px}
-.co{font-size:14pt;font-weight:bold;letter-spacing:1px}
-.doc{font-size:8pt;color:rgba(255,255,255,.5);margin-top:2px}
-.emp{font-size:13pt;font-weight:bold;color:#C8603A;margin-top:8px}
-.per{font-size:9pt;color:rgba(255,255,255,.45);margin-top:3px}
-.bd{padding:8px 18px 2px}
-.ln{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f0eeeb;font-size:9.5pt}
-.bruto{background:#FFF3CD;padding:8px 18px;display:flex;justify-content:space-between;font-weight:bold;font-size:11pt;border-top:2px solid #F0C040}
-.perc{background:#C8603A;padding:10px 18px;display:flex;justify-content:space-between;font-weight:bold;font-size:12pt;color:#fff}
-.firmas{padding:16px 18px;display:flex;gap:16px}
-.firma{flex:1;border-top:1px solid #aaa;padding-top:4px;font-size:8pt;color:#888;text-align:center}
-</style></head><body>
+    const isHours  = h > 0 && ph > 0
+    const isManual = bm !== 0
+    const isStd    = !isHours && !isManual
+
+    const $ = (n: number) => fmtARS(n)
+    const ln = (label: string, val: string, style = '') =>
+      `<tr><td class="lbl" style="${style}">${label}</td><td class="val" style="${style}">${val}</td></tr>`
+
+    /* ── Líneas de ingresos ── */
+    let incomeRows = ''
+    if (isHours) {
+      incomeRows += ln('Horas', h.toLocaleString('es-AR'))
+      incomeRows += ln('Valor', $(ph))
+    } else if (isManual) {
+      incomeRows += ln('Sueldo', $(bm))
+    } else {
+      incomeRows += ln('Sueldo', $(dep * 2))
+    }
+    if (com > 0)  incomeRows += ln(comLabel, $(com))
+    if (plusP > 0) incomeRows += ln('Plus', $(plusP))
+
+    /* ── ¿Mostrar fila "total"? Solo si hay más de un concepto de ingreso ── */
+    const showTotal = plusP > 0 || com > 0 || isHours
+    const totalRow  = showTotal ? ln('total', $(bruto), 'font-weight:bold;border-top:2px solid #ccc;padding-top:6px') : ''
+
+    /* ── Líneas de deducciones ── */
+    let deductRows = ''
+    if (isStd && dep > 0) deductRows += ln('Depósito', $(dep))
+    deductRows += ln('Adelanto', adel > 0 ? $(adel) : '$ —')
+
+    /* ── Inasistencias ── */
+    const inaRow = m.inasistencias_desc
+      ? `<tr><td class="lbl" style="color:#b91c1c;font-size:8pt" colspan="2">⚠ Inasistencias: ${m.inasistencias_desc}</td></tr><tr><td colspan="2" style="padding:2px"></td></tr>`
+      : ''
+
+    return `
 <div class="card">
   <div class="hdr">
     <div class="co">SUR MADERAS</div>
-    <div class="doc">RECIBO DE SUELDO</div>
+    <div class="doc">RECIBO DE SUELDO &nbsp;·&nbsp; ${branchName}</div>
     <div class="emp">${m.employee_name}</div>
-    <div class="per">${month} ${year} · ${branchName}</div>
+    <div class="per">${month} ${year}</div>
   </div>
-  <div class="bd">
-    ${m.inasistencias_desc ? `<div class="ln"><span style="color:#c00">Inasistencias</span><span style="color:#c00;font-weight:bold">${m.inasistencias_desc}</span></div>` : ''}
-    ${plusP > 0 ? `<div class="ln"><span>(+) Plus × ${m.plus_factor}</span><span style="font-weight:bold">${fmtARS(plusP)}</span></div>` : ''}
-  </div>
-  <div class="bruto"><span>TOTAL BRUTO</span><span>${fmtARS(bruto)}</span></div>
-  <div class="bd">
-    ${dep > 0 ? `<div class="ln"><span>(−) Depósito banco</span><span style="font-weight:bold">${fmtARS(dep)}</span></div>` : ''}
-    ${adel > 0 ? `<div class="ln"><span>(−) Adelanto</span><span style="font-weight:bold">${fmtARS(adel)}</span></div>` : ''}
-  </div>
-  <div class="perc"><span>TOTAL PERCIBIDO</span><span>${fmtARS(perc)}</span></div>
+  <table class="tbl">
+    ${inaRow}
+    ${incomeRows}
+    ${totalRow}
+    <tr><td colspan="2" class="sep"></td></tr>
+    ${deductRows}
+    <tr><td colspan="2" class="sep"></td></tr>
+    <tr class="perc-row">
+      <td class="lbl">Percibido</td>
+      <td class="val">${$(perc)}</td>
+    </tr>
+  </table>
   <div class="firmas">
     <div class="firma">Firma empleado</div>
-    <div class="firma">Fecha recibido</div>
+    <div class="firma">Fecha</div>
   </div>
-</div>
+</div>`
+  }
+
+  const PAYSLIP_CSS = `
+${pdfCSS}
+.card{border:1px solid #d1cec9;border-radius:4px;overflow:hidden;width:300px;margin:16px auto;page-break-inside:avoid;font-size:9.5pt}
+.hdr{background:#070614;color:#fff;padding:12px 14px}
+.co{font-size:11pt;font-weight:bold;letter-spacing:1px}
+.doc{font-size:7.5pt;color:rgba(255,255,255,.45);margin-top:1px}
+.emp{font-size:12pt;font-weight:bold;color:#C8603A;margin-top:6px}
+.per{font-size:8pt;color:rgba(255,255,255,.4);margin-top:2px}
+.tbl{width:100%;border-collapse:collapse;padding:0 14px}
+.tbl td{padding:4px 14px}
+.lbl{color:#444;width:65%}
+.val{text-align:right;font-weight:600;color:#111;width:35%}
+.sep{height:1px;background:#e5e2dd;padding:0}
+.perc-row .lbl{font-weight:bold;font-size:11pt;color:#070614;padding-top:7px;padding-bottom:7px}
+.perc-row .val{font-weight:bold;font-size:11pt;color:#C8603A;padding-top:7px;padding-bottom:7px}
+.firmas{display:flex;gap:12px;padding:10px 14px 12px;border-top:1px solid #e5e2dd}
+.firma{flex:1;border-top:1px solid #aaa;padding-top:3px;font-size:7pt;color:#888;text-align:center}
+`
+
+  /* Recibo individual de un empleado */
+  const printPayslip = (item: any, branchName: string) => {
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Recibo — ${merged(item).employee_name}</title>
+<style>${PAYSLIP_CSS}</style></head><body>
+${buildPayslipCard(item, branchName)}
 <script>window.onload=function(){window.print()}</script>
 </body></html>`
-
-    const win = window.open('', '_blank', 'width=480,height=700')
+    const win = window.open('', '_blank', 'width=480,height=720')
     if (win) { win.document.write(html); win.document.close() }
   }
 
@@ -931,13 +993,16 @@ ${pdfCSS}
 
     const rows = items.map((item, idx) => {
       const m = merged(item)
+      const pct = factorToPct(m.plus_factor)
+      const com = parseFloat(m.comision) || 0
       return `<tr style="background:${idx%2===0?'#fff':'#fafaf8'}">
         <td style="text-align:center;color:#C8603A;font-weight:bold">${idx+1}</td>
         <td>${m.employee_name}</td>
         <td>${m.inasistencias_desc||'—'}</td>
         <td style="text-align:right">${parseFloat(m.adelanto)>0?fmtARS(parseFloat(m.adelanto)):'—'}</td>
         <td style="text-align:right">${parseFloat(m.deposito_banco)>0?fmtARS(parseFloat(m.deposito_banco)):'—'}</td>
-        <td style="text-align:center">${m.plus_factor||'—'}</td>
+        <td style="text-align:right">${com>0?fmtARS(com):'—'}</td>
+        <td style="text-align:center">${pct?pct+'%':'—'}</td>
         <td style="text-align:right">${calcPlusP(m)>0?fmtARS(calcPlusP(m)):'—'}</td>
         <td style="text-align:right;background:#FFFBEB;color:#92400E;font-weight:bold">${fmtARS(calcBruto(m))}</td>
         <td style="text-align:right;background:#ECFDF5;color:#065F46;font-weight:bold">${fmtARS(calcPerc(m))}</td>
@@ -946,8 +1011,7 @@ ${pdfCSS}
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
 <title>Sueldos ${branchName} ${month} ${year}</title>
-<style>
-${pdfCSS}
+<style>${pdfCSS}
 h1{color:#070614;font-size:14pt;margin-bottom:4px}
 p{color:#666;font-size:9pt;margin:0 0 12px}
 table{width:100%;border-collapse:collapse}
@@ -959,24 +1023,22 @@ td{padding:5px 8px;border-bottom:1px solid #eee;font-size:9pt}
 <p>${month} ${year}</p>
 <table>
 <thead><tr>
-<th>N°</th><th>Empleado</th><th>Inasistencias</th><th style="text-align:right">Adelantos</th>
-<th style="text-align:right">Dep. Banco</th><th style="text-align:center">Plus</th>
-<th style="text-align:right">Plus $</th><th style="text-align:right;background:#92400E">Total Bruto</th>
-<th style="text-align:right;background:#065F46">Total Percibido</th>
+  <th>N°</th><th>Empleado</th><th>Inasistencias</th>
+  <th style="text-align:right">Adelantos</th><th style="text-align:right">Dep. Banco</th>
+  <th style="text-align:right">Comisión</th><th style="text-align:center">Plus</th>
+  <th style="text-align:right">Plus $</th>
+  <th style="text-align:right;background:#92400E">Total Bruto</th>
+  <th style="text-align:right;background:#065F46">Total Percibido</th>
 </tr></thead>
 <tbody>${rows}
 <tr class="tot">
-<td colspan="7">TOTALES</td>
-<td style="text-align:right">${fmtARS(totBruto)}</td>
-<td style="text-align:right">${fmtARS(totPerc)}</td>
+  <td colspan="8">TOTALES</td>
+  <td style="text-align:right">${fmtARS(totBruto)}</td>
+  <td style="text-align:right">${fmtARS(totPerc)}</td>
 </tr></tbody></table>
-<p style="margin-top:12px;font-size:8pt;color:#999">
-Total bruto = Dep.×2 (con Plus) ó Horas×$×Hora · Percibido = Bruto×Plus − Adelantos − Dep.
-</p>
 <script>window.onload=function(){window.print()}</script>
 </body></html>`
-
-    const win = window.open('', '_blank', 'width=900,height=700')
+    const win = window.open('', '_blank', 'width=1000,height=700')
     if (win) { win.document.write(html); win.document.close() }
   }
 
@@ -984,48 +1046,13 @@ Total bruto = Dep.×2 (con Plus) ó Horas×$×Hora · Percibido = Bruto×Plus �
   const printAllPayslips = (period: any, branchName: string) => {
     if (!period) return
     const items: any[] = period.items ?? []
-
-    const cards = items.map(item => {
-      const m = merged(item)
-      const bruto = calcBruto(m); const plusP = calcPlusP(m); const perc = calcPerc(m)
-      const dep = parseFloat(m.deposito_banco)||0; const adel = parseFloat(m.adelanto)||0
-      return `<div class="card">
-  <div class="hdr"><div class="co">SUR MADERAS</div><div class="doc">RECIBO DE SUELDO</div>
-    <div class="emp">${m.employee_name}</div><div class="per">${month} ${year} · ${branchName}</div></div>
-  <div class="bd">
-    ${m.inasistencias_desc?`<div class="ln"><span style="color:#c00">Inasistencias</span><span style="color:#c00;font-weight:bold">${m.inasistencias_desc}</span></div>`:''}
-    ${plusP>0?`<div class="ln"><span>(+) Plus × ${m.plus_factor}</span><span style="font-weight:bold">${fmtARS(plusP)}</span></div>`:''}
-  </div>
-  <div class="bruto"><span>TOTAL BRUTO</span><span>${fmtARS(bruto)}</span></div>
-  <div class="bd">
-    ${dep>0?`<div class="ln"><span>(−) Depósito banco</span><span style="font-weight:bold">${fmtARS(dep)}</span></div>`:''}
-    ${adel>0?`<div class="ln"><span>(−) Adelanto</span><span style="font-weight:bold">${fmtARS(adel)}</span></div>`:''}
-  </div>
-  <div class="perc"><span>TOTAL PERCIBIDO</span><span>${fmtARS(perc)}</span></div>
-  <div class="firmas"><div class="firma">Firma empleado</div><div class="firma">Fecha recibido</div></div>
-</div>`
-    }).join('')
-
+    const cards = items.map(item => buildPayslipCard(item, branchName)).join('')
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
 <title>Recibos ${branchName} ${month} ${year}</title>
-<style>
-${pdfCSS}
-.card{border:1px solid #ccc;border-radius:8px;overflow:hidden;max-width:300px;margin:12px auto;page-break-inside:avoid}
-.hdr{background:#070614;color:#fff;padding:12px 16px}
-.co{font-size:12pt;font-weight:bold;letter-spacing:1px}
-.doc{font-size:8pt;color:rgba(255,255,255,.5);margin-top:1px}
-.emp{font-size:11pt;font-weight:bold;color:#C8603A;margin-top:6px}
-.per{font-size:8pt;color:rgba(255,255,255,.4);margin-top:2px}
-.bd{padding:6px 16px 2px}
-.ln{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f0eeeb;font-size:9pt}
-.bruto{background:#FFF3CD;padding:7px 16px;display:flex;justify-content:space-between;font-weight:bold;font-size:10pt;border-top:2px solid #F0C040}
-.perc{background:#C8603A;padding:8px 16px;display:flex;justify-content:space-between;font-weight:bold;font-size:11pt;color:#fff}
-.firmas{padding:12px 16px;display:flex;gap:12px}
-.firma{flex:1;border-top:1px solid #aaa;padding-top:3px;font-size:7pt;color:#888;text-align:center}
-</style></head><body>${cards}
+<style>${PAYSLIP_CSS}</style></head><body>
+${cards}
 <script>window.onload=function(){window.print()}</script>
 </body></html>`
-
     const win = window.open('', '_blank')
     if (win) { win.document.write(html); win.document.close() }
   }
@@ -1034,23 +1061,23 @@ ${pdfCSS}
     { id: 'luro',          label: 'Luro'          },
     { id: 'independencia', label: 'Independencia' },
     { id: 'ambas',         label: 'Ambas'         },
+    { id: 'historial',     label: '📋 Historial'  },
   ]
 
-  /* ─── Helpers de cálculo — usan el item YA MERGEADO con localEdits ─── */
-
   const calcBruto = (m: any): number => {
-    const pf  = parseFloat(m.plus_factor) || 0
+    const pf     = parseFloat(m.plus_factor)  || 0
     const factor = pf > 1 ? pf : 1.0
-    // 1. Por horas (Rojo Matias, Zicavo Valentina) — sin plus
-    const h  = parseFloat(m.horas)       || 0
-    const ph = parseFloat(m.precio_hora) || 0
-    if (h > 0 && ph > 0) return h * ph
-    // 2. Sueldo base manual (Patricia) — plus se aplica sobre el sueldo base
+    const com    = parseFloat(m.comision)      || 0
+    // 1. Por horas — sin plus, más comisión si hay
+    const h  = parseFloat(m.horas)        || 0
+    const ph = parseFloat(m.precio_hora)  || 0
+    if (h > 0 && ph > 0) return h * ph + com
+    // 2. Sueldo base manual (Patricia) — plus sobre la base, más comisión
     const bm = parseFloat(m.bruto_manual) || 0
-    if (bm !== 0) return bm * factor
-    // 3. Estándar — deposito × 2 SIEMPRE, factor aplica el plus
+    if (bm !== 0) return bm * factor + com
+    // 3. Estándar — dep×2 siempre, factor aplica el plus, más comisión
     const dep = parseFloat(m.deposito_banco) || 0
-    return dep * 2 * factor
+    return dep * 2 * factor + com
   }
 
   const calcPlusP = (m: any): number => {
@@ -1060,10 +1087,10 @@ ${pdfCSS}
     const h  = parseFloat(m.horas)       || 0
     const ph = parseFloat(m.precio_hora) || 0
     if (h > 0 && ph > 0) return 0
-    // Sueldo base manual
+    // Sueldo base manual: plus sobre la base (sin comisión)
     const bm = parseFloat(m.bruto_manual) || 0
     if (bm !== 0) return bm * (pf - 1)
-    // Estándar: plus sobre dep × 2
+    // Estándar: plus sobre dep × 2 (sin comisión)
     const dep = parseFloat(m.deposito_banco) || 0
     return dep * 2 * (pf - 1)
   }
@@ -1076,12 +1103,12 @@ ${pdfCSS}
     const ph = parseFloat(m.precio_hora)  || 0
     const bm = parseFloat(m.bruto_manual) || 0
     if ((h > 0 && ph > 0) || bm !== 0) return bruto - adelanto
-    // Estándar: se resta depósito y adelanto
+    // Estándar: se restan depósito y adelanto
     const dep = parseFloat(m.deposito_banco) || 0
     return bruto - dep - adelanto
   }
 
-  /* Convierte factor almacenado (1.30) a porcentaje para mostrar (30) */
+  /* Convierte factor almacenado (1.30) → porcentaje para mostrar (30) */
   const factorToPct = (pf: any): string => {
     const f = parseFloat(pf) || 0
     return f > 1 ? String(Math.round((f - 1) * 100)) : ''
@@ -1162,6 +1189,7 @@ ${pdfCSS}
                   <TH right style={{ width: 70 }}>Horas</TH>
                   {branchId === 1 && <TH right style={{ width: 80 }}>$ × Hora</TH>}
                   <TH right style={{ width: 90 }} title="Sueldo base fijo (Patricia). El plus se aplica sobre este monto.">Sueldo Base</TH>
+                  <TH right style={{ width: 100 }} title="Comisión, incentivo o horas extra. La descripción aparece en el recibo.">Comisión</TH>
                   <TH right style={{ width: 60 }} title="Porcentaje de plus sobre el bruto (ej: 30 = 30%)">Plus %</TH>
                   <TH right style={{ background: '#FFF8E1', color: '#92400E' }}>Plus $</TH>
                   <TH right style={{ background: '#FFF3CD', color: '#92400E' }}>Total Bruto</TH>
@@ -1219,6 +1247,20 @@ ${pdfCSS}
                           onChange={v => setField(item.id, 'bruto_manual', v)}
                           onBlur={_v => saveItem(item.id, item)} />
                       </td>
+                      {/* Comisión — monto + etiqueta para el recibo (stacked) */}
+                      <td className="px-2 py-1.5">
+                        <div className="flex flex-col gap-0.5">
+                          <NumInput disabled={isClosed} value={m.comision}
+                            onChange={v => setField(item.id, 'comision', v)}
+                            onBlur={_v => saveItem(item.id, item)} />
+                          {(parseFloat(m.comision) > 0 || m.comision_desc) && (
+                            <TextInput disabled={isClosed}
+                              value={m.comision_desc} placeholder="Desc. recibo"
+                              onChange={v => setField(item.id, 'comision_desc', v || null)}
+                              onBlur={_v => saveItem(item.id, item)} />
+                          )}
+                        </div>
+                      </td>
                       {/* Plus % — el usuario ingresa 30 (= 30%), guardamos factor 1.30 */}
                       <td className="px-2 py-1.5">
                         <div className="flex items-center gap-0.5">
@@ -1268,7 +1310,7 @@ ${pdfCSS}
 
                 {/* Fila TOTALES */}
                 <tr style={{ background: NAVY }}>
-                  <td colSpan={branchId === 1 ? 9 : 8}
+                  <td colSpan={branchId === 1 ? 10 : 9}
                     className="px-3 py-2.5 text-white text-[11px] font-bold uppercase tracking-widest">
                     TOTALES
                   </td>
@@ -1434,8 +1476,122 @@ ${pdfCSS}
       {vista === 'luro'          && renderBranchTable(1, 'LURO')}
       {vista === 'independencia' && renderBranchTable(2, 'INDEPENDENCIA')}
       {vista === 'ambas'         && renderAmbasView()}
+      {vista === 'historial'     && renderHistorial()}
     </div>
   )
+
+  /* ── Vista Historial ── */
+  function renderHistorial() {
+    const MONTH_ORDER = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE']
+    // Agrupar por año desc
+    const byYear: Record<number, any[]> = {}
+    historyPeriods.forEach(p => {
+      if (!byYear[p.year]) byYear[p.year] = []
+      byYear[p.year].push(p)
+    })
+    const years = Object.keys(byYear).map(Number).sort((a, b) => b - a)
+
+    if (years.length === 0) return (
+      <div className="bg-white rounded-xl p-12 text-center text-gray-400 text-sm shadow-sm">
+        No hay períodos registrados todavía.
+      </div>
+    )
+
+    return (
+      <div className="space-y-4">
+        {years.map(yr => (
+          <div key={yr} className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div style={{ background: NAVY }} className="px-5 py-3">
+              <p className="text-white font-bold font-head text-sm tracking-wide">{yr}</p>
+            </div>
+            <div className="p-4 space-y-3">
+              {byYear[yr]
+                .sort((a, b) => MONTH_ORDER.indexOf(b.month) - MONTH_ORDER.indexOf(a.month))
+                .map(period => {
+                  const isOpen = histExpanded === period.id
+                  const brutoTotal = (period.items ?? []).reduce((s: number, i: any) => s + (i.total_bruto ?? 0), 0)
+                  const percTotal  = (period.items ?? []).reduce((s: number, i: any) => s + (i.total_percibido ?? 0), 0)
+                  const branchColor = period.branch_id === 1 ? NAVY : CORAL
+                  return (
+                    <div key={period.id} className="border border-gray-100 rounded-xl overflow-hidden">
+                      {/* Header de período */}
+                      <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
+                        onClick={() => setHistExpanded(isOpen ? null : period.id)}>
+                        <span className="px-2.5 py-0.5 rounded-full text-white text-[10px] font-bold"
+                          style={{ background: branchColor }}>
+                          {period.branch_name}
+                        </span>
+                        <span className="text-sm font-semibold font-body text-gray-800">
+                          {period.month} {period.year}
+                        </span>
+                        <span className={`ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${period.status === 'CLOSED' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                          {period.status === 'CLOSED' ? '✓ Cerrado' : 'Abierto'}
+                        </span>
+                        <span className="ml-auto text-xs text-gray-500 font-body">
+                          Bruto: <strong style={{ color: '#92400E' }}>{fmtARS(brutoTotal)}</strong>
+                          &nbsp;·&nbsp;
+                          Percibido: <strong style={{ color: '#065F46' }}>{fmtARS(percTotal)}</strong>
+                        </span>
+                        <span className="text-gray-400 text-xs ml-2">{isOpen ? '▲' : '▼'}</span>
+                      </div>
+                      {/* Detalle expandible */}
+                      {isOpen && (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs border-collapse">
+                            <thead>
+                              <tr style={{ background: '#f0eeeb' }}>
+                                {['Empleado','Adelanto','Dep. Banco','Comisión','Plus %','Plus $','Total Bruto','Percibido',''].map(h => (
+                                  <th key={h} className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-left border-b border-gray-200"
+                                    style={{ color: NAVY }}>{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(period.items ?? []).map((item: any, i: number) => (
+                                <tr key={item.id} style={{ background: i % 2 === 0 ? 'white' : '#fafaf8' }}>
+                                  <td className="px-3 py-2 font-semibold text-gray-800">{item.employee_name}</td>
+                                  <td className="px-3 py-2 text-right">{parseFloat(item.adelanto)>0?fmtARS(parseFloat(item.adelanto)):'—'}</td>
+                                  <td className="px-3 py-2 text-right">{parseFloat(item.deposito_banco)>0?fmtARS(parseFloat(item.deposito_banco)):'—'}</td>
+                                  <td className="px-3 py-2 text-right">{parseFloat(item.comision)>0?fmtARS(parseFloat(item.comision)):'—'}</td>
+                                  <td className="px-3 py-2 text-right">{factorToPct(item.plus_factor)?factorToPct(item.plus_factor)+'%':'—'}</td>
+                                  <td className="px-3 py-2 text-right">{item.plus_pesos>0?fmtARS(item.plus_pesos):'—'}</td>
+                                  <td className="px-3 py-2 text-right font-bold" style={{ background:'#FFFBEB',color:'#92400E' }}>{fmtARS(item.total_bruto)}</td>
+                                  <td className="px-3 py-2 text-right font-bold" style={{ background:'#ECFDF5',color:'#065F46' }}>{fmtARS(item.total_percibido)}</td>
+                                  <td className="px-2 py-2 text-center">
+                                    <button title="Imprimir recibo" onClick={() => printPayslip(item, period.branch_name)}
+                                      className="text-gray-300 hover:text-coral transition-colors"
+                                      onMouseOver={e=>(e.currentTarget.style.color=CORAL)}
+                                      onMouseOut={e=>(e.currentTarget.style.color='#d1d5db')}>
+                                      <FileDown size={13} />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          <div className="flex gap-2 px-4 py-3 border-t border-gray-100">
+                            <button onClick={() => printAllPayslips(period, period.branch_name)}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
+                              style={{ background: CORAL }}>
+                              <FileDown size={12} /> Todos los recibos
+                            </button>
+                            <button onClick={() => printPlanilla(period, period.branch_name)}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
+                              style={{ background: NAVY }}>
+                              <FileDown size={12} /> Planilla PDF
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────

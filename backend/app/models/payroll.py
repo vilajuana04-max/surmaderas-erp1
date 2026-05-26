@@ -37,13 +37,15 @@ class PayrollItem(Base):
     employee_id = Column(Integer, ForeignKey("employees.id"))
 
     # ── Inputs manuales (idénticos a las celdas editables del Excel) ──
-    inasistencias_desc = Column(String,        nullable=True)        # col B — texto libre
-    adelanto           = Column(Numeric(15, 2), default=0)           # col C
-    deposito_banco     = Column(Numeric(15, 2), default=0)           # col D
-    horas              = Column(Numeric(8,  2), nullable=True)       # col E (Q)
-    precio_hora        = Column(Numeric(15, 2), nullable=True)       # col F ($ x hora)
-    plus_factor        = Column(Numeric(5,  3), nullable=True)       # col G (1.3, 1.2, 1.1)
-    bruto_manual       = Column(Numeric(15, 2), nullable=True)       # override manual Total bruto
+    inasistencias_desc = Column(String,         nullable=True)        # col B — texto libre
+    adelanto           = Column(Numeric(15, 2), default=0)            # col C
+    deposito_banco     = Column(Numeric(15, 2), default=0)            # col D
+    horas              = Column(Numeric(8,  2), nullable=True)        # col E (Q)
+    precio_hora        = Column(Numeric(15, 2), nullable=True)        # col F ($ x hora)
+    plus_factor        = Column(Numeric(5,  3), nullable=True)        # col G (1.3, 1.2, 1.1)
+    bruto_manual       = Column(Numeric(15, 2), nullable=True)        # sueldo base manual (Patricia)
+    comision           = Column(Numeric(15, 2), nullable=True)        # incentivo / comisión / hora extra
+    comision_desc      = Column(String,         nullable=True)        # etiqueta para el recibo
 
     period   = relationship("PayrollPeriod", back_populates="items")
     employee = relationship("Employee", back_populates="payroll_items")
@@ -53,57 +55,48 @@ class PayrollItem(Base):
     @property
     def total_bruto(self) -> float:
         """
-        Col I — Total bruto.
-        Prioridad y fórmulas:
-          1. horas × precio_hora          (Rojo Matias, Zicavo Valentina — por hora, sin plus)
-          2. bruto_manual × plus_factor   (Scatizzi Patricia — sueldo base + plus si hay)
-          3. deposito_banco × 2 × plus_factor  (estándar — SIEMPRE ×2, plus incluido)
+        Total bruto — siempre incluye la comisión/incentivo.
+          Por horas:     horas × precio_hora + comision
+          Sueldo base:   bruto_manual × plus_factor + comision
+          Estándar:      dep × 2 × plus_factor + comision
         """
-        pf = float(self.plus_factor) if self.plus_factor and float(self.plus_factor) > 1 else 1.0
-        # 1. Por horas — sin plus
+        pf       = float(self.plus_factor) if self.plus_factor and float(self.plus_factor) > 1 else 1.0
+        comision = float(self.comision or 0)
         if self.horas and self.precio_hora:
-            return round(float(self.horas) * float(self.precio_hora), 2)
-        # 2. Sueldo base manual (Patricia) — plus se aplica sobre el sueldo base
+            return round(float(self.horas) * float(self.precio_hora) + comision, 2)
         if self.bruto_manual and float(self.bruto_manual) != 0:
-            return round(float(self.bruto_manual) * pf, 2)
-        # 3. Estándar — deposito × 2 (SIEMPRE), factor aplica el plus
+            return round(float(self.bruto_manual) * pf + comision, 2)
         dep = float(self.deposito_banco or 0)
-        return round(dep * 2 * pf, 2)
+        return round(dep * 2 * pf + comision, 2)
 
     @property
     def plus_pesos(self) -> float:
         """
-        Col H — Plus en $.
-          Estándar:    dep × 2 × (plus_factor − 1)
+        Plus en $ — se calcula sobre la base ANTES de sumar comisión.
+          Por horas:   0  (sin plus)
           Sueldo base: bruto_manual × (plus_factor − 1)
-          Por horas:   0  (no aplica plus)
+          Estándar:    dep × 2 × (plus_factor − 1)
         """
         if not self.plus_factor or float(self.plus_factor) <= 1:
             return 0.0
         pf = float(self.plus_factor)
-        # Por horas: sin plus
         if self.horas and self.precio_hora:
             return 0.0
-        # Sueldo base manual
         if self.bruto_manual and float(self.bruto_manual) != 0:
             return round(float(self.bruto_manual) * (pf - 1), 2)
-        # Estándar
         dep = float(self.deposito_banco or 0)
         return round(dep * 2 * (pf - 1), 2)
 
     @property
     def total_percibido(self) -> float:
         """
-        Col J — Total percibido.
-          Por horas:     bruto − adelantos                    (sin restar depósito)
-          Sueldo base:   bruto − adelantos                    (sin restar depósito)
-          Estándar:      bruto − deposito_banco − adelantos
+        Total percibido.
+          Por horas / sueldo base: total_bruto − adelantos
+          Estándar:                total_bruto − deposito_banco − adelantos
         """
         bruto    = self.total_bruto
         adelanto = float(self.adelanto or 0)
-        # Por horas o sueldo base manual: solo se resta el adelanto
         if (self.horas and self.precio_hora) or (self.bruto_manual and float(self.bruto_manual) != 0):
             return round(bruto - adelanto, 2)
-        # Estándar: se resta el depósito y el adelanto
         deposito = float(self.deposito_banco or 0)
         return round(bruto - deposito - adelanto, 2)

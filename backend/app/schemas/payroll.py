@@ -6,13 +6,15 @@ from decimal import Decimal
 class PayrollItemCreate(BaseModel):
     """Campos que el usuario edita (equivalen a las celdas del Excel)."""
     employee_id:        int
-    inasistencias_desc: Optional[str]     = None    # col B — texto libre
-    adelanto:           Decimal           = Decimal("0")    # col C
-    deposito_banco:     Decimal           = Decimal("0")    # col D
-    horas:              Optional[Decimal] = None    # col E
-    precio_hora:        Optional[Decimal] = None    # col F
-    plus_factor:        Optional[Decimal] = None    # col G (1.3, 1.2, 1.1)
-    bruto_manual:       Optional[Decimal] = None    # override manual Total bruto
+    inasistencias_desc: Optional[str]     = None
+    adelanto:           Decimal           = Decimal("0")
+    deposito_banco:     Decimal           = Decimal("0")
+    horas:              Optional[Decimal] = None
+    precio_hora:        Optional[Decimal] = None
+    plus_factor:        Optional[Decimal] = None
+    bruto_manual:       Optional[Decimal] = None
+    comision:           Optional[Decimal] = None    # incentivo / comisión / hora extra
+    comision_desc:      Optional[str]     = None    # etiqueta para el recibo
 
 
 class PayrollItemOut(BaseModel):
@@ -27,6 +29,8 @@ class PayrollItemOut(BaseModel):
     precio_hora:        Optional[Decimal] = None
     plus_factor:        Optional[Decimal] = None
     bruto_manual:       Optional[Decimal] = None
+    comision:           Optional[Decimal] = None
+    comision_desc:      Optional[str]     = None
     # Calculados
     total_bruto:        float
     plus_pesos:         float
