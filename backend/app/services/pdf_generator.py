@@ -341,14 +341,80 @@ LURO_EXPENSES_TEMPLATE = """
 </table>
 """ + FOOTER_HTML + "</body></html>"
 
+SINGLE_PAYSLIP_TEMPLATE = """
+<html><head><style>
+  @page { margin: 1.5cm; size: A5; }
+  body { font-family: Arial, sans-serif; font-size: 10pt; color: #222; }
+  .card {
+    border: 1px solid #ccc; border-radius: 6px; overflow: hidden;
+    max-width: 360px; margin: 0 auto; page-break-inside: avoid;
+  }
+  .card-header {
+    background: """ + NAVY + """; color: white; padding: 14px 16px 10px;
+  }
+  .card-header .company { font-size: 13pt; font-weight: bold; letter-spacing: 1px; }
+  .card-header .doc-title { font-size: 8pt; color: rgba(255,255,255,0.55); margin-top: 2px; }
+  .card-header .emp-name { font-size: 12pt; font-weight: bold; color: """ + CORAL + """; margin-top: 8px; }
+  .card-header .period { font-size: 8pt; color: rgba(255,255,255,0.45); margin-top: 2px; }
+  .card-body { padding: 10px 16px 4px; }
+  .line { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #f0eeeb; font-size: 9.5pt; }
+  .line .lbl { color: #555; }
+  .line .val { font-weight: bold; color: #222; }
+  .bruto-row { background: #FFF3CD; padding: 6px 16px; display: flex; justify-content: space-between; font-weight: bold; font-size: 10pt; border-top: 2px solid #F0C040; }
+  .perc-row  { background: """ + CORAL + """; padding: 8px 16px; display: flex; justify-content: space-between; font-weight: bold; font-size: 11pt; color: white; }
+  .firmas { padding: 14px 16px 16px; display: flex; justify-content: space-between; gap: 16px; }
+  .firma-box { flex: 1; border-top: 1px solid #aaa; padding-top: 4px; font-size: 8pt; color: #888; text-align: center; }
+</style></head><body>
+<div class="card">
+  <div class="card-header">
+    <div class="company">SUR MADERAS</div>
+    <div class="doc-title">RECIBO DE SUELDO</div>
+    <div class="emp-name">{{ item.employee.name }}</div>
+    <div class="period">{{ month }} {{ year }} · {{ branch_name }}</div>
+  </div>
+  <div class="card-body">
+    <div class="line"><span class="lbl">(+) Sueldo base</span><span class="val">$ {{ "{:,.0f}".format(item.base_salary or 0) }}</span></div>
+    {% if item.plus_amount %}
+    <div class="line"><span class="lbl">(+) Plus ({{ "{:.0%}".format(item.plus_pct or 0) }})</span><span class="val">$ {{ "{:,.0f}".format(item.plus_amount) }}</span></div>
+    {% endif %}
+    {% if item.incentive %}
+    <div class="line"><span class="lbl">(+) Incentivo</span><span class="val">$ {{ "{:,.0f}".format(item.incentive or 0) }}</span></div>
+    {% endif %}
+    {% if item.absences %}
+    <div class="line"><span class="lbl" style="color:#c00">Inasistencias</span><span class="val" style="color:#c00">{{ item.absences }} día(s)</span></div>
+    {% endif %}
+  </div>
+  <div class="bruto-row">
+    <span>TOTAL BRUTO</span><span>$ {{ "{:,.0f}".format(item.gross_total) }}</span>
+  </div>
+  <div class="card-body">
+    {% if item.bank_deposit %}
+    <div class="line"><span class="lbl">(−) Depósito banco</span><span class="val">$ {{ "{:,.0f}".format(item.bank_deposit or 0) }}</span></div>
+    {% endif %}
+    {% if item.advance %}
+    <div class="line"><span class="lbl">(−) Adelanto</span><span class="val">$ {{ "{:,.0f}".format(item.advance or 0) }}</span></div>
+    {% endif %}
+  </div>
+  <div class="perc-row">
+    <span>PERCIBIDO</span><span>$ {{ "{:,.0f}".format(item.net_total) }}</span>
+  </div>
+  <div class="firmas">
+    <div class="firma-box">Firma empleado</div>
+    <div class="firma-box">Fecha recibido</div>
+  </div>
+</div>
+</body></html>
+"""
+
 _env = Environment(loader=DictLoader({
-    "purchases":       PURCHASES_TEMPLATE,
-    "payroll":         PAYROLL_TEMPLATE,
-    "payslips":        PAYSLIP_TEMPLATE,
-    "vacations":       VACATIONS_TEMPLATE,
-    "shared_expenses": SHARED_EXPENSES_TEMPLATE,
-    "luro_expenses":   LURO_EXPENSES_TEMPLATE,
-    "sales":           SALES_TEMPLATE,
+    "purchases":        PURCHASES_TEMPLATE,
+    "payroll":          PAYROLL_TEMPLATE,
+    "payslips":         PAYSLIP_TEMPLATE,
+    "single_payslip":   SINGLE_PAYSLIP_TEMPLATE,
+    "vacations":        VACATIONS_TEMPLATE,
+    "shared_expenses":  SHARED_EXPENSES_TEMPLATE,
+    "luro_expenses":    LURO_EXPENSES_TEMPLATE,
+    "sales":            SALES_TEMPLATE,
 }))
 
 
@@ -397,6 +463,16 @@ def generate_shared_expenses_pdf(expenses, month: str, year: int) -> bytes:
     return _render("shared_expenses", expenses=expenses, month=month, year=year,
                    total=total, total_luro=total_luro,
                    doc_title="Gastos Compartidos")
+
+
+def generate_single_payslip_pdf(item, period) -> bytes:
+    branch_name = period.branch.name if period.branch else ""
+    return _render(
+        "single_payslip",
+        item=item, month=period.month, year=period.year,
+        branch_name=branch_name,
+        doc_title=f"Recibo de Sueldo — {item.employee.name}",
+    )
 
 
 def generate_luro_expenses_pdf(expenses, month: str, year: int) -> bytes:

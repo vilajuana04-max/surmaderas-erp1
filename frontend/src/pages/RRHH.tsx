@@ -787,17 +787,23 @@ function CalendarioTab() {
 /* ─────────────────────────────────────────────────────────────
    TAB 3: SUELDOS
 ───────────────────────────────────────────────────────────── */
+type SueldosVista = 'luro' | 'independencia' | 'ambas'
+
 function SueldosTab() {
-  const [month,   setMonth]   = useState(MONTHS[CURRENT_MONTH_IDX])
-  const [year]                = useState(CURRENT_YEAR)
-  const [periods, setPeriods] = useState<any[]>([])
+  const [month,    setMonth]    = useState(MONTHS[CURRENT_MONTH_IDX])
+  const [year]                  = useState(CURRENT_YEAR)
+  const [periods,  setPeriods]  = useState<any[]>([])
   const [creating, setCreating] = useState(false)
+  const [vista,    setVista]    = useState<SueldosVista>('luro')
 
   const load = useCallback(() => {
     api.get<any[]>(`/payroll/periods?year=${year}`).then(setPeriods)
   }, [year])
 
   useEffect(() => { load() }, [load])
+
+  const getPeriod = (branchId: number) =>
+    periods.find(p => p.branch_id === branchId && p.month === month && p.year === year)
 
   const createPeriod = async (branchId: number) => {
     setCreating(true)
@@ -832,111 +838,304 @@ function SueldosTab() {
     catch (err: any) { alert('Error PDF: ' + err.message) }
   }
 
-  const branchPeriods = (branchId: number) =>
-    periods.filter(p => p.branch_id === branchId && p.month === month && p.year === year)
+  const VISTA_BTNS: { id: SueldosVista; label: string }[] = [
+    { id: 'luro',          label: 'Luro'          },
+    { id: 'independencia', label: 'Independencia' },
+    { id: 'ambas',         label: 'Ambas'         },
+  ]
+
+  /* ── Render single-branch full table ── */
+  const renderBranchTable = (branchId: number, branchName: string, showIncentivo: boolean) => {
+    const period   = getPeriod(branchId)
+    const items    = period?.items ?? []
+    const isClosed = period?.status === 'CLOSED'
+    const totBruto = items.reduce((a: number, i: any) => a + (i.gross_total ?? 0), 0)
+    const totNet   = items.reduce((a: number, i: any) => a + (i.net_total   ?? 0), 0)
+
+    return (
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        {/* Branch header */}
+        <div style={{ background: branchId === 1 ? NAVY : CORAL }}
+          className="px-5 py-3 flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <p className="text-white text-sm font-bold font-head tracking-wide">{branchName}</p>
+            <p className="text-white/55 text-[11px] font-body">
+              Convenio {branchId === 1 ? 'Madereros' : 'SEC 12'} · {month} {year}
+            </p>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            {!period && (
+              <button onClick={() => createPeriod(branchId)} disabled={creating}
+                className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-xs font-semibold font-body flex items-center gap-1">
+                <Plus size={12} /> Abrir Mes
+              </button>
+            )}
+            {period && !isClosed && (
+              <button onClick={() => closePeriod(period.id)}
+                className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-xs font-semibold font-body flex items-center gap-1">
+                <Lock size={12} /> Cerrar
+              </button>
+            )}
+            {period && (
+              <>
+                <button onClick={() => handlePdf(`/payroll/periods/${period.id}/pdf`, `sueldos_${branchName}_${month}_${year}.pdf`)}
+                  className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-xs font-semibold font-body flex items-center gap-1">
+                  <FileDown size={12} /> Planilla
+                </button>
+                <button onClick={() => handlePdf(`/payroll/periods/${period.id}/payslips`, `recibos_${branchName}_${month}_${year}.pdf`)}
+                  className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-xs font-semibold font-body flex items-center gap-1">
+                  <FileDown size={12} /> Todos Recibos
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {period ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[820px] text-sm border-collapse">
+              <thead>
+                <tr style={{ background: '#f0eeeb' }}>
+                  <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-center border-b border-gray-200 w-8" style={{ color: NAVY }}>N°</th>
+                  <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-left border-b border-gray-200" style={{ color: NAVY }}>Empleado</th>
+                  <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-center border-b border-gray-200" style={{ color: NAVY }}>Inas.</th>
+                  <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-right border-b border-gray-200" style={{ color: NAVY }}>Base $</th>
+                  <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-right border-b border-gray-200" style={{ color: NAVY }}>Dep. Banco</th>
+                  <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-right border-b border-gray-200" style={{ color: NAVY }}>Adelanto</th>
+                  <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-center border-b border-gray-200" style={{ color: NAVY }}>Plus%</th>
+                  <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-right border-b border-gray-200" style={{ color: NAVY }}>Plus $</th>
+                  {showIncentivo && (
+                    <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-right border-b border-gray-200" style={{ color: NAVY }}>Incentivo</th>
+                  )}
+                  <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-right border-b border-gray-200" style={{ background: '#FFF3CD', color: '#92400E' }}>Total Bruto</th>
+                  <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-right border-b border-gray-200" style={{ background: '#D1FAE5', color: '#065F46' }}>Percibido</th>
+                  <th className="px-2 py-2.5 border-b border-gray-200 w-8" />
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item: any, i: number) => (
+                  <tr key={item.id} className={i % 2 === 0 ? 'bg-white' : ''} style={i % 2 !== 0 ? { background: '#fafaf8' } : {}}>
+                    <td className="px-3 py-2 text-center text-[11px] font-bold font-body" style={{ color: CORAL }}>{i + 1}</td>
+                    <td className="px-3 py-2 text-xs font-semibold font-body text-gray-800 whitespace-nowrap">{item.employee_name}</td>
+                    {/* Inas. */}
+                    <td className="px-2 py-1.5 text-center">
+                      <NumInput disabled={isClosed} value={item.absences} integer
+                        onBlur={v => updateItem(item.id, 'absences', v, item)} />
+                    </td>
+                    {/* Base $ */}
+                    <td className="px-2 py-1.5">
+                      <NumInput disabled={isClosed} value={item.base_salary}
+                        onBlur={v => updateItem(item.id, 'base_salary', v, item)} />
+                    </td>
+                    {/* Dep. Banco */}
+                    <td className="px-2 py-1.5">
+                      <NumInput disabled={isClosed} value={item.bank_deposit}
+                        onBlur={v => updateItem(item.id, 'bank_deposit', v, item)} />
+                    </td>
+                    {/* Adelanto */}
+                    <td className="px-2 py-1.5">
+                      <NumInput disabled={isClosed} value={item.advance}
+                        onBlur={v => updateItem(item.id, 'advance', v, item)} />
+                    </td>
+                    {/* Plus% */}
+                    <td className="px-2 py-1.5 text-center">
+                      <NumInput disabled={isClosed} value={item.plus_pct} step={0.01}
+                        onBlur={v => updateItem(item.id, 'plus_pct', v, item)} />
+                    </td>
+                    {/* Plus$ — auto */}
+                    <td className="px-3 py-2 text-xs text-right font-body text-gray-600 whitespace-nowrap">
+                      {item.plus_amount ? fmt$(item.plus_amount) : '—'}
+                    </td>
+                    {/* Incentivo (Luro only) */}
+                    {showIncentivo && (
+                      <td className="px-2 py-1.5">
+                        <NumInput disabled={isClosed} value={item.incentive}
+                          onBlur={v => updateItem(item.id, 'incentive', v, item)} />
+                      </td>
+                    )}
+                    {/* Total Bruto — auto, amber bg */}
+                    <td className="px-3 py-2 text-xs text-right font-bold font-body whitespace-nowrap"
+                      style={{ background: '#FFFBEB', color: '#92400E' }}>
+                      {fmt$(item.gross_total)}
+                    </td>
+                    {/* Percibido — auto, green bg */}
+                    <td className="px-3 py-2 text-xs text-right font-bold font-body whitespace-nowrap"
+                      style={{ background: '#ECFDF5', color: '#065F46' }}>
+                      {fmt$(item.net_total)}
+                    </td>
+                    {/* PDF export icon */}
+                    <td className="px-2 py-1.5 text-center">
+                      <button
+                        title="Exportar recibo"
+                        onClick={() => handlePdf(`/payroll/items/${item.id}/payslip`,
+                          `recibo_${(item.employee_name || 'emp').replace(/[, ]+/g,'_')}_${month}_${year}.pdf`)}
+                        className="text-gray-400 hover:text-coral transition-colors"
+                        style={{ color: undefined }}
+                        onMouseOver={e => (e.currentTarget.style.color = CORAL)}
+                        onMouseOut={e => (e.currentTarget.style.color = '')}>
+                        <FileDown size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {/* Totals row */}
+                <tr style={{ background: NAVY }}>
+                  <td colSpan={showIncentivo ? 9 : 8}
+                    className="px-3 py-2.5 text-white text-[11px] font-bold uppercase tracking-widest">
+                    TOTALES
+                  </td>
+                  <td className="px-3 py-2.5 text-xs text-right font-bold" style={{ color: '#FCD34D' }}>
+                    {fmt$(totBruto)}
+                  </td>
+                  <td className="px-3 py-2.5 text-xs text-right font-bold text-green-300">
+                    {fmt$(totNet)}
+                  </td>
+                  <td />
+                </tr>
+              </tbody>
+            </table>
+            <p className="px-4 py-2 text-[10px] text-gray-400 font-body border-t border-gray-100">
+              Convenio Madereros · Plus% = editable · Plus$ = Base × Plus% · Total Bruto = Base + Plus$ {showIncentivo ? '+ Incentivo' : ''} · Percibido = Bruto − Banco − Adelanto
+            </p>
+          </div>
+        ) : (
+          <div className="px-5 py-12 text-center text-gray-400 text-sm font-body">
+            No hay liquidación para {month} {year}.{' '}
+            <button onClick={() => createPeriod(branchId)} className="font-semibold hover:underline" style={{ color: CORAL }}>
+              Abrir mes
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  /* ── "Ambas" consolidated view ── */
+  const renderAmbasView = () => {
+    const periodLuro  = getPeriod(1)
+    const periodIndep = getPeriod(2)
+    const allItems    = [
+      ...(periodLuro?.items  ?? []).map((i: any) => ({ ...i, _branch: 'LURO'          })),
+      ...(periodIndep?.items ?? []).map((i: any) => ({ ...i, _branch: 'INDEPENDENCIA' })),
+    ]
+    const totBruto = allItems.reduce((a, i) => a + (i.gross_total ?? 0), 0)
+    const totNet   = allItems.reduce((a, i) => a + (i.net_total   ?? 0), 0)
+
+    return (
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div style={{ background: NAVY }} className="px-5 py-3 flex items-center justify-between">
+          <div>
+            <p className="text-white text-sm font-bold font-head tracking-wide">PLANILLA SUELDOS — AMBAS SUCURSALES</p>
+            <p className="text-white/50 text-[11px] font-body">{month} {year}</p>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[600px] text-sm border-collapse">
+            <thead>
+              <tr style={{ background: '#f0eeeb' }}>
+                <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-center border-b border-gray-200 w-8" style={{ color: NAVY }}>N°</th>
+                <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-left border-b border-gray-200" style={{ color: NAVY }}>Empleado</th>
+                <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-left border-b border-gray-200" style={{ color: NAVY }}>Sucursal</th>
+                <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-right border-b border-gray-200" style={{ color: NAVY }}>Base $</th>
+                <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-right border-b border-gray-200" style={{ color: NAVY }}>Plus $</th>
+                <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-right border-b border-gray-200" style={{ background: '#FFF3CD', color: '#92400E' }}>Total Bruto</th>
+                <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-right border-b border-gray-200" style={{ background: '#D1FAE5', color: '#065F46' }}>Percibido</th>
+                <th className="px-2 py-2.5 border-b border-gray-200 w-8" />
+              </tr>
+            </thead>
+            <tbody>
+              {allItems.map((item, i) => (
+                <tr key={item.id} className={i % 2 === 0 ? 'bg-white' : ''} style={i % 2 !== 0 ? { background: '#fafaf8' } : {}}>
+                  <td className="px-3 py-2 text-center text-[11px] font-bold font-body" style={{ color: CORAL }}>{i + 1}</td>
+                  <td className="px-3 py-2 text-xs font-semibold font-body text-gray-800 whitespace-nowrap">{item.employee_name}</td>
+                  <td className="px-3 py-2 text-[11px] font-body">
+                    <span className="px-2 py-0.5 rounded-full text-white text-[10px] font-bold"
+                      style={{ background: item._branch === 'LURO' ? NAVY : CORAL }}>
+                      {item._branch}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-xs text-right font-body text-gray-700 whitespace-nowrap">
+                    {item.base_salary ? fmt$(item.base_salary) : '—'}
+                  </td>
+                  <td className="px-3 py-2 text-xs text-right font-body text-gray-600 whitespace-nowrap">
+                    {item.plus_amount ? fmt$(item.plus_amount) : '—'}
+                  </td>
+                  <td className="px-3 py-2 text-xs text-right font-bold font-body whitespace-nowrap"
+                    style={{ background: '#FFFBEB', color: '#92400E' }}>
+                    {fmt$(item.gross_total)}
+                  </td>
+                  <td className="px-3 py-2 text-xs text-right font-bold font-body whitespace-nowrap"
+                    style={{ background: '#ECFDF5', color: '#065F46' }}>
+                    {fmt$(item.net_total)}
+                  </td>
+                  <td className="px-2 py-1.5 text-center">
+                    <button
+                      title="Exportar recibo"
+                      onClick={() => handlePdf(`/payroll/items/${item.id}/payslip`,
+                        `recibo_${(item.employee_name || 'emp').replace(/[, ]+/g,'_')}_${month}_${year}.pdf`)}
+                      className="text-gray-400 transition-colors"
+                      onMouseOver={e => (e.currentTarget.style.color = CORAL)}
+                      onMouseOut={e => (e.currentTarget.style.color = '')}>
+                      <FileDown size={14} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {allItems.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-4 py-10 text-center text-gray-400 text-sm font-body">
+                    No hay liquidaciones abiertas para {month} {year}.
+                  </td>
+                </tr>
+              )}
+              {allItems.length > 0 && (
+                <tr style={{ background: NAVY }}>
+                  <td colSpan={5} className="px-3 py-2.5 text-white text-[11px] font-bold uppercase tracking-widest">
+                    TOTAL GENERAL
+                  </td>
+                  <td className="px-3 py-2.5 text-xs text-right font-bold" style={{ color: '#FCD34D' }}>
+                    {fmt$(totBruto)}
+                  </td>
+                  <td className="px-3 py-2.5 text-xs text-right font-bold text-green-300">
+                    {fmt$(totNet)}
+                  </td>
+                  <td />
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-5">
+      {/* Controls: month selector + vista switcher */}
       <div className="flex flex-wrap items-center gap-3">
         <select value={month} onChange={e => setMonth(e.target.value)}
-          className="border border-brand-border rounded-lg px-3 py-2 text-sm font-body focus:outline-none">
+          className="border border-gray-200 rounded-lg px-3 py-2 text-sm font-body focus:outline-none bg-white shadow-sm">
           {MONTHS.map(m => <option key={m}>{m}</option>)}
         </select>
-        <span className="text-sm text-brand-muted font-body">{year}</span>
+        <span className="text-sm text-gray-500 font-body">{year}</span>
+
+        {/* Vista selector */}
+        <div className="flex rounded-lg overflow-hidden border border-gray-200 shadow-sm ml-auto">
+          {VISTA_BTNS.map(({ id, label }) => (
+            <button key={id} onClick={() => setVista(id)}
+              className="px-4 py-2 text-xs font-semibold font-body transition-all"
+              style={vista === id
+                ? { background: NAVY, color: 'white' }
+                : { background: 'white', color: '#666' }}>
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {BRANCHES.map(branch => {
-        const period   = branchPeriods(branch.id)[0]
-        const items    = period?.items ?? []
-        const isClosed = period?.status === 'CLOSED'
-        const totBruto = items.reduce((a: number, i: any) => a + (i.gross_total ?? 0), 0)
-        const totNet   = items.reduce((a: number, i: any) => a + (i.net_total   ?? 0), 0)
-
-        return (
-          <div key={branch.id} className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div style={{ background: branch.id === 1 ? NAVY : CORAL }}
-              className="px-5 py-3 flex items-center justify-between flex-wrap gap-2">
-              <div>
-                <p className="text-white text-sm font-bold font-head">{branch.name}</p>
-                <p className="text-white/60 text-xs font-body">Convenio {branch.union} · {month} {year}</p>
-              </div>
-              <div className="flex gap-2 flex-wrap">
-                {!period && (
-                  <button onClick={() => createPeriod(branch.id)} disabled={creating}
-                    className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-xs font-semibold font-body flex items-center gap-1">
-                    <Plus size={12} /> Abrir Mes
-                  </button>
-                )}
-                {period && !isClosed && (
-                  <button onClick={() => closePeriod(period.id)}
-                    className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-xs font-semibold font-body flex items-center gap-1">
-                    <Lock size={12} /> Cerrar
-                  </button>
-                )}
-                {period && (<>
-                  <button onClick={() => handlePdf(`/payroll/periods/${period.id}/pdf`, `sueldos_${branch.name}_${month}_${year}.pdf`)}
-                    className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-xs font-semibold font-body flex items-center gap-1">
-                    <FileDown size={12} /> Planilla
-                  </button>
-                  <button onClick={() => handlePdf(`/payroll/periods/${period.id}/payslips`, `recibos_${branch.name}_${month}_${year}.pdf`)}
-                    className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-xs font-semibold font-body flex items-center gap-1">
-                    <FileDown size={12} /> Recibos
-                  </button>
-                </>)}
-              </div>
-            </div>
-
-            {period ? (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[700px] text-sm">
-                  <thead style={{ background: '#f8f7f5' }}>
-                    <tr>
-                      {['Empleado','Inas.','Base $','Plus %','Plus $','Incentivo','Bruto $','Depósito','Adelanto','Percibido $'].map(h => (
-                        <th key={h} className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-left border-b border-brand-border"
-                          style={{ color: NAVY }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.map((item: any, i: number) => (
-                      <tr key={item.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}>
-                        <td className="px-3 py-2 text-xs font-semibold font-body text-gray-800">{item.employee_name}</td>
-                        <td className="px-2 py-1.5">
-                          <NumInput disabled={isClosed} value={item.absences} integer
-                            onBlur={v => updateItem(item.id, 'absences', v, item)} />
-                        </td>
-                        {['base_salary','plus_pct','bank_deposit','advance','incentive'].map(f => (
-                          <td key={f} className="px-2 py-1.5">
-                            <NumInput disabled={isClosed} value={item[f]}
-                              step={f === 'plus_pct' ? 0.01 : 1}
-                              onBlur={v => updateItem(item.id, f, v, item)} />
-                          </td>
-                        ))}
-                        <td className="px-3 py-2 text-xs text-right font-body text-gray-600">{fmt$(item.plus_amount)}</td>
-                        <td className="px-3 py-2 text-xs text-right font-bold font-body text-gray-800">{fmt$(item.gross_total)}</td>
-                        <td className="px-3 py-2 text-xs text-right font-bold font-body text-green-700">{fmt$(item.net_total)}</td>
-                      </tr>
-                    ))}
-                    <tr style={{ background: NAVY }}>
-                      <td colSpan={6} className="px-3 py-2.5 text-white text-xs font-bold uppercase tracking-widest">TOTALES</td>
-                      <td className="px-3 py-2.5 text-xs text-right font-bold" style={{ color: CORAL }}>{fmt$(totBruto)}</td>
-                      <td colSpan={2} />
-                      <td className="px-3 py-2.5 text-xs text-right font-bold text-green-400">{fmt$(totNet)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="px-5 py-10 text-center text-brand-muted text-sm font-body">
-                No hay liquidación para {month} {year}.{' '}
-                <button onClick={() => createPeriod(branch.id)} className="text-coral font-semibold hover:underline" style={{ color: CORAL }}>
-                  Abrir mes
-                </button>
-              </div>
-            )}
-          </div>
-        )
-      })}
+      {vista === 'luro'          && renderBranchTable(1, 'LURO', true)}
+      {vista === 'independencia' && renderBranchTable(2, 'INDEPENDENCIA', false)}
+      {vista === 'ambas'         && renderAmbasView()}
     </div>
   )
 }

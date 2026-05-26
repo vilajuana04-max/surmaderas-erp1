@@ -5,7 +5,7 @@ from typing import Optional
 from app.database import get_db
 from app.models import PayrollPeriod, PayrollItem, Employee, Branch
 from app.schemas import PayrollItemCreate, PayrollItemOut, PayrollPeriodOut
-from app.services.pdf_generator import generate_payroll_pdf, generate_payslips_pdf
+from app.services.pdf_generator import generate_payroll_pdf, generate_payslips_pdf, generate_single_payslip_pdf
 
 router = APIRouter(prefix="/payroll", tags=["Sueldos"])
 
@@ -89,6 +89,23 @@ def export_payroll_pdf(period_id: int, db: Session = Depends(get_db)):
         content    = pdf_bytes,
         media_type = "application/pdf",
         headers    = {"Content-Disposition": f"attachment; filename=sueldos_{period.month}_{period.year}.pdf"}
+    )
+
+
+@router.get("/items/{item_id}/payslip")
+def export_single_payslip(item_id: int, db: Session = Depends(get_db)):
+    item = db.query(PayrollItem).filter(PayrollItem.id == item_id).first()
+    if not item:
+        raise HTTPException(404, "Item no encontrado")
+    period = item.period
+    if not period:
+        raise HTTPException(404, "Periodo no encontrado")
+    pdf_bytes = generate_single_payslip_pdf(item, period)
+    safe_name = (item.employee.name or "empleado").replace(", ", "_").replace(" ", "_")
+    return Response(
+        content    = pdf_bytes,
+        media_type = "application/pdf",
+        headers    = {"Content-Disposition": f"attachment; filename=recibo_{safe_name}_{period.month}_{period.year}.pdf"}
     )
 
 
