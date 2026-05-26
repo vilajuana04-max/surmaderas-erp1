@@ -13,9 +13,6 @@ const NAV_MAIN = [
   { to: '/ventas',  icon: ShoppingCart,    label: 'Ventas',    num: '02' },
   { to: '/compras', icon: Package,         label: 'Compras',   num: '03' },
 ]
-const NAV_AFTER = [
-  { to: '/gastos',  icon: Receipt,         label: 'Gastos',    num: '05' },
-]
 const RRHH_SUB = [
   { tab: 'vacaciones', label: 'Vacaciones' },
   { tab: 'calendario', label: 'Calendario' },
@@ -24,12 +21,18 @@ const RRHH_SUB = [
   { tab: 'dashboard',  label: 'Dashboard'  },
   { tab: 'ajustes',    label: 'Ajustes'    },
 ]
+const GASTOS_SUB = [
+  { tab: 'compartidos', label: 'Compartidos' },
+  { tab: 'luro',        label: 'Gastos Luro' },
+]
 
 /* ── Sidebar content (shared desktop/mobile) ─────────────────── */
 function SidebarContent({ onClose }: { onClose?: () => void }) {
-  const location = useLocation()
-  const isRRHH   = location.pathname === '/rrhh' || location.pathname.startsWith('/rrhh')
-  const [rrhhOpen, setRrhhOpen] = useState(isRRHH)
+  const location   = useLocation()
+  const isRRHH     = location.pathname === '/rrhh' || location.pathname.startsWith('/rrhh')
+  const isGastos   = location.pathname === '/gastos' || location.pathname.startsWith('/gastos')
+  const [rrhhOpen,   setRrhhOpen]   = useState(isRRHH)
+  const [gastosOpen, setGastosOpen] = useState(isGastos)
 
   // Tab activo desde query params
   const activeTab = new URLSearchParams(location.search).get('tab') ?? 'vacaciones'
@@ -118,17 +121,51 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
           </div>
         )}
 
-        {/* Items después de RRHH */}
-        {NAV_AFTER.map(({ to, icon: Icon, label, num }) => (
-          <NavLink key={to} to={to}
-            onClick={onClose}
-            className={({ isActive }) => navLinkClass(isActive)}
-            style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
-            <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>{num}</span>
-            <Icon size={16} strokeWidth={2} />
-            <span className="tracking-[1px] uppercase text-[12px]">{label}</span>
-          </NavLink>
-        ))}
+        {/* ── Gastos con submenú desplegable ── */}
+        <button
+          onClick={() => setGastosOpen(o => !o)}
+          className={[
+            'w-full flex items-center gap-3 px-7 py-3 text-sm font-semibold font-body',
+            'border-l-[3px] transition-all duration-200 tracking-wide',
+            isGastos
+              ? 'text-white bg-white/5'
+              : 'text-white/40 border-l-transparent hover:text-white/80 hover:bg-white/5',
+          ].join(' ')}
+          style={{ borderLeftColor: isGastos ? CORAL : 'transparent' }}>
+          <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>05</span>
+          <Receipt size={16} strokeWidth={2} />
+          <span className="tracking-[1px] uppercase text-[12px] flex-1 text-left">Gastos</span>
+          <ChevronDown
+            size={14}
+            className="transition-transform duration-200 shrink-0"
+            style={{ transform: gastosOpen ? 'rotate(180deg)' : 'rotate(0deg)', opacity: 0.6 }}
+          />
+        </button>
+
+        {gastosOpen && (
+          <div className="pb-1" style={{ background: 'rgba(255,255,255,0.03)' }}>
+            {GASTOS_SUB.map(({ tab, label }) => {
+              const activeGastosTab = new URLSearchParams(location.search).get('tab') ?? 'compartidos'
+              const isActive = isGastos && activeGastosTab === tab
+              return (
+                <NavLink
+                  key={tab}
+                  to={`/gastos?tab=${tab}`}
+                  onClick={onClose}
+                  className={[
+                    'flex items-center gap-2 pl-14 pr-7 py-2 text-[11px] font-semibold font-body',
+                    'border-l-[3px] transition-all duration-150',
+                    isActive
+                      ? 'text-white bg-white/5'
+                      : 'text-white/35 border-l-transparent hover:text-white/70 hover:bg-white/5',
+                  ].join(' ')}
+                  style={{ borderLeftColor: isActive ? CORAL : 'transparent' }}>
+                  <span className="tracking-wide">{label}</span>
+                </NavLink>
+              )
+            })}
+          </div>
+        )}
       </nav>
 
       {/* Footer */}
