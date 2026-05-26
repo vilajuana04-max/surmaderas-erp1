@@ -4,5 +4,5 @@ from .payroll import PayrollItemCreate, PayrollItemOut, PayrollPeriodOut
 from .vacations import VacationRecordOut, VacationLogCreate, VacationLogOut
 from .expenses import (SharedExpenseOut, SharedExpenseUpdate,
                        LuroExpenseCreate, LuroExpenseOut, ExpenseCategoryOut)
-from .employees import EmployeeOut
+from .employees import EmployeeOut, EmployeeCreate, EmployeeUpdate
 from .dashboard import DashboardKPIs, MonthlyStats, WeekdaySales

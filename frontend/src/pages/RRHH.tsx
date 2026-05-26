@@ -15,7 +15,7 @@ const BRANCHES  = [
 ]
 
 /* ── Tipos ──────────────────────────────────────────────────── */
-type Tab = 'vacaciones' | 'sueldos' | 'recibos' | 'calendario'
+type Tab = 'vacaciones' | 'sueldos' | 'recibos' | 'calendario' | 'dashboard' | 'ajustes'
 
 type VacRecord = {
   id: number; year: number; employee_id: number; employee_name: string
@@ -51,10 +51,12 @@ export default function RRHH() {
   const setTab = (t: Tab) => setSearchParams({ tab: t }, { replace: true })
 
   const TABS: { id: Tab; label: string; subtitle: string }[] = [
-    { id: 'vacaciones', label: '🌴 Vacaciones', subtitle: 'Días tomados y disponibles' },
-    { id: 'calendario', label: '📅 Calendario', subtitle: 'Superposición visual'       },
-    { id: 'sueldos',    label: '💰 Sueldos',    subtitle: 'Liquidación mensual'        },
-    { id: 'recibos',    label: '📎 Recibos',    subtitle: 'PDFs por empleado'          },
+    { id: 'vacaciones', label: 'Vacaciones', subtitle: 'Dias tomados y disponibles' },
+    { id: 'calendario', label: 'Calendario', subtitle: 'Superposicion visual'       },
+    { id: 'sueldos',    label: 'Sueldos',    subtitle: 'Liquidacion mensual'        },
+    { id: 'recibos',    label: 'Recibos',    subtitle: 'PDFs por empleado'          },
+    { id: 'dashboard',  label: 'Dashboard',  subtitle: 'Metricas de personal'       },
+    { id: 'ajustes',    label: 'Ajustes',    subtitle: 'Empleados y configuracion'  },
   ]
   const current = TABS.find(t => t.id === tab) ?? TABS[0]
 
@@ -89,6 +91,8 @@ export default function RRHH() {
       {tab === 'calendario' && <CalendarioTab />}
       {tab === 'sueldos'    && <SueldosTab />}
       {tab === 'recibos'    && <RecibosTab />}
+      {tab === 'dashboard'  && <DashboardTab />}
+      {tab === 'ajustes'    && <AjustesTab />}
     </div>
   )
 }
@@ -230,7 +234,7 @@ function VacacionesTab() {
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <div style={{ background: CORAL }} className="px-5 py-3">
               <p className="text-white text-sm font-bold tracking-wide font-head">
-                📅 SITUACIÓN ACTUAL — {year}
+                SITUACION ACTUAL — {year}
               </p>
             </div>
             <div className="overflow-x-auto">
@@ -348,7 +352,7 @@ function VacacionesTab() {
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <div style={{ background: CORAL }} className="px-5 py-3">
               <p className="text-white text-sm font-bold tracking-wide font-head">
-                👥 DATOS EMPLEADOS — ANTIGÜEDAD Y VACACIONES POR CONVENIO
+                DATOS EMPLEADOS — ANTIGUEDAD Y VACACIONES POR CONVENIO
               </p>
             </div>
             <div className="overflow-x-auto">
@@ -402,8 +406,105 @@ function VacacionesTab() {
             </div>
             <div className="px-5 py-3 border-t border-brand-border" style={{ background: '#fef9c3' }}>
               <p className="text-[11px] text-amber-800 font-body font-semibold">
-                ⚖️ Fórmula convenio: &lt; 5 años = 14 días &nbsp;·&nbsp; 5 a 10 años = 21 días &nbsp;·&nbsp; ≥ 10 años = 28 días
+                Formula convenio: &lt; 5 años = 14 días &nbsp;·&nbsp; 5 a 10 años = 21 días &nbsp;·&nbsp; &gt;= 10 años = 28 días
               </p>
+            </div>
+          </div>
+
+          {/* ── SECCIÓN 2b: Resumen Anual ── */}
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div style={{ background: NAVY }} className="px-5 py-3">
+              <p className="text-white text-sm font-bold tracking-wide font-head">
+                RESUMEN ANUAL DE VACACIONES — {year}
+              </p>
+            </div>
+            {/* Summary card */}
+            {(() => {
+              const empConPendiente = records.filter(r => {
+                const edit      = editing[r.id]
+                const entitled  = edit ? (parseInt(edit.entitled) || 0) : (r.days_entitled    ?? 0)
+                const taken     = edit ? (parseInt(edit.taken)    || 0) : (r.days_taken       ?? 0)
+                const prev      = r.pending_prev_year ?? 0
+                const available = entitled + prev
+                const pending   = available - taken
+                return pending > 0
+              })
+              return (
+                <div className="px-5 py-3 border-b border-brand-border" style={{ background: '#fef9c3' }}>
+                  <p className="text-[12px] font-semibold text-amber-800 font-body">
+                    Total pendiente: <strong>{totals.pending} dias</strong> en{' '}
+                    <strong>{empConPendiente.length}</strong> empleado{empConPendiente.length !== 1 ? 's' : ''}
+                    {totals.prev > 0 && (
+                      <span className="ml-3 text-amber-700">
+                        · {totals.prev} dias arrastrados del año anterior
+                      </span>
+                    )}
+                  </p>
+                </div>
+              )
+            })()}
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[700px] text-sm">
+                <thead style={{ background: '#f0eeeb' }}>
+                  <tr>
+                    <th className="px-3 py-2.5 text-center text-[10px] font-bold uppercase tracking-widest border-b border-brand-border w-8"
+                      style={{ color: CORAL }}>N°</th>
+                    {['Empleado','Sucursal','Dias Correspondientes','Dias Tomados','Pendiente Año Ant.','Pendiente ' + year].map(h => (
+                      <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest border-b border-brand-border"
+                        style={{ color: NAVY }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {records.map((r, i) => {
+                    const edit      = editing[r.id]
+                    const entitled  = edit ? (parseInt(edit.entitled) || 0) : (r.days_entitled    ?? 0)
+                    const taken     = edit ? (parseInt(edit.taken)    || 0) : (r.days_taken       ?? 0)
+                    const prev      = r.pending_prev_year ?? 0
+                    const available = entitled + prev
+                    const pending   = available - taken
+                    const isBranchIndep = r.branch_name === 'INDEPENDENCIA'
+                    const hasPrevPending = prev > 0
+                    return (
+                      <tr key={r.id}
+                        className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}
+                        style={{ borderLeft: `3px solid ${isBranchIndep ? CORAL : NAVY}` }}>
+                        <td className="px-3 py-2 text-[10px] font-bold text-center font-body"
+                          style={{ color: CORAL }}>{i + 1}</td>
+                        <td className="px-4 py-2 text-xs font-semibold text-gray-800 font-body">{r.employee_name}</td>
+                        <td className="px-4 py-2 text-xs font-semibold font-body"
+                          style={{ color: isBranchIndep ? CORAL : NAVY }}>
+                          {isBranchIndep ? 'Indep.' : 'Luro'}
+                        </td>
+                        <td className="px-4 py-2 text-xs text-center font-body">{entitled}</td>
+                        <td className="px-4 py-2 text-xs text-center font-body">{taken}</td>
+                        <td className="px-4 py-2 text-xs text-center font-body"
+                          style={{ background: hasPrevPending ? '#fef3c7' : undefined }}>
+                          <span className={hasPrevPending ? 'font-bold text-amber-800' : 'text-brand-muted'}>
+                            {prev > 0 ? prev : '—'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2 text-xs text-center font-body"
+                          style={{ background: pending > 0 ? '#fef3c7' : '#dcfce7' }}>
+                          <span className={`font-bold ${pending > 0 ? 'text-amber-800' : 'text-green-800'}`}>
+                            {pending}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr style={{ background: NAVY }}>
+                    <td className="px-3 py-2.5 text-white/40 text-[10px] text-center font-body">—</td>
+                    <td className="px-4 py-2.5 text-white text-xs font-bold uppercase tracking-widest" colSpan={2}>TOTALES {year}</td>
+                    <td className="px-4 py-2.5 text-center text-xs font-bold" style={{ color: CORAL }}>{totals.entitled}</td>
+                    <td className="px-4 py-2.5 text-center text-xs font-bold text-white">{totals.taken}</td>
+                    <td className="px-4 py-2.5 text-center text-xs font-bold" style={{ color: '#fde68a' }}>{totals.prev}</td>
+                    <td className="px-4 py-2.5 text-center text-xs font-bold" style={{ color: totals.pending > 0 ? '#fde68a' : '#86efac' }}>{totals.pending}</td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
           </div>
 
@@ -411,7 +512,7 @@ function VacacionesTab() {
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <div style={{ background: NAVY }} className="px-5 py-3.5 flex items-center justify-between">
               <p className="text-white text-sm font-bold tracking-wide font-head">
-                📋 DETALLE DE SOLICITUDES Y VACACIONES APROBADAS — {year}
+                DETALLE DE SOLICITUDES Y VACACIONES APROBADAS — {year}
               </p>
               <button onClick={() => setShowLogForm(!showLogForm)}
                 style={{ background: CORAL }}
@@ -690,11 +791,11 @@ function CalendarioTab() {
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <div style={{ background: NAVY }} className="px-5 py-3 flex items-center justify-between">
           <p className="text-white text-sm font-bold font-head">
-            📅 CALENDARIO — {MONTH_NAMES[monthIdx].toUpperCase()} {year}
+            CALENDARIO — {MONTH_NAMES[monthIdx].toUpperCase()} {year}
           </p>
           {overlapDays.size > 0 && (
             <span className="text-xs font-semibold font-body bg-amber-400 text-amber-900 px-2.5 py-1 rounded-full">
-              ⚠️ {overlapDays.size} día{overlapDays.size > 1 ? 's' : ''} con superposición
+              {overlapDays.size} día{overlapDays.size > 1 ? 's' : ''} con superposicion
             </span>
           )}
         </div>
@@ -923,7 +1024,7 @@ function SueldosTab() {
 
     /* ── Inasistencias ── */
     const inaRow = m.inasistencias_desc
-      ? `<tr><td class="lbl" style="color:#b91c1c;font-size:8pt" colspan="2">⚠ Inasistencias: ${m.inasistencias_desc}</td></tr><tr><td colspan="2" style="padding:2px"></td></tr>`
+      ? `<tr><td class="lbl" style="color:#b91c1c;font-size:8pt" colspan="2">Inasistencias: ${m.inasistencias_desc}</td></tr><tr><td colspan="2" style="padding:2px"></td></tr>`
       : ''
 
     return `
@@ -1061,7 +1162,7 @@ ${cards}
     { id: 'luro',          label: 'Luro'          },
     { id: 'independencia', label: 'Independencia' },
     { id: 'ambas',         label: 'Ambas'         },
-    { id: 'historial',     label: '📋 Historial'  },
+    { id: 'historial',     label: 'Historial'     },
   ]
 
   const calcBruto = (m: any): number => {
@@ -1525,14 +1626,14 @@ ${cards}
                           {period.month} {period.year}
                         </span>
                         <span className={`ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${period.status === 'CLOSED' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                          {period.status === 'CLOSED' ? '✓ Cerrado' : 'Abierto'}
+                          {period.status === 'CLOSED' ? 'Cerrado' : 'Abierto'}
                         </span>
                         <span className="ml-auto text-xs text-gray-500 font-body">
                           Bruto: <strong style={{ color: '#92400E' }}>{fmtARS(brutoTotal)}</strong>
                           &nbsp;·&nbsp;
                           Percibido: <strong style={{ color: '#065F46' }}>{fmtARS(percTotal)}</strong>
                         </span>
-                        <span className="text-gray-400 text-xs ml-2">{isOpen ? '▲' : '▼'}</span>
+                        <span className="text-gray-400 text-xs ml-2">{isOpen ? '^' : 'v'}</span>
                       </div>
                       {/* Detalle expandible */}
                       {isOpen && (
@@ -1812,6 +1913,664 @@ function RecibosTab() {
           No hay empleados activos en el sistema.
         </div>
       )}
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────
+   TAB 5: DASHBOARD — Metricas de personal
+───────────────────────────────────────────────────────────── */
+function DashboardTab() {
+  const fmtARS = (n: number) => '$ ' + Math.round(n).toLocaleString('es-AR')
+
+  const [allPeriods,   setAllPeriods]   = useState<any[]>([])
+  const [allEmployees, setAllEmployees] = useState<any[]>([])
+
+  useEffect(() => {
+    api.get<any[]>('/payroll/periods').then(setAllPeriods).catch(() => setAllPeriods([]))
+    api.get<any[]>('/employees/').then(setAllEmployees).catch(() => setAllEmployees([]))
+  }, [])
+
+  // Helper to compute bruto and percibido from an item (mirrors SueldosTab logic)
+  const calcBruto = (m: any): number => {
+    const pf = parseFloat(m.plus_factor) || 0
+    const factor = pf > 1 ? pf : 1.0
+    const com = parseFloat(m.comision) || 0
+    const h  = parseFloat(m.horas) || 0
+    const ph = parseFloat(m.precio_hora) || 0
+    if (h > 0 && ph > 0) return h * ph + com
+    const bm = parseFloat(m.bruto_manual) || 0
+    if (bm !== 0) return bm * factor + com
+    const dep = parseFloat(m.deposito_banco) || 0
+    return dep * 2 * factor + com
+  }
+  const calcPerc = (m: any): number => {
+    const bruto   = calcBruto(m)
+    const adelanto = parseFloat(m.adelanto) || 0
+    const h  = parseFloat(m.horas) || 0
+    const ph = parseFloat(m.precio_hora) || 0
+    const bm = parseFloat(m.bruto_manual) || 0
+    if ((h > 0 && ph > 0) || bm !== 0) return bruto - adelanto
+    const dep = parseFloat(m.deposito_banco) || 0
+    return bruto - dep - adelanto
+  }
+
+  // Find periods for current and previous month
+  const currentMonthName = MONTHS[CURRENT_MONTH_IDX]
+  const prevMonthIdx     = CURRENT_MONTH_IDX === 0 ? 11 : CURRENT_MONTH_IDX - 1
+  const prevMonthName    = MONTHS[prevMonthIdx]
+  const prevYear         = CURRENT_MONTH_IDX === 0 ? CURRENT_YEAR - 1 : CURRENT_YEAR
+
+  const currentPeriods = allPeriods.filter(p => p.month === currentMonthName && p.year === CURRENT_YEAR)
+  const prevPeriods    = allPeriods.filter(p => p.month === prevMonthName    && p.year === prevYear)
+
+  const currentItems: any[] = currentPeriods.flatMap(p => (p.items ?? []).map((i: any) => ({ ...i, _branch: p.branch_name })))
+  const prevItems:    any[] = prevPeriods.flatMap(p    => (p.items ?? []).map((i: any) => ({ ...i, _branch: p.branch_name })))
+
+  const totalMasaActual = currentItems.reduce((s, i) => s + calcPerc(i), 0)
+  const totalMasaPrev   = prevItems.reduce((s, i) => s + calcPerc(i), 0)
+  const variacion       = totalMasaPrev > 0 ? ((totalMasaActual - totalMasaPrev) / totalMasaPrev) * 100 : 0
+  const avgSueldo       = currentItems.length > 0 ? currentItems.reduce((s, i) => s + calcBruto(i), 0) / currentItems.length : 0
+  const totalAdelantos  = currentItems.reduce((s, i) => s + (parseFloat(i.adelanto) || 0), 0)
+
+  // Per-employee evolution
+  type EmpStat = {
+    id: number; name: string; branch: string
+    brutoActual: number; brutoPrev: number
+    percActual: number
+    varAbs: number; varPct: number
+  }
+
+  const empStats: EmpStat[] = currentItems.map(item => {
+    const prevItem = prevItems.find((p: any) => p.employee_id === item.employee_id)
+    const brutoActual = calcBruto(item)
+    const brutoPrev   = prevItem ? calcBruto(prevItem) : 0
+    const percActual  = calcPerc(item)
+    const varAbs      = brutoActual - brutoPrev
+    const varPct      = brutoPrev > 0 ? (varAbs / brutoPrev) * 100 : 0
+    return {
+      id: item.employee_id,
+      name: item.employee_name,
+      branch: item._branch,
+      brutoActual,
+      brutoPrev,
+      percActual,
+      varAbs,
+      varPct,
+    }
+  })
+
+  // Ranking top 5 by bruto
+  const ranking = [...empStats].sort((a, b) => b.brutoActual - a.brutoActual).slice(0, 5)
+
+  // Por sucursal
+  const luroItems  = currentItems.filter(i => i._branch === 'LURO')
+  const indepItems = currentItems.filter(i => i._branch === 'INDEPENDENCIA')
+  const branchStats = [
+    {
+      name: 'LURO', color: NAVY,
+      bruto: luroItems.reduce((s, i) => s + calcBruto(i), 0),
+      perc:  luroItems.reduce((s, i) => s + calcPerc(i),  0),
+      count: luroItems.length,
+    },
+    {
+      name: 'INDEPENDENCIA', color: CORAL,
+      bruto: indepItems.reduce((s, i) => s + calcBruto(i), 0),
+      perc:  indepItems.reduce((s, i) => s + calcPerc(i),  0),
+      count: indepItems.length,
+    },
+  ]
+
+  const Card = ({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) => (
+    <div className="bg-white rounded-xl shadow-sm p-5 border border-gray-100">
+      <p className="text-[11px] font-semibold text-brand-muted uppercase tracking-widest font-body mb-1">{label}</p>
+      <p className="text-2xl font-bold font-head" style={{ color: color ?? NAVY }}>{value}</p>
+      {sub && <p className="text-[11px] text-brand-muted font-body mt-0.5">{sub}</p>}
+    </div>
+  )
+
+  if (allPeriods.length === 0 && allEmployees.length === 0) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm p-12 text-center text-brand-muted font-body text-sm">
+        Cargando datos...
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card
+          label="Masa salarial (percibido)"
+          value={fmtARS(totalMasaActual)}
+          sub={currentMonthName + ' ' + CURRENT_YEAR}
+          color={NAVY}
+        />
+        <Card
+          label="Variacion vs mes anterior"
+          value={(variacion >= 0 ? '+' : '') + variacion.toFixed(1) + '%'}
+          sub={prevMonthName + ' → ' + currentMonthName}
+          color={variacion >= 0 ? '#16a34a' : '#dc2626'}
+        />
+        <Card
+          label="Promedio sueldo bruto"
+          value={fmtARS(avgSueldo)}
+          sub={currentItems.length + ' empleados activos'}
+          color={CORAL}
+        />
+        <Card
+          label="Total adelantos del mes"
+          value={fmtARS(totalAdelantos)}
+          sub="Suma de todos los adelantos"
+          color="#78350F"
+        />
+      </div>
+
+      {/* Evolucion por empleado */}
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div style={{ background: NAVY }} className="px-5 py-3">
+          <p className="text-white text-sm font-bold font-head tracking-wide">
+            EVOLUCION POR EMPLEADO — {prevMonthName} → {currentMonthName}
+          </p>
+        </div>
+        {empStats.length === 0 ? (
+          <div className="px-5 py-10 text-center text-brand-muted font-body text-sm">
+            No hay liquidaciones para {currentMonthName} {CURRENT_YEAR}.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[700px] text-sm border-collapse">
+              <thead style={{ background: '#f0eeeb' }}>
+                <tr>
+                  {['Empleado','Sucursal','Bruto actual','Bruto ant.','Variacion $','Variacion %','Percibido actual'].map(h => (
+                    <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest border-b border-gray-200 font-body"
+                      style={{ color: NAVY }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {empStats.map((e, i) => (
+                  <tr key={e.id} style={{ background: i % 2 === 0 ? 'white' : '#fafaf8' }}>
+                    <td className="px-4 py-2.5 text-xs font-semibold text-gray-800 font-body">{e.name}</td>
+                    <td className="px-4 py-2.5">
+                      <span className="px-2 py-0.5 rounded-full text-white text-[10px] font-bold"
+                        style={{ background: e.branch === 'LURO' ? NAVY : CORAL }}>
+                        {e.branch}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-right font-bold font-body" style={{ color: '#92400E' }}>
+                      {fmtARS(e.brutoActual)}
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-right font-body text-gray-500">
+                      {e.brutoPrev > 0 ? fmtARS(e.brutoPrev) : '—'}
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-right font-bold font-body"
+                      style={{ color: e.varAbs >= 0 ? '#16a34a' : '#dc2626' }}>
+                      {e.brutoPrev > 0 ? (e.varAbs >= 0 ? '+' : '') + fmtARS(e.varAbs) : '—'}
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-right font-body"
+                      style={{ color: e.varPct >= 0 ? '#16a34a' : '#dc2626' }}>
+                      {e.brutoPrev > 0 ? (e.varPct >= 0 ? '+' : '') + e.varPct.toFixed(1) + '%' : '—'}
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-right font-bold font-body"
+                      style={{ background: '#ECFDF5', color: '#065F46' }}>
+                      {fmtARS(e.percActual)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Ranking + Masa por sucursal in a grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Ranking top 5 */}
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div style={{ background: CORAL }} className="px-5 py-3">
+            <p className="text-white text-sm font-bold font-head tracking-wide">RANKING SUELDOS (TOP 5)</p>
+            <p className="text-white/60 text-[11px] font-body">{currentMonthName} {CURRENT_YEAR} — por bruto</p>
+          </div>
+          <div className="p-4 space-y-2">
+            {ranking.length === 0 && (
+              <p className="text-center text-brand-muted font-body text-sm py-4">Sin datos</p>
+            )}
+            {ranking.map((e, i) => (
+              <div key={e.id} className="flex items-center gap-3">
+                <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+                  style={{ background: i === 0 ? CORAL : NAVY }}>
+                  {i + 1}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-gray-800 font-body truncate">{e.name}</p>
+                  <p className="text-[10px] text-brand-muted font-body">{e.branch}</p>
+                </div>
+                <span className="text-xs font-bold font-body" style={{ color: '#92400E' }}>
+                  {fmtARS(e.brutoActual)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Masa salarial por sucursal */}
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div style={{ background: NAVY }} className="px-5 py-3">
+            <p className="text-white text-sm font-bold font-head tracking-wide">MASA SALARIAL POR SUCURSAL</p>
+            <p className="text-white/60 text-[11px] font-body">{currentMonthName} {CURRENT_YEAR}</p>
+          </div>
+          <div className="p-4 space-y-4">
+            {branchStats.map(b => (
+              <div key={b.name} className="rounded-xl border border-gray-100 p-4"
+                style={{ borderLeft: `4px solid ${b.color}` }}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold font-body" style={{ color: b.color }}>{b.name}</span>
+                  <span className="text-[10px] text-brand-muted font-body">{b.count} empleados</span>
+                </div>
+                <div className="flex gap-4">
+                  <div>
+                    <p className="text-[10px] text-brand-muted font-body">Total Bruto</p>
+                    <p className="text-sm font-bold font-body" style={{ color: '#92400E' }}>{fmtARS(b.bruto)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-brand-muted font-body">Total Percibido</p>
+                    <p className="text-sm font-bold font-body" style={{ color: '#065F46' }}>{fmtARS(b.perc)}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────
+   TAB 6: AJUSTES — Gestion de empleados
+───────────────────────────────────────────────────────────── */
+type EmployeeExtended = {
+  id: number; name: string; branch_id: number; branch_name: string
+  hire_date: string; is_active: boolean
+  months_of_service: number; years_of_service: number; vacation_days_entitled: number
+  cuil?: string; position?: string; phone?: string; email_address?: string
+  payroll_type?: string; default_plus_pct?: number; notes?: string
+}
+
+const PAYROLL_TYPE_LABELS: Record<string, string> = {
+  standard: 'Deposito banco x2',
+  manual:   'Sueldo base fijo',
+  hourly:   'Por horas',
+}
+
+const emptyEmployee = {
+  name: '', branch_id: 1, hire_date: '', cuil: '', position: '', phone: '',
+  email_address: '', payroll_type: 'standard', default_plus_pct: '', notes: '', is_active: true,
+}
+
+function AjustesTab() {
+  const [employees, setEmployees] = useState<EmployeeExtended[]>([])
+  const [editing,   setEditing]   = useState<number | 'new' | null>(null)
+  const [form,      setForm]      = useState<typeof emptyEmployee>(emptyEmployee)
+  const [saving,    setSaving]    = useState(false)
+
+  const load = useCallback(() => {
+    api.get<EmployeeExtended[]>('/employees/all').then(setEmployees).catch(() => {
+      // fallback to standard list if /all not available yet
+      api.get<EmployeeExtended[]>('/employees/').then(setEmployees).catch(() => setEmployees([]))
+    })
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const startNew = () => {
+    setForm(emptyEmployee)
+    setEditing('new')
+  }
+
+  const startEdit = (emp: EmployeeExtended) => {
+    setForm({
+      name:             emp.name,
+      branch_id:        emp.branch_id,
+      hire_date:        emp.hire_date?.slice(0, 10) ?? '',
+      cuil:             emp.cuil ?? '',
+      position:         emp.position ?? '',
+      phone:            emp.phone ?? '',
+      email_address:    emp.email_address ?? '',
+      payroll_type:     emp.payroll_type ?? 'standard',
+      default_plus_pct: emp.default_plus_pct != null ? String(emp.default_plus_pct) : '',
+      notes:            emp.notes ?? '',
+      is_active:        emp.is_active,
+    } as any)
+    setEditing(emp.id)
+  }
+
+  const cancel = () => { setEditing(null); setForm(emptyEmployee) }
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      const payload = {
+        name:             form.name,
+        branch_id:        Number(form.branch_id),
+        hire_date:        form.hire_date,
+        cuil:             form.cuil  || null,
+        position:         form.position  || null,
+        phone:            form.phone     || null,
+        email_address:    form.email_address || null,
+        payroll_type:     form.payroll_type ?? 'standard',
+        default_plus_pct: form.default_plus_pct !== '' ? Number(form.default_plus_pct) : null,
+        notes:            form.notes    || null,
+        is_active:        (form as any).is_active ?? true,
+      }
+      if (editing === 'new') {
+        await api.post('/employees/', payload)
+      } else {
+        await api.put(`/employees/${editing}`, payload)
+      }
+      cancel()
+      load()
+    } catch (err: any) {
+      alert('Error: ' + (err.message ?? 'No se pudo guardar'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const deactivate = async (id: number) => {
+    if (!confirm('Desactivar empleado? Esto no lo elimina del sistema.')) return
+    await api.delete(`/employees/${id}`)
+    load()
+  }
+
+  const reactivate = async (emp: EmployeeExtended) => {
+    if (!confirm('Reactivar este empleado?')) return
+    setSaving(true)
+    try {
+      await api.put(`/employees/${emp.id}`, {
+        name:             emp.name,
+        branch_id:        emp.branch_id,
+        hire_date:        emp.hire_date?.slice(0, 10),
+        cuil:             emp.cuil || null,
+        position:         emp.position || null,
+        phone:            emp.phone || null,
+        email_address:    emp.email_address || null,
+        payroll_type:     emp.payroll_type ?? 'standard',
+        default_plus_pct: emp.default_plus_pct ?? null,
+        notes:            emp.notes || null,
+        is_active:        true,
+      })
+      load()
+    } finally { setSaving(false) }
+  }
+
+  const InputCls = "border border-gray-200 rounded-lg py-1.5 px-2.5 text-sm focus:outline-none w-full font-body"
+  const LabelCls = "text-[10px] font-bold uppercase text-brand-muted block mb-1 font-body"
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold text-gray-600 font-body">{employees.length} empleados en total</p>
+        <button onClick={startNew}
+          className="text-white px-3 py-1.5 rounded-lg text-xs font-semibold font-body"
+          style={{ background: NAVY }}>
+          + Nuevo Empleado
+        </button>
+      </div>
+
+      {/* New employee form */}
+      {editing === 'new' && (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div style={{ background: CORAL }} className="px-5 py-3">
+            <p className="text-white text-sm font-bold font-head">NUEVO EMPLEADO</p>
+          </div>
+          <form onSubmit={save} className="p-5 grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div>
+              <label className={LabelCls}>Nombre *</label>
+              <input required className={InputCls} value={form.name}
+                onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+            </div>
+            <div>
+              <label className={LabelCls}>Sucursal *</label>
+              <select required className={InputCls} value={form.branch_id}
+                onChange={e => setForm(f => ({ ...f, branch_id: Number(e.target.value) }))}>
+                {BRANCHES.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={LabelCls}>Fecha de ingreso *</label>
+              <input required type="date" className={InputCls} value={form.hire_date}
+                onChange={e => setForm(f => ({ ...f, hire_date: e.target.value }))} />
+            </div>
+            <div>
+              <label className={LabelCls}>CUIL</label>
+              <input className={InputCls} value={form.cuil}
+                onChange={e => setForm(f => ({ ...f, cuil: e.target.value }))} />
+            </div>
+            <div>
+              <label className={LabelCls}>Cargo</label>
+              <input className={InputCls} value={form.position}
+                onChange={e => setForm(f => ({ ...f, position: e.target.value }))} />
+            </div>
+            <div>
+              <label className={LabelCls}>Telefono</label>
+              <input className={InputCls} value={form.phone}
+                onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
+            </div>
+            <div>
+              <label className={LabelCls}>Email</label>
+              <input type="email" className={InputCls} value={form.email_address}
+                onChange={e => setForm(f => ({ ...f, email_address: e.target.value }))} />
+            </div>
+            <div>
+              <label className={LabelCls}>Tipo de nomina</label>
+              <select className={InputCls} value={form.payroll_type}
+                onChange={e => setForm(f => ({ ...f, payroll_type: e.target.value }))}>
+                <option value="standard">Deposito banco x2</option>
+                <option value="manual">Sueldo base fijo</option>
+                <option value="hourly">Por horas</option>
+              </select>
+            </div>
+            <div>
+              <label className={LabelCls}>Plus % por defecto (0-50)</label>
+              <input type="number" min={0} max={50} className={InputCls} value={form.default_plus_pct}
+                onChange={e => setForm(f => ({ ...f, default_plus_pct: e.target.value as any }))} />
+            </div>
+            <div className="col-span-2 md:col-span-3">
+              <label className={LabelCls}>Notas internas</label>
+              <textarea className={InputCls + ' resize-none h-16'} value={form.notes}
+                onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+            </div>
+            <div className="col-span-2 md:col-span-3 flex gap-2 justify-end">
+              <button type="button" onClick={cancel}
+                className="border border-gray-200 text-gray-600 px-3 py-1.5 rounded-lg text-xs font-semibold font-body">
+                Cancelar
+              </button>
+              <button type="submit" disabled={saving}
+                className="text-white px-3 py-1.5 rounded-lg text-xs font-semibold font-body"
+                style={{ background: saving ? '#ccc' : CORAL }}>
+                {saving ? 'Guardando...' : 'Crear Empleado'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Employees table */}
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div style={{ background: NAVY }} className="px-5 py-3">
+          <p className="text-white text-sm font-bold font-head tracking-wide">EMPLEADOS — ACTIVOS E INACTIVOS</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px] text-sm border-collapse">
+            <thead style={{ background: '#f0eeeb' }}>
+              <tr>
+                {['N°','Nombre','Sucursal','Cargo','Tipo Nomina','Antiguedad','CUIL','Estado',''].map(h => (
+                  <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest border-b border-gray-200 font-body"
+                    style={{ color: NAVY }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {employees.map((emp, i) => {
+                const isEditing = editing === emp.id
+                const isIndep   = emp.branch_name === 'INDEPENDENCIA'
+                const meses     = emp.months_of_service ?? 0
+                const anos      = Math.floor(meses / 12)
+                return (
+                  <React.Fragment key={emp.id}>
+                    <tr style={{
+                      background: !emp.is_active ? '#fafafa' : i % 2 === 0 ? 'white' : '#fafaf8',
+                      opacity: emp.is_active ? 1 : 0.6,
+                      borderLeft: `3px solid ${isIndep ? CORAL : NAVY}`,
+                    }}>
+                      <td className="px-3 py-2.5 text-[10px] font-bold text-center font-body" style={{ color: CORAL }}>{i + 1}</td>
+                      <td className="px-4 py-2.5 text-xs font-semibold text-gray-800 font-body">{emp.name}</td>
+                      <td className="px-4 py-2.5">
+                        <span className="px-2 py-0.5 rounded-full text-white text-[10px] font-bold"
+                          style={{ background: isIndep ? CORAL : NAVY }}>
+                          {isIndep ? 'Indep.' : 'Luro'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-xs text-gray-600 font-body">{emp.position ?? '—'}</td>
+                      <td className="px-4 py-2.5 text-xs text-gray-600 font-body">
+                        {PAYROLL_TYPE_LABELS[emp.payroll_type ?? 'standard'] ?? emp.payroll_type ?? '—'}
+                      </td>
+                      <td className="px-4 py-2.5 text-xs text-gray-600 font-body">
+                        {anos > 0 ? `${anos} año${anos !== 1 ? 's' : ''}` : `${meses} meses`}
+                      </td>
+                      <td className="px-4 py-2.5 text-xs text-gray-500 font-body">{emp.cuil ?? '—'}</td>
+                      <td className="px-4 py-2.5">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          emp.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
+                        }`}>
+                          {emp.is_active ? 'Activo' : 'Inactivo'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 text-right">
+                        <div className="flex items-center gap-2 justify-end">
+                          <button onClick={() => isEditing ? cancel() : startEdit(emp)}
+                            className="border border-gray-200 text-gray-600 px-2.5 py-1 rounded-lg text-xs font-semibold font-body">
+                            {isEditing ? 'Cerrar' : 'Editar'}
+                          </button>
+                          {emp.is_active ? (
+                            <button onClick={() => deactivate(emp.id)}
+                              className="border border-red-200 text-red-500 px-2.5 py-1 rounded-lg text-xs font-semibold font-body">
+                              Desactivar
+                            </button>
+                          ) : (
+                            <button onClick={() => reactivate(emp)}
+                              className="border border-green-200 text-green-600 px-2.5 py-1 rounded-lg text-xs font-semibold font-body">
+                              Reactivar
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                    {/* Inline edit row */}
+                    {isEditing && (
+                      <tr>
+                        <td colSpan={9} className="p-0">
+                          <form onSubmit={save}
+                            className="px-5 py-4 border-b border-brand-border grid grid-cols-2 md:grid-cols-4 gap-3"
+                            style={{ background: '#f5ede9' }}>
+                            <div>
+                              <label className={LabelCls}>Nombre *</label>
+                              <input required className={InputCls} value={form.name}
+                                onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+                            </div>
+                            <div>
+                              <label className={LabelCls}>Sucursal *</label>
+                              <select required className={InputCls} value={form.branch_id}
+                                onChange={e => setForm(f => ({ ...f, branch_id: Number(e.target.value) }))}>
+                                {BRANCHES.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label className={LabelCls}>Fecha de ingreso *</label>
+                              <input required type="date" className={InputCls} value={form.hire_date}
+                                onChange={e => setForm(f => ({ ...f, hire_date: e.target.value }))} />
+                            </div>
+                            <div>
+                              <label className={LabelCls}>CUIL</label>
+                              <input className={InputCls} value={form.cuil}
+                                onChange={e => setForm(f => ({ ...f, cuil: e.target.value }))} />
+                            </div>
+                            <div>
+                              <label className={LabelCls}>Cargo</label>
+                              <input className={InputCls} value={form.position}
+                                onChange={e => setForm(f => ({ ...f, position: e.target.value }))} />
+                            </div>
+                            <div>
+                              <label className={LabelCls}>Telefono</label>
+                              <input className={InputCls} value={form.phone}
+                                onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
+                            </div>
+                            <div>
+                              <label className={LabelCls}>Email</label>
+                              <input type="email" className={InputCls} value={form.email_address}
+                                onChange={e => setForm(f => ({ ...f, email_address: e.target.value }))} />
+                            </div>
+                            <div>
+                              <label className={LabelCls}>Tipo de nomina</label>
+                              <select className={InputCls} value={form.payroll_type}
+                                onChange={e => setForm(f => ({ ...f, payroll_type: e.target.value }))}>
+                                <option value="standard">Deposito banco x2</option>
+                                <option value="manual">Sueldo base fijo</option>
+                                <option value="hourly">Por horas</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className={LabelCls}>Plus % por defecto</label>
+                              <input type="number" min={0} max={50} className={InputCls} value={form.default_plus_pct}
+                                onChange={e => setForm(f => ({ ...f, default_plus_pct: e.target.value as any }))} />
+                            </div>
+                            <div>
+                              <label className={LabelCls}>Estado</label>
+                              <select className={InputCls} value={String((form as any).is_active)}
+                                onChange={e => setForm(f => ({ ...f, is_active: e.target.value === 'true' } as any))}>
+                                <option value="true">Activo</option>
+                                <option value="false">Inactivo</option>
+                              </select>
+                            </div>
+                            <div className="md:col-span-2">
+                              <label className={LabelCls}>Notas internas</label>
+                              <textarea className={InputCls + ' resize-none h-16'} value={form.notes}
+                                onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+                            </div>
+                            <div className="col-span-2 md:col-span-4 flex gap-2 justify-end">
+                              <button type="button" onClick={cancel}
+                                className="border border-gray-200 text-gray-600 px-3 py-1.5 rounded-lg text-xs font-semibold font-body">
+                                Cancelar
+                              </button>
+                              <button type="submit" disabled={saving}
+                                className="text-white px-3 py-1.5 rounded-lg text-xs font-semibold font-body"
+                                style={{ background: saving ? '#ccc' : CORAL }}>
+                                {saving ? 'Guardando...' : 'Guardar Cambios'}
+                              </button>
+                            </div>
+                          </form>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                )
+              })}
+              {employees.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="px-4 py-10 text-center text-brand-muted font-body text-sm">
+                    No hay empleados registrados.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   )
 }
