@@ -5,15 +5,19 @@ from typing import Optional
 from app.database import get_db
 from app.models import PayrollPeriod, PayrollItem, Employee, Branch
 from app.schemas import PayrollItemCreate, PayrollItemOut, PayrollPeriodOut
-from app.services.pdf_generator import generate_payroll_pdf, generate_payslips_pdf, generate_single_payslip_pdf
+from app.services.pdf_generator import (
+    generate_payroll_pdf, generate_payslips_pdf, generate_single_payslip_pdf
+)
 
 router = APIRouter(prefix="/payroll", tags=["Sueldos"])
 
 
+# ── Períodos ─────────────────────────────────────────────────────────────────
+
 @router.get("/periods", response_model=list[PayrollPeriodOut])
 def list_periods(
-    year:       Optional[int] = None,
-    branch_id:  Optional[int] = None,
+    year:      Optional[int] = None,
+    branch_id: Optional[int] = None,
     db: Session = Depends(get_db)
 ):
     q = db.query(PayrollPeriod)
@@ -28,8 +32,8 @@ def list_periods(
 @router.post("/periods", status_code=201)
 def create_period(month: str, year: int, branch_id: int, db: Session = Depends(get_db)):
     existing = db.query(PayrollPeriod).filter(
-        PayrollPeriod.month == month.upper(),
-        PayrollPeriod.year  == year,
+        PayrollPeriod.month     == month.upper(),
+        PayrollPeriod.year      == year,
         PayrollPeriod.branch_id == branch_id
     ).first()
     if existing:
@@ -41,7 +45,7 @@ def create_period(month: str, year: int, branch_id: int, db: Session = Depends(g
 
     employees = db.query(Employee).filter(
         Employee.branch_id == branch_id,
-        Employee.is_active == True
+        Employee.is_active  == True
     ).all()
     for emp in employees:
         item = PayrollItem(period_id=period.id, employee_id=emp.id)
@@ -50,23 +54,6 @@ def create_period(month: str, year: int, branch_id: int, db: Session = Depends(g
     db.commit()
     db.refresh(period)
     return _enrich_period(period)
-
-
-@router.put("/items/{item_id}", response_model=PayrollItemOut)
-def update_payroll_item(item_id: int, data: PayrollItemCreate, db: Session = Depends(get_db)):
-    item = db.query(PayrollItem).filter(PayrollItem.id == item_id).first()
-    if not item:
-        raise HTTPException(404, "Registro de sueldo no encontrado")
-
-    item.absences     = data.absences
-    item.base_salary  = data.base_salary
-    item.bank_deposit = data.bank_deposit
-    item.advance      = data.advance
-    item.plus_pct     = data.plus_pct
-    item.incentive    = data.incentive
-    db.commit()
-    db.refresh(item)
-    return _enrich_item(item)
 
 
 @router.post("/periods/{period_id}/close")
@@ -79,21 +66,32 @@ def close_period(period_id: int, db: Session = Depends(get_db)):
     return {"status": "CLOSED", "period_id": period_id}
 
 
-@router.get("/periods/{period_id}/pdf")
-def export_payroll_pdf(period_id: int, db: Session = Depends(get_db)):
-    period = db.query(PayrollPeriod).filter(PayrollPeriod.id == period_id).first()
-    if not period:
-        raise HTTPException(404, "Periodo no encontrado")
-    pdf_bytes = generate_payroll_pdf(period)
-    return Response(
-        content    = pdf_bytes,
-        media_type = "application/pdf",
-        headers    = {"Content-Disposition": f"attachment; filename=sueldos_{period.month}_{period.year}.pdf"}
-    )
+# ── Items (filas de empleado) ─────────────────────────────────────────────────
 
+@router.put("/items/{item_id}", response_model=PayrollItemOut)
+def update_payroll_item(item_id: int, data: PayrollItemCreate, db: Session = Depends(get_db)):
+    item = db.query(PayrollItem).filter(PayrollItem.id == item_id).first()
+    if not item:
+        raise HTTPException(404, "Registro de sueldo no encontrado")
+
+    item.inasistencias_desc = data.inasistencias_desc
+    item.adelanto           = data.adelanto
+    item.deposito_banco     = data.deposito_banco
+    item.horas              = data.horas
+    item.precio_hora        = data.precio_hora
+    item.plus_factor        = data.plus_factor
+    item.bruto_manual       = data.bruto_manual
+
+    db.commit()
+    db.refresh(item)
+    return _enrich_item(item)
+
+
+# ── PDFs ──────────────────────────────────────────────────────────────────────
 
 @router.get("/items/{item_id}/payslip")
 def export_single_payslip(item_id: int, db: Session = Depends(get_db)):
+    """Exporta el recibo individual de un empleado."""
     item = db.query(PayrollItem).filter(PayrollItem.id == item_id).first()
     if not item:
         raise HTTPException(404, "Item no encontrado")
@@ -106,6 +104,19 @@ def export_single_payslip(item_id: int, db: Session = Depends(get_db)):
         content    = pdf_bytes,
         media_type = "application/pdf",
         headers    = {"Content-Disposition": f"attachment; filename=recibo_{safe_name}_{period.month}_{period.year}.pdf"}
+    )
+
+
+@router.get("/periods/{period_id}/pdf")
+def export_payroll_pdf(period_id: int, db: Session = Depends(get_db)):
+    period = db.query(PayrollPeriod).filter(PayrollPeriod.id == period_id).first()
+    if not period:
+        raise HTTPException(404, "Periodo no encontrado")
+    pdf_bytes = generate_payroll_pdf(period)
+    return Response(
+        content    = pdf_bytes,
+        media_type = "application/pdf",
+        headers    = {"Content-Disposition": f"attachment; filename=sueldos_{period.month}_{period.year}.pdf"}
     )
 
 
@@ -122,6 +133,8 @@ def export_payslips(period_id: int, db: Session = Depends(get_db)):
     )
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
 def _enrich_period(p: PayrollPeriod) -> dict:
     return {
         "id":          p.id,
@@ -136,16 +149,18 @@ def _enrich_period(p: PayrollPeriod) -> dict:
 
 def _enrich_item(i: PayrollItem) -> dict:
     return {
-        "id":            i.id,
-        "employee_id":   i.employee_id,
-        "employee_name": i.employee.name if i.employee else None,
-        "absences":      i.absences,
-        "base_salary":   i.base_salary,
-        "bank_deposit":  i.bank_deposit,
-        "advance":       i.advance,
-        "plus_pct":      i.plus_pct,
-        "incentive":     i.incentive,
-        "plus_amount":   i.plus_amount,
-        "gross_total":   i.gross_total,
-        "net_total":     i.net_total,
+        "id":                 i.id,
+        "employee_id":        i.employee_id,
+        "employee_name":      i.employee.name if i.employee else None,
+        "inasistencias_desc": i.inasistencias_desc,
+        "adelanto":           i.adelanto,
+        "deposito_banco":     i.deposito_banco,
+        "horas":              i.horas,
+        "precio_hora":        i.precio_hora,
+        "plus_factor":        i.plus_factor,
+        "bruto_manual":       i.bruto_manual,
+        # Calculados
+        "total_bruto":       i.total_bruto,
+        "plus_pesos":        i.plus_pesos,
+        "total_percibido":   i.total_percibido,
     }

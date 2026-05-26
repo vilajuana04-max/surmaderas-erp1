@@ -190,33 +190,30 @@ PAYROLL_TEMPLATE = """
 <html><head><style>{{ css }}</style></head><body>
 """ + HEADER_HTML + """
 <h1>Liquidación de Sueldos — {{ branch_name }}</h1>
-<p class="subtitle">{{ month }} {{ year }} · Convenio {{ union_type }}</p>
+<p class="subtitle">{{ month }} {{ year }}</p>
 <table>
   <thead><tr>
-    <th>Empleado</th><th>Inas.</th><th>Base $</th><th>Plus %</th>
-    <th>Plus $</th><th>Incentivo</th><th>Bruto $</th><th>Depósito</th><th>Adelanto</th><th>Percibido $</th>
+    <th>Empleado</th><th>Inasistencias</th><th>Adelantos</th><th>Dep. Banco</th>
+    <th>Plus</th><th>Plus $</th><th>Total Bruto</th><th>Total Percibido</th>
   </tr></thead>
   <tbody>
   {% for i in items %}
   <tr>
     <td>{{ i.employee.name }}</td>
-    <td>{{ i.absences }}</td>
-    <td>$ {{ "{:,.0f}".format(i.base_salary or 0) }}</td>
-    <td>{{ "{:.0%}".format(i.plus_pct or 0) }}</td>
-    <td>$ {{ "{:,.0f}".format(i.plus_amount) }}</td>
-    <td>$ {{ "{:,.0f}".format(i.incentive or 0) }}</td>
-    <td>$ {{ "{:,.0f}".format(i.gross_total) }}</td>
-    <td>$ {{ "{:,.0f}".format(i.bank_deposit or 0) }}</td>
-    <td>$ {{ "{:,.0f}".format(i.advance or 0) }}</td>
-    <td><strong>$ {{ "{:,.0f}".format(i.net_total) }}</strong></td>
+    <td>{{ i.inasistencias_desc or '—' }}</td>
+    <td>$ {{ "{:,.0f}".format(i.adelanto or 0) }}</td>
+    <td>$ {{ "{:,.0f}".format(i.deposito_banco or 0) }}</td>
+    <td>{{ i.plus_factor or '—' }}</td>
+    <td>$ {{ "{:,.0f}".format(i.plus_pesos) }}</td>
+    <td><strong>$ {{ "{:,.0f}".format(i.total_bruto) }}</strong></td>
+    <td><strong>$ {{ "{:,.0f}".format(i.total_percibido) }}</strong></td>
   </tr>
   {% endfor %}
   <tr class="total-row">
-    <td colspan="6"><strong>TOTALES</strong></td>
-    <td>$ {{ "{:,.0f}".format(total_gross) }}</td>
-    <td>$ {{ "{:,.0f}".format(total_deposit) }}</td>
-    <td>$ {{ "{:,.0f}".format(total_advance) }}</td>
-    <td>$ {{ "{:,.0f}".format(total_net) }}</td>
+    <td colspan="5"><strong>TOTALES</strong></td>
+    <td>$ {{ "{:,.0f}".format(total_plus) }}</td>
+    <td>$ {{ "{:,.0f}".format(total_bruto) }}</td>
+    <td>$ {{ "{:,.0f}".format(total_percibido) }}</td>
   </tr>
   </tbody>
 </table>
@@ -225,11 +222,11 @@ PAYROLL_TEMPLATE = """
 PAYSLIP_TEMPLATE = """
 <html><head><style>
 {{ css }}
-.payslip {{ border: 1px solid #ccc; padding: 12px; margin-bottom: 20px; page-break-inside: avoid; }}
-.ps-header {{ display: flex; justify-content: space-between; margin-bottom: 8px; }}
-.ps-name {{ font-weight: bold; font-size: 11pt; }}
-.ps-row {{ display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px dotted #ddd; }}
-.ps-total {{ font-weight: bold; font-size: 11pt; margin-top: 6px; display: flex; justify-content: space-between; }}
+.payslip { border: 1px solid #ccc; padding: 12px; margin-bottom: 20px; page-break-inside: avoid; }
+.ps-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+.ps-name { font-weight: bold; font-size: 11pt; }
+.ps-row { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px dotted #ddd; }
+.ps-total { font-weight: bold; font-size: 11pt; margin-top: 6px; display: flex; justify-content: space-between; }
 </style></head><body>
 """ + HEADER_HTML + """
 <h1>Recibos de Sueldo — {{ branch_name }}</h1>
@@ -240,13 +237,11 @@ PAYSLIP_TEMPLATE = """
     <div class="ps-name">{{ i.employee.name }}</div>
     <div style="color:#666; font-size:9pt;">{{ month }} {{ year }}</div>
   </div>
-  <div class="ps-row"><span>(+) Sueldo base</span><span>$ {{ "{:,.0f}".format(i.base_salary or 0) }}</span></div>
-  {% if i.plus_amount %}<div class="ps-row"><span>(+) Plus ({{ "{:.0%}".format(i.plus_pct or 0) }})</span><span>$ {{ "{:,.0f}".format(i.plus_amount) }}</span></div>{% endif %}
-  {% if i.incentive %}<div class="ps-row"><span>(+) Incentivo</span><span>$ {{ "{:,.0f}".format(i.incentive or 0) }}</span></div>{% endif %}
-  <div class="ps-row"><span>TOTAL BRUTO</span><span>$ {{ "{:,.0f}".format(i.gross_total) }}</span></div>
-  {% if i.bank_deposit %}<div class="ps-row"><span>(−) Depósito banco</span><span>$ {{ "{:,.0f}".format(i.bank_deposit or 0) }}</span></div>{% endif %}
-  {% if i.advance %}<div class="ps-row"><span>(−) Adelanto</span><span>$ {{ "{:,.0f}".format(i.advance or 0) }}</span></div>{% endif %}
-  <div class="ps-total"><span>PERCIBIDO</span><span>$ {{ "{:,.0f}".format(i.net_total) }}</span></div>
+  {% if i.plus_pesos %}<div class="ps-row"><span>(+) Plus (× {{ i.plus_factor }})</span><span>$ {{ "{:,.0f}".format(i.plus_pesos) }}</span></div>{% endif %}
+  <div class="ps-row"><span>TOTAL BRUTO</span><span>$ {{ "{:,.0f}".format(i.total_bruto) }}</span></div>
+  {% if i.deposito_banco %}<div class="ps-row"><span>(−) Depósito banco</span><span>$ {{ "{:,.0f}".format(i.deposito_banco or 0) }}</span></div>{% endif %}
+  {% if i.adelanto %}<div class="ps-row"><span>(−) Adelanto</span><span>$ {{ "{:,.0f}".format(i.adelanto or 0) }}</span></div>{% endif %}
+  <div class="ps-total"><span>TOTAL PERCIBIDO</span><span>$ {{ "{:,.0f}".format(i.total_percibido) }}</span></div>
 </div>
 {% endfor %}
 """ + FOOTER_HTML + "</body></html>"
@@ -373,30 +368,26 @@ SINGLE_PAYSLIP_TEMPLATE = """
     <div class="period">{{ month }} {{ year }} · {{ branch_name }}</div>
   </div>
   <div class="card-body">
-    <div class="line"><span class="lbl">(+) Sueldo base</span><span class="val">$ {{ "{:,.0f}".format(item.base_salary or 0) }}</span></div>
-    {% if item.plus_amount %}
-    <div class="line"><span class="lbl">(+) Plus ({{ "{:.0%}".format(item.plus_pct or 0) }})</span><span class="val">$ {{ "{:,.0f}".format(item.plus_amount) }}</span></div>
+    {% if item.inasistencias_desc %}
+    <div class="line"><span class="lbl" style="color:#c00">Inasistencias</span><span class="val" style="color:#c00">{{ item.inasistencias_desc }}</span></div>
     {% endif %}
-    {% if item.incentive %}
-    <div class="line"><span class="lbl">(+) Incentivo</span><span class="val">$ {{ "{:,.0f}".format(item.incentive or 0) }}</span></div>
-    {% endif %}
-    {% if item.absences %}
-    <div class="line"><span class="lbl" style="color:#c00">Inasistencias</span><span class="val" style="color:#c00">{{ item.absences }} día(s)</span></div>
+    {% if item.plus_pesos %}
+    <div class="line"><span class="lbl">(+) Plus × {{ item.plus_factor }}</span><span class="val">$ {{ "{:,.0f}".format(item.plus_pesos) }}</span></div>
     {% endif %}
   </div>
   <div class="bruto-row">
-    <span>TOTAL BRUTO</span><span>$ {{ "{:,.0f}".format(item.gross_total) }}</span>
+    <span>TOTAL BRUTO</span><span>$ {{ "{:,.0f}".format(item.total_bruto) }}</span>
   </div>
   <div class="card-body">
-    {% if item.bank_deposit %}
-    <div class="line"><span class="lbl">(−) Depósito banco</span><span class="val">$ {{ "{:,.0f}".format(item.bank_deposit or 0) }}</span></div>
+    {% if item.deposito_banco %}
+    <div class="line"><span class="lbl">(−) Depósito banco</span><span class="val">$ {{ "{:,.0f}".format(item.deposito_banco or 0) }}</span></div>
     {% endif %}
-    {% if item.advance %}
-    <div class="line"><span class="lbl">(−) Adelanto</span><span class="val">$ {{ "{:,.0f}".format(item.advance or 0) }}</span></div>
+    {% if item.adelanto %}
+    <div class="line"><span class="lbl">(−) Adelanto</span><span class="val">$ {{ "{:,.0f}".format(item.adelanto or 0) }}</span></div>
     {% endif %}
   </div>
   <div class="perc-row">
-    <span>PERCIBIDO</span><span>$ {{ "{:,.0f}".format(item.net_total) }}</span>
+    <span>TOTAL PERCIBIDO</span><span>$ {{ "{:,.0f}".format(item.total_percibido) }}</span>
   </div>
   <div class="firmas">
     <div class="firma-box">Firma empleado</div>
@@ -431,17 +422,15 @@ def generate_purchases_pdf(purchases, month: str, year: int) -> bytes:
 
 
 def generate_payroll_pdf(period) -> bytes:
-    items        = period.items
-    total_gross  = sum(i.gross_total  for i in items)
-    total_net    = sum(i.net_total    for i in items)
-    total_deposit = sum(float(i.bank_deposit or 0) for i in items)
-    total_advance = sum(float(i.advance or 0) for i in items)
+    items           = period.items
+    total_bruto     = sum(i.total_bruto     for i in items)
+    total_percibido = sum(i.total_percibido for i in items)
+    total_plus      = sum(i.plus_pesos      for i in items)
     return _render("payroll", period=period, items=items,
                    branch_name=period.branch.name if period.branch else "",
-                   union_type=period.branch.union_type if period.branch else "",
                    month=period.month, year=period.year,
-                   total_gross=total_gross, total_net=total_net,
-                   total_deposit=total_deposit, total_advance=total_advance,
+                   total_bruto=total_bruto, total_percibido=total_percibido,
+                   total_plus=total_plus,
                    doc_title="Liquidación de Sueldos")
 
 

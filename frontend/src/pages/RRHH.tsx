@@ -785,7 +785,11 @@ function CalendarioTab() {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   TAB 3: SUELDOS
+   TAB 3: SUELDOS — réplica exacta del Excel Luro/Independencia
+   Fórmulas:
+     Total bruto    = Deposito × 2  (o horas × $xhora, o manual)
+     Plus en $      = Total bruto × (Plus − 1)
+     Total percibido= (Total bruto × Plus) − Adelantos − Deposito
 ───────────────────────────────────────────────────────────── */
 type SueldosVista = 'luro' | 'independencia' | 'ambas'
 
@@ -813,16 +817,17 @@ function SueldosTab() {
     } finally { setCreating(false) }
   }
 
-  const updateItem = async (itemId: number, field: string, val: string, item: any) => {
-    const updated = { ...item, [field]: val === '' ? null : parseFloat(val) }
+  const updateItem = async (itemId: number, field: string, val: string | number | null, item: any) => {
+    const updated = { ...item, [field]: val }
     await api.put(`/payroll/items/${itemId}`, {
-      employee_id:  updated.employee_id,
-      absences:     updated.absences     ?? 0,
-      base_salary:  updated.base_salary  ?? null,
-      bank_deposit: updated.bank_deposit ?? 0,
-      advance:      updated.advance      ?? 0,
-      plus_pct:     updated.plus_pct     ?? 0,
-      incentive:    updated.incentive    ?? 0,
+      employee_id:        updated.employee_id,
+      inasistencias_desc: updated.inasistencias_desc || null,
+      adelanto:           parseFloat(updated.adelanto)    || 0,
+      deposito_banco:     parseFloat(updated.deposito_banco) || 0,
+      horas:              updated.horas      ? parseFloat(updated.horas)      : null,
+      precio_hora:        updated.precio_hora ? parseFloat(updated.precio_hora) : null,
+      plus_factor:        updated.plus_factor ? parseFloat(updated.plus_factor) : null,
+      bruto_manual:       updated.bruto_manual ? parseFloat(updated.bruto_manual) : null,
     })
     load()
   }
@@ -844,13 +849,58 @@ function SueldosTab() {
     { id: 'ambas',         label: 'Ambas'         },
   ]
 
+  /* ─── Helpers de cálculo en vivo (espeja las @property del backend) ─── */
+  const calcBruto = (item: any): number => {
+    if (item.horas && item.precio_hora) return item.horas * item.precio_hora
+    if (item.bruto_manual && item.bruto_manual !== 0) return item.bruto_manual
+    const dep = parseFloat(item.deposito_banco) || 0
+    if (dep > 0 && item.plus_factor && parseFloat(item.plus_factor) > 1) return dep * 2
+    return dep
+  }
+  const calcPlusP = (item: any): number => {
+    const f = parseFloat(item.plus_factor) || 0
+    if (f <= 1) return 0
+    return calcBruto(item) * (f - 1)
+  }
+  const calcPerc = (item: any): number => {
+    const bruto = calcBruto(item)
+    const f = parseFloat(item.plus_factor) || 0
+    const factor = f > 1 ? f : 1
+    return bruto * factor - (parseFloat(item.adelanto) || 0) - (parseFloat(item.deposito_banco) || 0)
+  }
+
+  /* ── Texto de input inline (para inasistencias) ── */
+  function TextInput({ value, onBlur, disabled, placeholder }: {
+    value: string | null; onBlur: (v: string) => void; disabled?: boolean; placeholder?: string
+  }) {
+    const [v, setV] = React.useState(value ?? '')
+    React.useEffect(() => { setV(value ?? '') }, [value])
+    return (
+      <input type="text" placeholder={placeholder}
+        className="border border-gray-200 rounded-lg py-1 px-1.5 text-[11px] w-24 focus:outline-none disabled:opacity-40 font-body"
+        disabled={disabled} value={v}
+        onChange={e => setV(e.target.value)}
+        onBlur={() => onBlur(v)} />
+    )
+  }
+
   /* ── Render single-branch full table ── */
-  const renderBranchTable = (branchId: number, branchName: string, showIncentivo: boolean) => {
+  const renderBranchTable = (branchId: number, branchName: string) => {
     const period   = getPeriod(branchId)
     const items    = period?.items ?? []
     const isClosed = period?.status === 'CLOSED'
-    const totBruto = items.reduce((a: number, i: any) => a + (i.gross_total ?? 0), 0)
-    const totNet   = items.reduce((a: number, i: any) => a + (i.net_total   ?? 0), 0)
+
+    // Totals calculados en frontend (para actualización en tiempo real)
+    const totBruto = items.reduce((a: number, i: any) => a + calcBruto(i), 0)
+    const totPlusP = items.reduce((a: number, i: any) => a + calcPlusP(i), 0)
+    const totPerc  = items.reduce((a: number, i: any) => a + calcPerc(i),  0)
+
+    const TH = ({ children, right = false, style = {} }: { children: React.ReactNode; right?: boolean; style?: React.CSSProperties }) => (
+      <th className={`px-2.5 py-2.5 text-[10px] font-bold uppercase tracking-widest border-b border-gray-200 ${right ? 'text-right' : 'text-left'}`}
+        style={{ color: NAVY, background: '#f0eeeb', ...style }}>
+        {children}
+      </th>
+    )
 
     return (
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -860,7 +910,7 @@ function SueldosTab() {
           <div>
             <p className="text-white text-sm font-bold font-head tracking-wide">{branchName}</p>
             <p className="text-white/55 text-[11px] font-body">
-              Convenio {branchId === 1 ? 'Madereros' : 'SEC 12'} · {month} {year}
+              {branchId === 1 ? 'Convenio Madereros' : 'Convenio SEC 12'} · {month} {year}
             </p>
           </div>
           <div className="flex gap-2 flex-wrap">
@@ -880,11 +930,11 @@ function SueldosTab() {
               <>
                 <button onClick={() => handlePdf(`/payroll/periods/${period.id}/pdf`, `sueldos_${branchName}_${month}_${year}.pdf`)}
                   className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-xs font-semibold font-body flex items-center gap-1">
-                  <FileDown size={12} /> Planilla
+                  <FileDown size={12} /> Planilla PDF
                 </button>
                 <button onClick={() => handlePdf(`/payroll/periods/${period.id}/payslips`, `recibos_${branchName}_${month}_${year}.pdf`)}
                   className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-xs font-semibold font-body flex items-center gap-1">
-                  <FileDown size={12} /> Todos Recibos
+                  <FileDown size={12} /> Todos los recibos
                 </button>
               </>
             )}
@@ -893,109 +943,125 @@ function SueldosTab() {
 
         {period ? (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[820px] text-sm border-collapse">
+            {/*
+              Columnas exactas del Excel:
+              Luro:  Empleado | Inasistencias | Adelantos | Deposito | Horas | $×Hora | Plus | Plus $ | Total Bruto | Total Percibido
+              Indep: Empleado | Inasistencias | Adelantos | Deposito | Horas |         Plus | Plus $ | Total Bruto | Total Percibido
+            */}
+            <table className="w-full min-w-[900px] text-sm border-collapse">
               <thead>
-                <tr style={{ background: '#f0eeeb' }}>
-                  <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-center border-b border-gray-200 w-8" style={{ color: NAVY }}>N°</th>
-                  <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-left border-b border-gray-200" style={{ color: NAVY }}>Empleado</th>
-                  <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-center border-b border-gray-200" style={{ color: NAVY }}>Inas.</th>
-                  <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-right border-b border-gray-200" style={{ color: NAVY }}>Base $</th>
-                  <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-right border-b border-gray-200" style={{ color: NAVY }}>Dep. Banco</th>
-                  <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-right border-b border-gray-200" style={{ color: NAVY }}>Adelanto</th>
-                  <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-center border-b border-gray-200" style={{ color: NAVY }}>Plus%</th>
-                  <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-right border-b border-gray-200" style={{ color: NAVY }}>Plus $</th>
-                  {showIncentivo && (
-                    <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-right border-b border-gray-200" style={{ color: NAVY }}>Incentivo</th>
-                  )}
-                  <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-right border-b border-gray-200" style={{ background: '#FFF3CD', color: '#92400E' }}>Total Bruto</th>
-                  <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-right border-b border-gray-200" style={{ background: '#D1FAE5', color: '#065F46' }}>Percibido</th>
-                  <th className="px-2 py-2.5 border-b border-gray-200 w-8" />
+                <tr>
+                  <TH style={{ width: 28, textAlign: 'center' }}>N°</TH>
+                  <TH>Empleado</TH>
+                  <TH>Inasistencias</TH>
+                  <TH right>Adelantos</TH>
+                  <TH right>Dep. Banco</TH>
+                  <TH right style={{ width: 70 }}>Horas</TH>
+                  {branchId === 1 && <TH right style={{ width: 80 }}>$ × Hora</TH>}
+                  <TH right style={{ width: 70 }}>Plus</TH>
+                  <TH right style={{ background: '#FFF8E1', color: '#92400E' }}>Plus $</TH>
+                  <TH right style={{ background: '#FFF3CD', color: '#92400E' }}>Total Bruto</TH>
+                  <TH right style={{ background: '#D1FAE5', color: '#065F46' }}>Total Percibido</TH>
+                  <TH style={{ width: 32 }}>{''}</TH>
                 </tr>
               </thead>
               <tbody>
-                {items.map((item: any, i: number) => (
-                  <tr key={item.id} className={i % 2 === 0 ? 'bg-white' : ''} style={i % 2 !== 0 ? { background: '#fafaf8' } : {}}>
-                    <td className="px-3 py-2 text-center text-[11px] font-bold font-body" style={{ color: CORAL }}>{i + 1}</td>
-                    <td className="px-3 py-2 text-xs font-semibold font-body text-gray-800 whitespace-nowrap">{item.employee_name}</td>
-                    {/* Inas. */}
-                    <td className="px-2 py-1.5 text-center">
-                      <NumInput disabled={isClosed} value={item.absences} integer
-                        onBlur={v => updateItem(item.id, 'absences', v, item)} />
-                    </td>
-                    {/* Base $ */}
-                    <td className="px-2 py-1.5">
-                      <NumInput disabled={isClosed} value={item.base_salary}
-                        onBlur={v => updateItem(item.id, 'base_salary', v, item)} />
-                    </td>
-                    {/* Dep. Banco */}
-                    <td className="px-2 py-1.5">
-                      <NumInput disabled={isClosed} value={item.bank_deposit}
-                        onBlur={v => updateItem(item.id, 'bank_deposit', v, item)} />
-                    </td>
-                    {/* Adelanto */}
-                    <td className="px-2 py-1.5">
-                      <NumInput disabled={isClosed} value={item.advance}
-                        onBlur={v => updateItem(item.id, 'advance', v, item)} />
-                    </td>
-                    {/* Plus% */}
-                    <td className="px-2 py-1.5 text-center">
-                      <NumInput disabled={isClosed} value={item.plus_pct} step={0.01}
-                        onBlur={v => updateItem(item.id, 'plus_pct', v, item)} />
-                    </td>
-                    {/* Plus$ — auto */}
-                    <td className="px-3 py-2 text-xs text-right font-body text-gray-600 whitespace-nowrap">
-                      {item.plus_amount ? fmt$(item.plus_amount) : '—'}
-                    </td>
-                    {/* Incentivo (Luro only) */}
-                    {showIncentivo && (
+                {items.map((item: any, i: number) => {
+                  const liveBruto = calcBruto(item)
+                  const livePlusP = calcPlusP(item)
+                  const livePerc  = calcPerc(item)
+                  return (
+                    <tr key={item.id} style={{ background: i % 2 === 0 ? 'white' : '#fafaf8' }}>
+                      {/* N° */}
+                      <td className="px-2 py-1.5 text-center text-[11px] font-bold font-body" style={{ color: CORAL }}>{i + 1}</td>
+                      {/* Empleado */}
+                      <td className="px-3 py-1.5 text-xs font-semibold font-body text-gray-800 whitespace-nowrap">{item.employee_name}</td>
+                      {/* Inasistencias — texto libre */}
                       <td className="px-2 py-1.5">
-                        <NumInput disabled={isClosed} value={item.incentive}
-                          onBlur={v => updateItem(item.id, 'incentive', v, item)} />
+                        <TextInput disabled={isClosed} value={item.inasistencias_desc} placeholder="—"
+                          onBlur={v => updateItem(item.id, 'inasistencias_desc', v || null, item)} />
                       </td>
-                    )}
-                    {/* Total Bruto — auto, amber bg */}
-                    <td className="px-3 py-2 text-xs text-right font-bold font-body whitespace-nowrap"
-                      style={{ background: '#FFFBEB', color: '#92400E' }}>
-                      {fmt$(item.gross_total)}
-                    </td>
-                    {/* Percibido — auto, green bg */}
-                    <td className="px-3 py-2 text-xs text-right font-bold font-body whitespace-nowrap"
-                      style={{ background: '#ECFDF5', color: '#065F46' }}>
-                      {fmt$(item.net_total)}
-                    </td>
-                    {/* PDF export icon */}
-                    <td className="px-2 py-1.5 text-center">
-                      <button
-                        title="Exportar recibo"
-                        onClick={() => handlePdf(`/payroll/items/${item.id}/payslip`,
-                          `recibo_${(item.employee_name || 'emp').replace(/[, ]+/g,'_')}_${month}_${year}.pdf`)}
-                        className="text-gray-400 hover:text-coral transition-colors"
-                        style={{ color: undefined }}
-                        onMouseOver={e => (e.currentTarget.style.color = CORAL)}
-                        onMouseOut={e => (e.currentTarget.style.color = '')}>
-                        <FileDown size={14} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {/* Totals row */}
+                      {/* Adelantos */}
+                      <td className="px-2 py-1.5">
+                        <NumInput disabled={isClosed} value={item.adelanto}
+                          onBlur={v => updateItem(item.id, 'adelanto', v, item)} />
+                      </td>
+                      {/* Deposito banco */}
+                      <td className="px-2 py-1.5">
+                        <NumInput disabled={isClosed} value={item.deposito_banco}
+                          onBlur={v => updateItem(item.id, 'deposito_banco', v, item)} />
+                      </td>
+                      {/* Horas */}
+                      <td className="px-2 py-1.5">
+                        <NumInput disabled={isClosed} value={item.horas} step={0.5}
+                          onBlur={v => updateItem(item.id, 'horas', v, item)} />
+                      </td>
+                      {/* $ × Hora — solo Luro (donde está Ariel) */}
+                      {branchId === 1 && (
+                        <td className="px-2 py-1.5">
+                          <NumInput disabled={isClosed} value={item.precio_hora}
+                            onBlur={v => updateItem(item.id, 'precio_hora', v, item)} />
+                        </td>
+                      )}
+                      {/* Plus factor (1.3, 1.2, 1.1) */}
+                      <td className="px-2 py-1.5">
+                        <NumInput disabled={isClosed} value={item.plus_factor} step={0.1}
+                          onBlur={v => updateItem(item.id, 'plus_factor', v, item)} />
+                      </td>
+                      {/* Plus $ — auto */}
+                      <td className="px-3 py-1.5 text-xs text-right font-body whitespace-nowrap"
+                        style={{ background: '#FFFDE7', color: '#78350F' }}>
+                        {livePlusP > 0 ? fmt$(livePlusP) : '—'}
+                      </td>
+                      {/* Total bruto — auto (amber) */}
+                      <td className="px-3 py-1.5 text-xs text-right font-bold font-body whitespace-nowrap"
+                        style={{ background: '#FFFBEB', color: '#92400E' }}>
+                        {fmt$(liveBruto)}
+                      </td>
+                      {/* Total percibido — auto (green) */}
+                      <td className="px-3 py-1.5 text-xs text-right font-bold font-body whitespace-nowrap"
+                        style={{ background: '#ECFDF5', color: '#065F46' }}>
+                        {fmt$(livePerc)}
+                      </td>
+                      {/* PDF recibo individual */}
+                      <td className="px-2 py-1.5 text-center">
+                        <button title="Exportar recibo individual"
+                          onClick={() => handlePdf(`/payroll/items/${item.id}/payslip`,
+                            `recibo_${(item.employee_name || 'emp').replace(/[,. ]+/g,'_')}_${month}_${year}.pdf`)}
+                          className="text-gray-300 transition-colors"
+                          onMouseOver={e => (e.currentTarget.style.color = CORAL)}
+                          onMouseOut={e => (e.currentTarget.style.color = '#d1d5db')}>
+                          <FileDown size={13} />
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+
+                {/* Fila TOTALES */}
                 <tr style={{ background: NAVY }}>
-                  <td colSpan={showIncentivo ? 9 : 8}
+                  <td colSpan={branchId === 1 ? 8 : 7}
                     className="px-3 py-2.5 text-white text-[11px] font-bold uppercase tracking-widest">
                     TOTALES
+                  </td>
+                  <td className="px-3 py-2.5 text-xs text-right font-bold" style={{ color: '#FCD34D' }}>
+                    {totPlusP > 0 ? fmt$(totPlusP) : '—'}
                   </td>
                   <td className="px-3 py-2.5 text-xs text-right font-bold" style={{ color: '#FCD34D' }}>
                     {fmt$(totBruto)}
                   </td>
                   <td className="px-3 py-2.5 text-xs text-right font-bold text-green-300">
-                    {fmt$(totNet)}
+                    {fmt$(totPerc)}
                   </td>
                   <td />
                 </tr>
               </tbody>
             </table>
+
             <p className="px-4 py-2 text-[10px] text-gray-400 font-body border-t border-gray-100">
-              Convenio Madereros · Plus% = editable · Plus$ = Base × Plus% · Total Bruto = Base + Plus$ {showIncentivo ? '+ Incentivo' : ''} · Percibido = Bruto − Banco − Adelanto
+              Total bruto = Dep. × 2 (si hay Plus) ó Horas × $×Hora ·
+              Plus $ = Bruto × (Plus − 1) ·
+              Total percibido = Bruto × Plus − Adelantos − Dep.
             </p>
           </div>
         ) : (
@@ -1010,95 +1076,97 @@ function SueldosTab() {
     )
   }
 
-  /* ── "Ambas" consolidated view ── */
+  /* ── "Ambas" — PLANILLA SUELDOS consolidada ── */
   const renderAmbasView = () => {
     const periodLuro  = getPeriod(1)
     const periodIndep = getPeriod(2)
-    const allItems    = [
+    const allItems = [
       ...(periodLuro?.items  ?? []).map((i: any) => ({ ...i, _branch: 'LURO'          })),
       ...(periodIndep?.items ?? []).map((i: any) => ({ ...i, _branch: 'INDEPENDENCIA' })),
     ]
-    const totBruto = allItems.reduce((a, i) => a + (i.gross_total ?? 0), 0)
-    const totNet   = allItems.reduce((a, i) => a + (i.net_total   ?? 0), 0)
+    const totBruto = allItems.reduce((a, i) => a + calcBruto(i), 0)
+    const totPlusP = allItems.reduce((a, i) => a + calcPlusP(i), 0)
+    const totPerc  = allItems.reduce((a, i) => a + calcPerc(i),  0)
 
     return (
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div style={{ background: NAVY }} className="px-5 py-3 flex items-center justify-between">
-          <div>
-            <p className="text-white text-sm font-bold font-head tracking-wide">PLANILLA SUELDOS — AMBAS SUCURSALES</p>
-            <p className="text-white/50 text-[11px] font-body">{month} {year}</p>
-          </div>
+        <div style={{ background: NAVY }} className="px-5 py-3">
+          <p className="text-white text-sm font-bold font-head tracking-wide">PLANILLA SUELDOS — AMBAS SUCURSALES</p>
+          <p className="text-white/50 text-[11px] font-body">{month} {year}</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[600px] text-sm border-collapse">
             <thead>
               <tr style={{ background: '#f0eeeb' }}>
-                <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-center border-b border-gray-200 w-8" style={{ color: NAVY }}>N°</th>
-                <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-left border-b border-gray-200" style={{ color: NAVY }}>Empleado</th>
-                <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-left border-b border-gray-200" style={{ color: NAVY }}>Sucursal</th>
-                <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-right border-b border-gray-200" style={{ color: NAVY }}>Base $</th>
-                <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-right border-b border-gray-200" style={{ color: NAVY }}>Plus $</th>
-                <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-right border-b border-gray-200" style={{ background: '#FFF3CD', color: '#92400E' }}>Total Bruto</th>
-                <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-right border-b border-gray-200" style={{ background: '#D1FAE5', color: '#065F46' }}>Percibido</th>
-                <th className="px-2 py-2.5 border-b border-gray-200 w-8" />
+                {[
+                  { label: 'N°',         cls: 'w-8 text-center'  },
+                  { label: 'Empleado',   cls: 'text-left'         },
+                  { label: 'Sucursal',   cls: 'text-left'         },
+                  { label: 'Dep. Banco', cls: 'text-right'        },
+                  { label: 'Plus',       cls: 'text-right'        },
+                  { label: 'Plus $',     cls: 'text-right'        },
+                  { label: 'Total Bruto',cls: 'text-right'        },
+                  { label: 'Percibido',  cls: 'text-right'        },
+                  { label: '',           cls: 'w-8'               },
+                ].map(({ label, cls }) => (
+                  <th key={label} className={`px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest border-b border-gray-200 ${cls}`}
+                    style={{ color: NAVY, background: '#f0eeeb' }}>{label}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {allItems.map((item, i) => (
-                <tr key={item.id} className={i % 2 === 0 ? 'bg-white' : ''} style={i % 2 !== 0 ? { background: '#fafaf8' } : {}}>
+                <tr key={item.id} style={{ background: i % 2 === 0 ? 'white' : '#fafaf8' }}>
                   <td className="px-3 py-2 text-center text-[11px] font-bold font-body" style={{ color: CORAL }}>{i + 1}</td>
                   <td className="px-3 py-2 text-xs font-semibold font-body text-gray-800 whitespace-nowrap">{item.employee_name}</td>
-                  <td className="px-3 py-2 text-[11px] font-body">
+                  <td className="px-3 py-2">
                     <span className="px-2 py-0.5 rounded-full text-white text-[10px] font-bold"
                       style={{ background: item._branch === 'LURO' ? NAVY : CORAL }}>
                       {item._branch}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-xs text-right font-body text-gray-700 whitespace-nowrap">
-                    {item.base_salary ? fmt$(item.base_salary) : '—'}
+                  <td className="px-3 py-2 text-xs text-right font-body text-gray-600 whitespace-nowrap">
+                    {parseFloat(item.deposito_banco) > 0 ? fmt$(item.deposito_banco) : '—'}
                   </td>
                   <td className="px-3 py-2 text-xs text-right font-body text-gray-600 whitespace-nowrap">
-                    {item.plus_amount ? fmt$(item.plus_amount) : '—'}
+                    {item.plus_factor ? `×${item.plus_factor}` : '—'}
+                  </td>
+                  <td className="px-3 py-2 text-xs text-right font-body whitespace-nowrap" style={{ color: '#78350F' }}>
+                    {calcPlusP(item) > 0 ? fmt$(calcPlusP(item)) : '—'}
                   </td>
                   <td className="px-3 py-2 text-xs text-right font-bold font-body whitespace-nowrap"
                     style={{ background: '#FFFBEB', color: '#92400E' }}>
-                    {fmt$(item.gross_total)}
+                    {fmt$(calcBruto(item))}
                   </td>
                   <td className="px-3 py-2 text-xs text-right font-bold font-body whitespace-nowrap"
                     style={{ background: '#ECFDF5', color: '#065F46' }}>
-                    {fmt$(item.net_total)}
+                    {fmt$(calcPerc(item))}
                   </td>
                   <td className="px-2 py-1.5 text-center">
-                    <button
-                      title="Exportar recibo"
+                    <button title="Exportar recibo"
                       onClick={() => handlePdf(`/payroll/items/${item.id}/payslip`,
-                        `recibo_${(item.employee_name || 'emp').replace(/[, ]+/g,'_')}_${month}_${year}.pdf`)}
-                      className="text-gray-400 transition-colors"
+                        `recibo_${(item.employee_name || 'emp').replace(/[,. ]+/g,'_')}_${month}_${year}.pdf`)}
+                      className="text-gray-300 transition-colors"
                       onMouseOver={e => (e.currentTarget.style.color = CORAL)}
-                      onMouseOut={e => (e.currentTarget.style.color = '')}>
-                      <FileDown size={14} />
+                      onMouseOut={e => (e.currentTarget.style.color = '#d1d5db')}>
+                      <FileDown size={13} />
                     </button>
                   </td>
                 </tr>
               ))}
               {allItems.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-gray-400 text-sm font-body">
+                  <td colSpan={9} className="px-4 py-10 text-center text-gray-400 text-sm font-body">
                     No hay liquidaciones abiertas para {month} {year}.
                   </td>
                 </tr>
               )}
               {allItems.length > 0 && (
                 <tr style={{ background: NAVY }}>
-                  <td colSpan={5} className="px-3 py-2.5 text-white text-[11px] font-bold uppercase tracking-widest">
-                    TOTAL GENERAL
-                  </td>
-                  <td className="px-3 py-2.5 text-xs text-right font-bold" style={{ color: '#FCD34D' }}>
-                    {fmt$(totBruto)}
-                  </td>
-                  <td className="px-3 py-2.5 text-xs text-right font-bold text-green-300">
-                    {fmt$(totNet)}
-                  </td>
+                  <td colSpan={5} className="px-3 py-2.5 text-white text-[11px] font-bold uppercase tracking-widest">TOTAL GENERAL</td>
+                  <td className="px-3 py-2.5 text-xs text-right font-bold" style={{ color: '#FCD34D' }}>{totPlusP > 0 ? fmt$(totPlusP) : '—'}</td>
+                  <td className="px-3 py-2.5 text-xs text-right font-bold" style={{ color: '#FCD34D' }}>{fmt$(totBruto)}</td>
+                  <td className="px-3 py-2.5 text-xs text-right font-bold text-green-300">{fmt$(totPerc)}</td>
                   <td />
                 </tr>
               )}
@@ -1133,8 +1201,8 @@ function SueldosTab() {
         </div>
       </div>
 
-      {vista === 'luro'          && renderBranchTable(1, 'LURO', true)}
-      {vista === 'independencia' && renderBranchTable(2, 'INDEPENDENCIA', false)}
+      {vista === 'luro'          && renderBranchTable(1, 'LURO')}
+      {vista === 'independencia' && renderBranchTable(2, 'INDEPENDENCIA')}
       {vista === 'ambas'         && renderAmbasView()}
     </div>
   )
