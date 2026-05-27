@@ -232,6 +232,11 @@ def delete_luro_expense(expense_id: int, db: Session = Depends(get_db)):
     db.commit()
 
 
+@router.get("/categories", response_model=list[ExpenseCategoryOut])
+def list_categories(db: Session = Depends(get_db)):
+    return db.query(ExpenseCategory).order_by(ExpenseCategory.name).all()
+
+
 @router.get("/luro/reporte/{year}")
 def luro_reporte_anual(year: int, db: Session = Depends(get_db)):
     """Reporte anual: {categoria: {subcategoria: {mes: total}}}"""
@@ -239,33 +244,26 @@ def luro_reporte_anual(year: int, db: Session = Depends(get_db)):
               "JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"]
     rows = db.query(LuroExpense).filter(LuroExpense.year == year).all()
 
-    # Acumula por categoría > subcategoría > mes
     report: dict = {}
     for e in rows:
-        cat  = e.categoria  or "Sin categoría"
-        sub  = e.subcategoria or "—"
-        mes  = e.month or "—"
-        amt  = float(e.amount or 0)
+        cat = e.categoria   or "Sin categoría"
+        sub = e.subcategoria or "—"
+        mes = e.month        or "—"
+        amt = float(e.amount or 0)
         report.setdefault(cat, {}).setdefault(sub, {m: 0.0 for m in MONTHS})
         if mes in report[cat][sub]:
             report[cat][sub][mes] += amt
 
-    # Serializa en lista plana para el frontend
     result = []
     for cat, subs in report.items():
         for sub, months in subs.items():
             result.append({
-                "categoria":   cat,
+                "categoria":    cat,
                 "subcategoria": sub,
-                "months":      months,
-                "total":       sum(months.values()),
+                "months":       months,
+                "total":        sum(months.values()),
             })
     return result
-
-
-@router.get("/categories", response_model=list[ExpenseCategoryOut])
-def list_categories(db: Session = Depends(get_db)):
-    return db.query(ExpenseCategory).order_by(ExpenseCategory.name).all()
 
 
 @router.get("/luro/pdf/{year}/{month}")

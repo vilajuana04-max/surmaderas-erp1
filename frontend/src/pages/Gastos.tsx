@@ -58,20 +58,6 @@ export default function Gastos() {
         </select>
       </div>
 
-      <div className="flex gap-2 border-b border-brand-border pb-0">
-        {(['compartidos', 'luro'] as Tab[]).map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            className={[
-              'px-4 py-2 text-sm font-medium rounded-t-lg transition-colors',
-              tabParam === t
-                ? 'bg-white border border-b-white border-brand-border text-brand-body -mb-px'
-                : 'text-brand-muted hover:text-brand-body',
-            ].join(' ')}>
-            {t === 'compartidos' ? 'Compartidos' : 'Gastos Luro'}
-          </button>
-        ))}
-      </div>
-
       {tabParam === 'compartidos'
         ? <GastosCompartidos month={month} year={year} />
         : <GastosLuro        month={month} year={year} />}
@@ -563,7 +549,7 @@ function GastosLuro({ month, year }: { month: string; year: number }) {
               'px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors',
               view === v ? 'bg-navy text-white' : 'bg-brand-off-white text-brand-muted hover:text-brand-body border border-brand-border',
             ].join(' ')}>
-            {v === 'registro' ? '📋 Registro mensual' : '📊 Reporte anual'}
+            {v === 'registro' ? 'Registro mensual' : 'Reporte anual'}
           </button>
         ))}
       </div>
