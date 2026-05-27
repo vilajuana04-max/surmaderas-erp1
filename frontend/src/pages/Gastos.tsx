@@ -565,6 +565,8 @@ function GastosLuro({ month, year }: { month: string; year: number }) {
 function LuroRegistro({ month, year }: { month: string; year: number }) {
   const [expenses, setExpenses] = useState<any[]>([])
   const [adding, setAdding]     = useState(false)
+  const [saving, setSaving]     = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const EMPTY_FORM = { expense_date: '', categoria: '', subcategoria: '', detail: '', amount: '', payment_method: '', pagado: 'NO' }
   const [form, setForm]         = useState(EMPTY_FORM)
 
@@ -578,19 +580,28 @@ function LuroRegistro({ month, year }: { month: string; year: number }) {
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
-    await api.post('/expenses/luro', {
-      expense_date:   form.expense_date || null,
-      categoria:      form.categoria,
-      subcategoria:   form.subcategoria || null,
-      detail:         form.detail || null,
-      amount:         parseFloat(form.amount),
-      payment_method: form.payment_method || null,
-      pagado:         form.pagado,
-      month, year,
-    })
-    setAdding(false)
-    setForm(EMPTY_FORM)
-    load()
+    setSaving(true)
+    setSaveError(null)
+    try {
+      await api.post('/expenses/luro', {
+        expense_date:   form.expense_date || null,
+        categoria:      form.categoria,
+        subcategoria:   form.subcategoria || null,
+        detail:         form.detail || null,
+        amount:         parseFloat(form.amount),
+        payment_method: form.payment_method || null,
+        pagado:         form.pagado,
+        month, year,
+      })
+      setAdding(false)
+      setForm(EMPTY_FORM)
+      load()
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || err?.message || 'Error al guardar el gasto'
+      setSaveError(typeof msg === 'string' ? msg : JSON.stringify(msg))
+    } finally {
+      setSaving(false)
+    }
   }
 
   const togglePagado = async (id: number, current: string) => {
@@ -672,9 +683,18 @@ function LuroRegistro({ month, year }: { month: string; year: number }) {
                 <option value="SI">SI</option>
               </select>
             </div>
-            <div className="col-span-2 md:col-span-3 flex gap-2 justify-end pt-1">
-              <button type="button" onClick={() => { setAdding(false); setForm(EMPTY_FORM) }} className="btn-ghost text-sm">Cancelar</button>
-              <button type="submit" className="btn-primary text-sm">Guardar gasto</button>
+            <div className="col-span-2 md:col-span-3 flex flex-col gap-2 pt-1">
+              {saveError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-xs">
+                  Error al guardar: {saveError}
+                </div>
+              )}
+              <div className="flex gap-2 justify-end">
+                <button type="button" onClick={() => { setAdding(false); setForm(EMPTY_FORM); setSaveError(null) }} className="btn-ghost text-sm">Cancelar</button>
+                <button type="submit" disabled={saving} className="btn-primary text-sm">
+                  {saving ? 'Guardando...' : 'Guardar gasto'}
+                </button>
+              </div>
             </div>
           </form>
         )}
