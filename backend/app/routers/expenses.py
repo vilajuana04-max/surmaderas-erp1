@@ -4,7 +4,7 @@ from sqlalchemy import func
 from typing import Optional
 
 from app.database import get_db
-from app.models import SharedExpenseItem, SharedExpense, ExpenseCategory, LuroExpense
+from app.models import SharedExpenseItem, SharedExpense, ExpenseCategory, LuroExpense, GastoCompartido
 from app.schemas import (SharedExpenseOut, SharedExpenseUpdate,
                           SharedExpenseItemOut, SharedExpenseItemCreate, SharedExpenseItemUpdate,
                           LuroExpenseCreate, LuroExpenseOut, ExpenseCategoryOut)
@@ -292,4 +292,60 @@ def _enrich_luro(e: LuroExpense) -> dict:
         "amount":           e.amount,
         "payment_method":   e.payment_method,
         "paid_status":      e.paid_status,
+    }
+
+
+# ─── Gastos Compartidos v2 (tabla simple, sin catálogo) ──────────────────────
+
+@router.get("/compartidos/{year}/{month}")
+def get_compartidos(year: int, month: str, db: Session = Depends(get_db)):
+    """Retorna dict {item_key: {total_amount, indep_amount, due_date, detail, paid_status}}."""
+    rows = db.query(GastoCompartido).filter(
+        GastoCompartido.year  == year,
+        GastoCompartido.month == month.upper()
+    ).all()
+    return {r.item_key: _enrich_compartido(r) for r in rows}
+
+
+@router.put("/compartidos/{year}/{month}/{item_key}")
+def upsert_compartido(
+    year: int, month: str, item_key: str,
+    data: dict,
+    db: Session = Depends(get_db)
+):
+    """Upsert de un item por clave. Acepta total_amount, indep_amount, due_date, detail, paid_status."""
+    row = db.query(GastoCompartido).filter(
+        GastoCompartido.year     == year,
+        GastoCompartido.month    == month.upper(),
+        GastoCompartido.item_key == item_key
+    ).first()
+
+    if not row:
+        row = GastoCompartido(year=year, month=month.upper(), item_key=item_key)
+        db.add(row)
+
+    if "total_amount" in data:
+        row.total_amount = data["total_amount"]
+    if "indep_amount" in data:
+        row.indep_amount = data["indep_amount"]
+    if "due_date" in data:
+        row.due_date = data["due_date"] or None
+    if "detail" in data:
+        row.detail = data["detail"] or None
+    if "paid_status" in data:
+        row.paid_status = data["paid_status"]
+
+    db.commit()
+    db.refresh(row)
+    return _enrich_compartido(row)
+
+
+def _enrich_compartido(r: GastoCompartido) -> dict:
+    return {
+        "item_key":     r.item_key,
+        "total_amount": float(r.total_amount) if r.total_amount is not None else None,
+        "indep_amount": float(r.indep_amount) if r.indep_amount is not None else None,
+        "due_date":     str(r.due_date) if r.due_date else None,
+        "detail":       r.detail,
+        "paid_status":  r.paid_status or "NO",
     }

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, Numeric, Boolean, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Date, Numeric, Boolean, Text, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -57,3 +57,22 @@ class LuroExpense(Base):
 
     category    = relationship("ExpenseCategory", foreign_keys=[category_id])
     subcategory = relationship("ExpenseCategory", foreign_keys=[subcategory_id])
+
+
+class GastoCompartido(Base):
+    """
+    Tabla simple para gastos compartidos entre sucursales.
+    Keyed por (year, month, item_key). Sin catálogo externo.
+    """
+    __tablename__ = "gastos_compartidos"
+    __table_args__ = (UniqueConstraint("year", "month", "item_key", name="uq_gasto_compartido"),)
+
+    id           = Column(Integer, primary_key=True)
+    year         = Column(Integer,      nullable=False)
+    month        = Column(String(20),   nullable=False)
+    item_key     = Column(String(100),  nullable=False)   # slug del item, ej: 'luz', 'gas'
+    total_amount = Column(Numeric(15, 2))
+    indep_amount = Column(Numeric(15, 2))                 # cuánto paga Independencia
+    due_date     = Column(Date)
+    detail       = Column(Text)
+    paid_status  = Column(String(20), default="NO")

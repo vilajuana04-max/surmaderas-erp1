@@ -1,15 +1,32 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Plus, Trash2, FileDown, Settings } from 'lucide-react'
+import { Plus, Trash2, FileDown } from 'lucide-react'
 import { api, fmt$, MONTHS, CURRENT_YEAR } from '../api'
 
 type Tab = 'compartidos' | 'luro'
 
-// ── helpers ──────────────────────────────────────────────────────────────────
-function fmt0(v: any): string {
-  const n = parseFloat(v)
-  return isNaN(n) ? '' : String(n)
-}
+// ── Items fijos — editar aquí para agregar/quitar filas ──────────────────────
+// split: 'half'  → Indep paga el 50%  (se auto-calcula al ingresar Total)
+// split: 'full'  → Indep paga el 100% (ítem exclusivo de Independencia)
+type SplitType = 'half' | 'full'
+const FIXED_ITEMS: { key: string; name: string; category: string; split: SplitType }[] = [
+  { key: 'luz',        name: 'Luz / Energía Eléctrica',    category: 'Servicios',              split: 'half' },
+  { key: 'gas',        name: 'Gas',                        category: 'Servicios',              split: 'half' },
+  { key: 'agua',       name: 'Agua',                       category: 'Servicios',              split: 'half' },
+  { key: 'internet',   name: 'Internet',                   category: 'Servicios',              split: 'half' },
+  { key: 'telefono',   name: 'Teléfono',                   category: 'Servicios',              split: 'half' },
+  { key: 'alarma',     name: 'Alarma',                     category: 'Seguridad',              split: 'half' },
+  { key: 'seguro',     name: 'Seguro',                     category: 'Seguridad',              split: 'half' },
+  { key: 'expensas',   name: 'Expensas',                   category: 'Edificio',               split: 'half' },
+  { key: 'alquiler',   name: 'Alquiler',                   category: 'Edificio',               split: 'half' },
+  { key: 'contador',   name: 'Contador / Estudio Contable',category: 'Administración',         split: 'half' },
+  { key: 'inacap',     name: 'INACAP',                     category: 'Gestión de empleados',   split: 'half' },
+  { key: 'avila',      name: 'Sueldo Avila Alejandro',     category: 'Personal Independencia', split: 'full' },
+  { key: 'salinas',    name: 'Sueldo Salinas Adrian',      category: 'Personal Independencia', split: 'full' },
+  { key: 'ponasso',    name: 'Sueldo Ponasso Martin',      category: 'Personal Independencia', split: 'full' },
+  { key: 'limpieza',   name: 'Limpieza',                   category: 'Varios',                 split: 'half' },
+  { key: 'otros',      name: 'Otros',                      category: 'Varios',                 split: 'half' },
+]
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function Gastos() {
@@ -57,140 +74,110 @@ export default function Gastos() {
 
 // ── GastosCompartidos ─────────────────────────────────────────────────────────
 function GastosCompartidos({ month, year }: { month: string; year: number }) {
-  const [expenses, setExpenses]   = useState<any[]>([])
-  const [edits, setEdits]         = useState<Record<number, any>>({})
-  const [showCatalog, setShowCatalog] = useState(false)
-  const [catalog, setCatalog]     = useState<any[]>([])
-  const [newItem, setNewItem]     = useState({ name: '', category: '' })
-  const [savingNew, setSavingNew] = useState(false)
-
-  const loadCatalog = useCallback(() => {
-    api.get<any[]>('/expenses/shared/items').then(setCatalog)
-  }, [])
+  // dbData: { [item_key]: { total_amount, indep_amount, due_date, detail, paid_status } }
+  const [dbData, setDbData] = useState<Record<string, any>>({})
+  // localEdits: { [item_key]: { field: value } } — live while typing
+  const [edits, setEdits]   = useState<Record<string, any>>({})
+  const savingRef           = useRef<Record<string, boolean>>({})
 
   const load = useCallback(() => {
-    api.get<any[]>(`/expenses/shared/${year}/${month}`).then(rows => {
-      setExpenses(rows)
+    api.get<Record<string, any>>(`/expenses/compartidos/${year}/${month}`).then(data => {
+      setDbData(data)
       setEdits({})
     })
   }, [month, year])
 
   useEffect(() => { load() }, [load])
-  useEffect(() => { if (showCatalog) loadCatalog() }, [showCatalog, loadCatalog])
 
-  const addNewItem = async () => {
-    if (!newItem.name.trim()) return
-    setSavingNew(true)
-    await api.post('/expenses/shared/items', { name: newItem.name.trim(), category: newItem.category.trim() || null })
-    setNewItem({ name: '', category: '' })
-    setSavingNew(false)
-    loadCatalog()
-    load()
+  // Set a field in localEdits for a given item key
+  const setField = (key: string, field: string, value: any) => {
+    setEdits(prev => ({ ...prev, [key]: { ...prev[key], [field]: value } }))
   }
 
-  const removeItem = async (itemId: number) => {
-    await api.delete(`/expenses/shared/items/${itemId}`)
-    loadCatalog()
-    load()
+  // Save one field for an item key to the server
+  const saveField = async (key: string, field: string, value: any) => {
+    if (savingRef.current[key]) return
+    savingRef.current[key] = true
+    try {
+      const updated = await api.put<any>(`/expenses/compartidos/${year}/${month}/${key}`, { [field]: value })
+      setDbData(prev => ({ ...prev, [key]: updated }))
+    } finally {
+      savingRef.current[key] = false
+    }
   }
 
-  const seedDefaults = async () => {
-    setSavingNew(true)
-    await api.post('/expenses/shared/items/seed-defaults', {})
-    setSavingNew(false)
-    loadCatalog()
-    load()
+  // Merge db + local for a given item key
+  const merged = (key: string) => ({ ...dbData[key], ...edits[key] })
+
+  // Compute indep_amount based on split type when total changes
+  const autoIndep = (key: string, total: number): number => {
+    const item = FIXED_ITEMS.find(i => i.key === key)
+    return item?.split === 'full' ? total : total / 2
   }
 
-  const setField = (id: number, key: string, value: any) => {
-    setEdits(prev => ({ ...prev, [id]: { ...prev[id], [key]: value } }))
-  }
-
-  const save = async (id: number) => {
-    const edit = edits[id]
-    if (!edit || Object.keys(edit).length === 0) return
-    await api.put(`/expenses/shared/${id}`, edit)
-    load()
-  }
-
-  // Totals from server values (or edited total_amount for preview)
-  const totalGeneral    = expenses.reduce((a, e) => a + (parseFloat(edits[e.id]?.total_amount ?? e.total_amount) || 0), 0)
-  const totalLuro       = expenses.reduce((a, e) => a + (parseFloat(edits[e.id]?.luro_amount   ?? e.luro_amount)  || 0), 0)
-  const totalIndep      = totalGeneral - totalLuro
+  // Totals
+  const totalGeneral = FIXED_ITEMS.reduce((a, i) => a + (parseFloat(merged(i.key)?.total_amount) || 0), 0)
+  const totalIndep   = FIXED_ITEMS.reduce((a, i) => a + (parseFloat(merged(i.key)?.indep_amount) || 0), 0)
+  const totalLuro    = totalGeneral - totalIndep
 
   const exportPDF = () => {
-    const rows = expenses.map(e => ({
-      item:     e.item_name,
-      cat:      e.category ?? '',
-      total:    parseFloat(edits[e.id]?.total_amount ?? e.total_amount) || 0,
-      luro:     parseFloat(edits[e.id]?.luro_amount  ?? e.luro_amount)  || 0,
-      due:      e.due_date ?? '',
-      detail:   e.detail   ?? '',
-      paid:     (edits[e.id]?.paid_status ?? e.paid_status) === 'SI' ? 'SI' : 'NO',
-    }))
+    const rows = FIXED_ITEMS.map(item => {
+      const m = merged(item.key)
+      const total = parseFloat(m?.total_amount) || 0
+      const indep = parseFloat(m?.indep_amount) || 0
+      return { name: item.name, cat: item.category, total, indep, luro: total - indep,
+               due: m?.due_date ?? '', detail: m?.detail ?? '', paid: m?.paid_status ?? 'NO' }
+    }).filter(r => r.total > 0)
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
 <title>Gastos Compartidos ${month} ${year}</title>
 <style>
-  body { font-family: Arial, sans-serif; font-size: 11px; color: #1a1a1a; margin: 32px; }
-  h2 { font-size: 16px; margin-bottom: 4px; }
-  .sub { color: #666; font-size: 11px; margin-bottom: 20px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-  th { background: #f0ede8; text-align: left; padding: 6px 8px; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; border-bottom: 2px solid #c8a87a; }
-  td { padding: 5px 8px; border-bottom: 1px solid #e8e4df; }
-  .num { text-align: right; }
-  .paid-si { color: #16a34a; font-weight: bold; }
-  .paid-no { color: #dc2626; }
-  .tfoot td { background: #f0ede8; font-weight: bold; border-top: 2px solid #c8a87a; }
-  .summary { margin-top: 24px; display: flex; gap: 24px; }
-  .summary-box { border: 1px solid #c8a87a; border-radius: 6px; padding: 12px 20px; min-width: 160px; }
-  .summary-box .label { font-size: 10px; text-transform: uppercase; color: #888; letter-spacing: .5px; }
-  .summary-box .value { font-size: 16px; font-weight: bold; margin-top: 2px; }
-  @media print { body { margin: 20px; } }
+  body{font-family:Arial,sans-serif;font-size:11px;color:#1a1a1a;margin:32px}
+  h2{font-size:16px;margin-bottom:4px}
+  .sub{color:#666;font-size:11px;margin-bottom:20px}
+  table{width:100%;border-collapse:collapse;margin-top:12px}
+  th{background:#f0ede8;text-align:left;padding:6px 8px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #c8a87a}
+  td{padding:5px 8px;border-bottom:1px solid #e8e4df}
+  .num{text-align:right}
+  .paid-si{color:#16a34a;font-weight:bold}
+  .paid-no{color:#dc2626}
+  .tfoot td{background:#f0ede8;font-weight:bold;border-top:2px solid #c8a87a}
+  .summary{margin-top:24px;display:flex;gap:24px}
+  .summary-box{border:1px solid #c8a87a;border-radius:6px;padding:12px 20px;min-width:160px}
+  .summary-box .label{font-size:10px;text-transform:uppercase;color:#888;letter-spacing:.5px}
+  .summary-box .value{font-size:16px;font-weight:bold;margin-top:2px}
+  @media print{body{margin:20px}}
 </style></head><body>
 <h2>Gastos Compartidos</h2>
-<div class="sub">${month} ${year} &nbsp;·&nbsp; Distribución entre Luro e Independencia</div>
+<div class="sub">${month} ${year} &nbsp;·&nbsp; Distribución Luro / Independencia</div>
 <table>
   <thead><tr>
-    <th>Ítem</th><th>Categoría</th><th>Vencimiento</th><th>Detalle</th>
-    <th class="num">Total $</th><th class="num">Luro $</th><th class="num">Indep. $</th><th>Pagado</th>
+    <th>Item</th><th>Categoria</th><th>Vto.</th><th>Detalle</th>
+    <th class="num">Total $</th><th class="num">Indep. $</th><th class="num">Luro $</th><th>Pagado</th>
   </tr></thead>
   <tbody>
     ${rows.map(r => `<tr>
-      <td>${r.item}</td>
-      <td>${r.cat}</td>
-      <td>${r.due}</td>
-      <td>${r.detail}</td>
+      <td>${r.name}</td><td>${r.cat}</td><td>${r.due}</td><td>${r.detail}</td>
       <td class="num">${fmt$(r.total)}</td>
+      <td class="num">${fmt$(r.indep)}</td>
       <td class="num">${fmt$(r.luro)}</td>
-      <td class="num">${fmt$(r.total - r.luro)}</td>
       <td class="${r.paid === 'SI' ? 'paid-si' : 'paid-no'}">${r.paid}</td>
     </tr>`).join('')}
   </tbody>
   <tfoot><tr>
     <td colspan="4">TOTAL MES</td>
     <td class="num">${fmt$(totalGeneral)}</td>
-    <td class="num">${fmt$(totalLuro)}</td>
     <td class="num">${fmt$(totalIndep)}</td>
+    <td class="num">${fmt$(totalLuro)}</td>
     <td></td>
   </tr></tfoot>
 </table>
 <div class="summary">
-  <div class="summary-box">
-    <div class="label">Total General</div>
-    <div class="value">${fmt$(totalGeneral)}</div>
-  </div>
-  <div class="summary-box">
-    <div class="label">Luro paga</div>
-    <div class="value">${fmt$(totalLuro)}</div>
-  </div>
-  <div class="summary-box">
-    <div class="label">Independencia debe</div>
-    <div class="value">${fmt$(totalIndep)}</div>
-  </div>
+  <div class="summary-box"><div class="label">Total General</div><div class="value">${fmt$(totalGeneral)}</div></div>
+  <div class="summary-box"><div class="label">Independencia debe</div><div class="value">${fmt$(totalIndep)}</div></div>
+  <div class="summary-box"><div class="label">Luro neto</div><div class="value">${fmt$(totalLuro)}</div></div>
 </div>
 </body></html>`
-
     const w = window.open('', '_blank')
     if (!w) return
     w.document.write(html)
@@ -203,18 +190,18 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
     <div className="space-y-4">
       {/* KPIs + PDF */}
       <div className="flex flex-wrap justify-between items-center gap-3">
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
           <div className="kpi-card py-2 px-3">
             <span className="kpi-label text-[10px]">Total General</span>
             <span className="kpi-value text-base">{fmt$(totalGeneral)}</span>
           </div>
           <div className="kpi-card py-2 px-3">
-            <span className="kpi-label text-[10px]">Luro paga</span>
-            <span className="kpi-value text-base">{fmt$(totalLuro)}</span>
-          </div>
-          <div className="kpi-card py-2 px-3">
             <span className="kpi-label text-[10px]">Independencia debe</span>
             <span className="kpi-value text-base">{fmt$(totalIndep)}</span>
+          </div>
+          <div className="kpi-card py-2 px-3">
+            <span className="kpi-label text-[10px]">Luro neto</span>
+            <span className="kpi-value text-base">{fmt$(totalLuro)}</span>
           </div>
         </div>
         <button onClick={exportPDF} className="btn-ghost text-sm">
@@ -224,205 +211,128 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
 
       <div className="card p-0 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[820px]">
+          <table className="w-full min-w-[760px]">
             <thead className="bg-wood-50 border-b border-wood-100">
               <tr>
                 <th className="table-th">Item</th>
                 <th className="table-th">Categoria</th>
+                <th className="table-th text-right">Total $</th>
+                <th className="table-th text-right">Indep. $</th>
+                <th className="table-th text-right">Luro $</th>
                 <th className="table-th">Vencimiento</th>
                 <th className="table-th">Detalle</th>
-                <th className="table-th text-right">Total $</th>
-                <th className="table-th text-right">Luro $</th>
-                <th className="table-th text-right">Indep. $</th>
                 <th className="table-th text-center">Pagado</th>
-                <th className="table-th" />
               </tr>
             </thead>
             <tbody>
-              {expenses.map(e => {
-                const edit     = edits[e.id] ?? {}
-                const isDirty  = !!edits[e.id] && Object.keys(edits[e.id]).length > 0
-                const total    = parseFloat(edit.total_amount ?? e.total_amount) || 0
-                const luro     = parseFloat(edit.luro_amount  ?? e.luro_amount)  || 0
-                const indep    = total - luro
-                const paid     = edit.paid_status ?? e.paid_status
+              {FIXED_ITEMS.map(item => {
+                const m     = merged(item.key)
+                const total = parseFloat(m?.total_amount) || 0
+                const indep = parseFloat(m?.indep_amount) || 0
+                const luro  = total - indep
+                const paid  = m?.paid_status ?? 'NO'
 
                 return (
-                  <tr key={e.id} className="table-tr">
+                  <tr key={item.key} className="table-tr">
                     {/* Item */}
-                    <td className="table-td text-xs font-medium">{e.item_name}</td>
-                    {/* Categoría */}
-                    <td className="table-td text-xs text-wood-500">{e.category ?? '—'}</td>
+                    <td className="table-td text-xs font-medium">{item.name}</td>
+                    {/* Categoria */}
+                    <td className="table-td text-xs text-wood-400">{item.category}</td>
+                    {/* Total $ */}
+                    <td className="table-td p-1">
+                      <input
+                        type="number" placeholder="0"
+                        className="input py-1 px-2 text-xs text-right w-28"
+                        value={edits[item.key]?.total_amount ?? (m?.total_amount != null ? String(m.total_amount) : '')}
+                        onChange={ev => {
+                          const val = ev.target.value
+                          const num = parseFloat(val)
+                          setEdits(prev => ({
+                            ...prev,
+                            [item.key]: {
+                              ...prev[item.key],
+                              total_amount: val,
+                              // auto-set indep unless user has already overridden it
+                              ...(prev[item.key]?.indep_amount === undefined && !isNaN(num)
+                                ? { indep_amount: String(autoIndep(item.key, num)) }
+                                : {}),
+                            },
+                          }))
+                        }}
+                        onBlur={async ev => {
+                          const val = parseFloat(ev.target.value)
+                          if (isNaN(val)) return
+                          const indepVal = parseFloat(edits[item.key]?.indep_amount) ?? autoIndep(item.key, val)
+                          await saveField(item.key, 'total_amount', val)
+                          await saveField(item.key, 'indep_amount', isNaN(indepVal) ? autoIndep(item.key, val) : indepVal)
+                          setEdits(prev => { const n = { ...prev }; delete n[item.key]; return n })
+                        }}
+                      />
+                    </td>
+                    {/* Indep. $ — editable, auto-filled based on split */}
+                    <td className="table-td p-1">
+                      <input
+                        type="number" placeholder="auto"
+                        className="input py-1 px-2 text-xs text-right w-28"
+                        value={edits[item.key]?.indep_amount ?? (m?.indep_amount != null ? String(m.indep_amount) : '')}
+                        onChange={ev => setField(item.key, 'indep_amount', ev.target.value)}
+                        onBlur={async ev => {
+                          const val = parseFloat(ev.target.value)
+                          if (isNaN(val)) return
+                          await saveField(item.key, 'indep_amount', val)
+                          setEdits(prev => { const n = { ...prev }; delete n[item.key]?.indep_amount; return n })
+                        }}
+                      />
+                    </td>
+                    {/* Luro $ — computed */}
+                    <td className="table-td text-xs text-right font-medium text-wood-600">
+                      {total > 0 ? fmt$(luro) : '—'}
+                    </td>
                     {/* Vencimiento */}
                     <td className="table-td p-1">
-                      <input type="date"
+                      <input
+                        type="date"
                         className="input py-1 px-2 text-xs w-32"
-                        value={edit.due_date ?? (e.due_date ?? '')}
-                        onChange={ev => setField(e.id, 'due_date', ev.target.value || null)}
-                        onBlur={() => save(e.id)}
+                        value={edits[item.key]?.due_date ?? (m?.due_date ?? '')}
+                        onChange={ev => setField(item.key, 'due_date', ev.target.value)}
+                        onBlur={ev => saveField(item.key, 'due_date', ev.target.value || null)}
                       />
                     </td>
                     {/* Detalle */}
                     <td className="table-td p-1">
-                      <input type="text" placeholder="—"
-                        className="input py-1 px-2 text-xs w-36"
-                        value={edit.detail ?? (e.detail ?? '')}
-                        onChange={ev => setField(e.id, 'detail', ev.target.value || null)}
-                        onBlur={() => save(e.id)}
+                      <input
+                        type="text" placeholder="—"
+                        className="input py-1 px-2 text-xs w-32"
+                        value={edits[item.key]?.detail ?? (m?.detail ?? '')}
+                        onChange={ev => setField(item.key, 'detail', ev.target.value)}
+                        onBlur={ev => saveField(item.key, 'detail', ev.target.value || null)}
                       />
-                    </td>
-                    {/* Total $ */}
-                    <td className="table-td p-1">
-                      <input type="number" placeholder="0"
-                        className="input py-1 px-2 text-xs text-right w-28"
-                        value={edit.total_amount ?? fmt0(e.total_amount)}
-                        onChange={ev => {
-                          const val = ev.target.value
-                          const num = parseFloat(val)
-                          // Auto-preview: luro = total/2 if user hasn't manually set luro
-                          if (!isNaN(num) && edit.luro_amount === undefined) {
-                            setEdits(prev => ({
-                              ...prev,
-                              [e.id]: { ...prev[e.id], total_amount: val, _autoLuro: num / 2 },
-                            }))
-                          } else {
-                            setField(e.id, 'total_amount', val || null)
-                          }
-                        }}
-                        onBlur={() => save(e.id)}
-                      />
-                    </td>
-                    {/* Luro $ — editable override */}
-                    <td className="table-td p-1">
-                      <input type="number" placeholder="auto"
-                        className="input py-1 px-2 text-xs text-right w-28"
-                        value={edit.luro_amount ?? fmt0(e.luro_amount)}
-                        onChange={ev => setField(e.id, 'luro_amount', ev.target.value || null)}
-                        onBlur={() => save(e.id)}
-                      />
-                    </td>
-                    {/* Independencia $ — computed */}
-                    <td className="table-td text-xs text-right font-medium text-wood-600">
-                      {indep > 0 ? fmt$(indep) : '—'}
                     </td>
                     {/* Pagado */}
-                    <td className="table-td text-center p-1">
+                    <td className="table-td text-center">
                       <button
                         onClick={async () => {
-                          const newPaid = paid === 'SI' ? 'NO' : 'SI'
-                          setField(e.id, 'paid_status', newPaid)
-                          await api.put(`/expenses/shared/${e.id}`, { paid_status: newPaid })
+                          const np = paid === 'SI' ? 'NO' : 'SI'
+                          await saveField(item.key, 'paid_status', np)
                           load()
                         }}
-                        className={[
-                          'badge cursor-pointer',
-                          paid === 'SI' ? 'badge-green' : 'badge-red',
-                        ].join(' ')}>
+                        className={['badge cursor-pointer', paid === 'SI' ? 'badge-green' : 'badge-red'].join(' ')}>
                         {paid === 'SI' ? 'SI' : 'NO'}
                       </button>
-                    </td>
-                    {/* Guardar */}
-                    <td className="table-td p-1 w-10">
-                      {isDirty && (
-                        <button onClick={() => save(e.id)} className="btn-primary text-xs py-1 px-2">OK</button>
-                      )}
                     </td>
                   </tr>
                 )
               })}
               <tr className="bg-wood-50 border-t-2 border-wood-200">
-                <td colSpan={4} className="table-td font-bold text-xs">TOTAL MES</td>
+                <td colSpan={2} className="table-td font-bold text-xs">TOTAL MES</td>
                 <td className="table-td text-xs text-right font-bold">{fmt$(totalGeneral)}</td>
-                <td className="table-td text-xs text-right font-bold">{fmt$(totalLuro)}</td>
                 <td className="table-td text-xs text-right font-bold">{fmt$(totalIndep)}</td>
-                <td colSpan={2} />
+                <td className="table-td text-xs text-right font-bold">{fmt$(totalLuro)}</td>
+                <td colSpan={3} />
               </tr>
             </tbody>
           </table>
         </div>
-      </div>
-
-      <p className="text-xs text-wood-400">
-        Luro adelanta todos los gastos. Independencia reintegra su parte (columna Indep. $).
-        Para items exclusivos de una sucursal, escriba 0 en el campo "Luro $".
-      </p>
-
-      {/* Catalog management */}
-      <div className="border-t border-wood-100 pt-4">
-        <button
-          onClick={() => setShowCatalog(v => !v)}
-          className="flex items-center gap-2 text-xs text-wood-400 hover:text-wood-700 transition-colors">
-          <Settings size={13} />
-          {showCatalog ? 'Ocultar' : 'Gestionar items del catálogo'}
-        </button>
-
-        {showCatalog && (
-          <div className="mt-3 card p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-wood-600 uppercase tracking-wide">Items del catálogo</p>
-              {catalog.length === 0 && (
-                <button
-                  onClick={seedDefaults}
-                  disabled={savingNew}
-                  className="btn-ghost text-xs py-1 px-2">
-                  {savingNew ? 'Cargando...' : 'Cargar plantilla base'}
-                </button>
-              )}
-            </div>
-
-            {/* Add new item */}
-            <div className="flex gap-2 items-end">
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] text-wood-400 uppercase tracking-wide">Nombre *</label>
-                <input
-                  type="text" placeholder="ej: Luz Eléctrica"
-                  className="input py-1 px-2 text-xs w-48"
-                  value={newItem.name}
-                  onChange={e => setNewItem(p => ({ ...p, name: e.target.value }))}
-                  onKeyDown={e => e.key === 'Enter' && addNewItem()}
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] text-wood-400 uppercase tracking-wide">Categoría</label>
-                <input
-                  type="text" placeholder="ej: Servicios"
-                  className="input py-1 px-2 text-xs w-36"
-                  value={newItem.category}
-                  onChange={e => setNewItem(p => ({ ...p, category: e.target.value }))}
-                  onKeyDown={e => e.key === 'Enter' && addNewItem()}
-                />
-              </div>
-              <button
-                onClick={addNewItem}
-                disabled={savingNew || !newItem.name.trim()}
-                className="btn-primary text-xs py-1 px-3 h-8">
-                <Plus size={13} /> Agregar
-              </button>
-            </div>
-
-            {/* Item list */}
-            <div className="space-y-1 max-h-48 overflow-y-auto">
-              {catalog.length === 0 && (
-                <p className="text-xs text-wood-400 py-2">
-                  No hay items. Usa "Cargar plantilla base" para agregar los items típicos, o agrega uno arriba.
-                </p>
-              )}
-              {catalog.map(item => (
-                <div key={item.id} className="flex items-center justify-between py-1 px-2 rounded hover:bg-wood-50">
-                  <div>
-                    <span className="text-xs font-medium">{item.name}</span>
-                    {item.category && <span className="text-[10px] text-wood-400 ml-2">{item.category}</span>}
-                  </div>
-                  <button
-                    onClick={() => removeItem(item.id)}
-                    className="text-red-300 hover:text-red-500 transition-colors p-1">
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )
