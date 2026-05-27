@@ -4,7 +4,7 @@ from .sales import DailySales
 from .purchases import Provider, Purchase
 from .payroll import PayrollPeriod, PayrollItem
 from .vacations import VacationRecord, VacationLog
-from .expenses import SharedExpenseItem, SharedExpense, ExpenseCategory, LuroExpense, GastoCompartido
+from .expenses import SharedExpenseItem, SharedExpense, ExpenseCategory, LuroExpense, GastoCompartido, MonthClosure
 from .receipts import PayslipUpload
 
 __all__ = [
@@ -14,6 +14,6 @@ __all__ = [
     "Provider", "Purchase",
     "PayrollPeriod", "PayrollItem",
     "VacationRecord", "VacationLog",
-    "SharedExpenseItem", "SharedExpense", "ExpenseCategory", "LuroExpense", "GastoCompartido",
+    "SharedExpenseItem", "SharedExpense", "ExpenseCategory", "LuroExpense", "GastoCompartido", "MonthClosure",
     "PayslipUpload",
 ]

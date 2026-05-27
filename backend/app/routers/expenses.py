@@ -2,15 +2,23 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Optional
+import os
 
 from app.database import get_db
-from app.models import SharedExpenseItem, SharedExpense, ExpenseCategory, LuroExpense, GastoCompartido
+from app.models import SharedExpenseItem, SharedExpense, ExpenseCategory, LuroExpense, GastoCompartido, MonthClosure
 from app.schemas import (SharedExpenseOut, SharedExpenseUpdate,
                           SharedExpenseItemOut, SharedExpenseItemCreate, SharedExpenseItemUpdate,
                           LuroExpenseCreate, LuroExpenseOut, ExpenseCategoryOut)
 from app.services.pdf_generator import generate_shared_expenses_pdf, generate_luro_expenses_pdf
 
 router = APIRouter(prefix="/expenses", tags=["Gastos"])
+
+CLOSE_PASSWORD = os.environ.get("CLOSE_PASSWORD", "Sur2026*")
+
+MONTH_ORDER = {
+    "ENERO":1,"FEBRERO":2,"MARZO":3,"ABRIL":4,"MAYO":5,"JUNIO":6,
+    "JULIO":7,"AGOSTO":8,"SEPTIEMBRE":9,"OCTUBRE":10,"NOVIEMBRE":11,"DICIEMBRE":12
+}
 
 
 # ─── Catálogo de Items Compartidos ────────────────────────────
@@ -377,3 +385,85 @@ def _enrich_compartido(r: GastoCompartido) -> dict:
         "custom_name":  r.custom_name,
         "split_type":   r.split_type or "half",
     }
+
+
+# ─── Cierre de mes ───────────────────────────────────────────────────────────
+
+@router.get("/history/{section}")
+def get_history(section: str, db: Session = Depends(get_db)):
+    """Historial de meses con datos, totales y estado de cierre."""
+    if section == "luro":
+        rows = db.query(
+            LuroExpense.year,
+            LuroExpense.month,
+            func.sum(LuroExpense.amount).label("total")
+        ).group_by(LuroExpense.year, LuroExpense.month).all()
+    else:
+        rows = db.query(
+            GastoCompartido.year,
+            GastoCompartido.month,
+            func.sum(GastoCompartido.total_amount).label("total")
+        ).group_by(GastoCompartido.year, GastoCompartido.month).all()
+
+    closures = {
+        f"{c.year}-{c.month}": c.closed_at
+        for c in db.query(MonthClosure).filter(MonthClosure.section == section).all()
+    }
+
+    result = [
+        {
+            "year":      r.year,
+            "month":     r.month,
+            "total":     float(r.total or 0),
+            "is_closed": f"{r.year}-{r.month}" in closures,
+            "closed_at": closures[f"{r.year}-{r.month}"].isoformat()
+                         if f"{r.year}-{r.month}" in closures else None,
+        }
+        for r in rows
+        if r.year and r.month
+    ]
+    result.sort(key=lambda x: (x["year"], MONTH_ORDER.get(x["month"], 0)), reverse=True)
+    return result
+
+
+@router.get("/is-closed/{section}/{year}/{month}")
+def check_closed(section: str, year: int, month: str, db: Session = Depends(get_db)):
+    closure = db.query(MonthClosure).filter(
+        MonthClosure.section == section,
+        MonthClosure.year    == year,
+        MonthClosure.month   == month.upper()
+    ).first()
+    return {
+        "is_closed": closure is not None,
+        "closed_at": closure.closed_at.isoformat() if closure else None,
+    }
+
+
+@router.post("/close/{section}/{year}/{month}", status_code=201)
+def close_month(section: str, year: int, month: str, db: Session = Depends(get_db)):
+    existing = db.query(MonthClosure).filter(
+        MonthClosure.section == section,
+        MonthClosure.year    == year,
+        MonthClosure.month   == month.upper()
+    ).first()
+    if existing:
+        raise HTTPException(400, "El mes ya está cerrado")
+    db.add(MonthClosure(section=section, year=year, month=month.upper()))
+    db.commit()
+    return {"ok": True}
+
+
+@router.post("/reopen/{section}/{year}/{month}")
+def reopen_month(section: str, year: int, month: str, data: dict, db: Session = Depends(get_db)):
+    if data.get("password") != CLOSE_PASSWORD:
+        raise HTTPException(403, "Clave incorrecta")
+    closure = db.query(MonthClosure).filter(
+        MonthClosure.section == section,
+        MonthClosure.year    == year,
+        MonthClosure.month   == month.upper()
+    ).first()
+    if not closure:
+        raise HTTPException(404, "El mes no está cerrado")
+    db.delete(closure)
+    db.commit()
+    return {"ok": True}

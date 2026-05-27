@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Plus, Trash2, FileDown, Pencil, Check, X, Settings } from 'lucide-react'
+import { Plus, Trash2, FileDown, Pencil, Check, X, Settings, Lock, Unlock, History } from 'lucide-react'
 import { api, fmt$, MONTHS, CURRENT_YEAR } from '../api'
 
 type Tab = 'compartidos' | 'luro'
@@ -59,14 +59,214 @@ export default function Gastos() {
       </div>
 
       {tabParam === 'compartidos'
-        ? <GastosCompartidos month={month} year={year} />
-        : <GastosLuro        month={month} year={year} />}
+        ? <GastosCompartidos month={month} year={year} onMonthChange={setMonth} />
+        : <GastosLuro        month={month} year={year} onMonthChange={setMonth} />}
+    </div>
+  )
+}
+
+// ── Historial de meses ────────────────────────────────────────────────────────
+function HistorialView({
+  section, onNavigate
+}: { section: 'luro' | 'compartidos'; onNavigate: (month: string, year: number) => void }) {
+  const [rows, setRows]     = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    api.get<any[]>(`/expenses/history/${section}`)
+      .then(setRows)
+      .finally(() => setLoading(false))
+  }, [section])
+
+  if (loading) return <div className="text-center py-10 text-brand-muted text-sm">Cargando historial...</div>
+
+  return (
+    <div className="card p-0 overflow-hidden">
+      <table className="w-full">
+        <thead>
+          <tr className="bg-navy text-white">
+            <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-widest">Período</th>
+            <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-widest">Total</th>
+            <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-widest">Estado</th>
+            <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-widest">Cerrado el</th>
+            <th className="px-4 py-3 w-16" />
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(h => (
+            <tr key={`${h.year}-${h.month}`} className="table-tr">
+              <td className="table-td font-semibold">{h.month} {h.year}</td>
+              <td className="table-td text-right font-semibold tabular-nums">{fmt$(h.total)}</td>
+              <td className="table-td text-center">
+                {h.is_closed
+                  ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+                      <Lock size={10}/> Cerrado
+                    </span>
+                  : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-200">
+                      Abierto
+                    </span>}
+              </td>
+              <td className="table-td text-center text-xs text-brand-muted">
+                {h.closed_at ? new Date(h.closed_at).toLocaleDateString('es-AR') : '—'}
+              </td>
+              <td className="table-td text-center">
+                <button onClick={() => onNavigate(h.month, h.year)}
+                  className="text-xs text-coral hover:text-coral-dark font-semibold transition-colors">
+                  Ver →
+                </button>
+              </td>
+            </tr>
+          ))}
+          {rows.length === 0 && (
+            <tr><td colSpan={5} className="table-td text-center text-brand-muted py-10">
+              No hay historial de gastos registrados
+            </td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// ── Modal confirmar cierre ────────────────────────────────────────────────────
+function CloseMonthModal({ month, year, onConfirm, onClose }: {
+  month: string; year: number
+  onConfirm: () => void; onClose: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(7,6,20,0.55)' }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+            <Lock size={18} className="text-amber-600" />
+          </div>
+          <div>
+            <h3 className="font-bold text-brand-body">Cerrar {month} {year}</h3>
+            <p className="text-xs text-brand-muted">Esta acción requiere clave para revertirse</p>
+          </div>
+        </div>
+        <p className="text-sm text-brand-muted leading-relaxed">
+          Una vez cerrado el mes, no podrás agregar, editar ni eliminar gastos
+          sin la clave de administrador.
+        </p>
+        <div className="flex gap-2 justify-end pt-1">
+          <button onClick={onClose} className="btn-ghost text-sm">Cancelar</button>
+          <button onClick={onConfirm} className="btn-primary text-sm bg-amber-600 hover:bg-amber-700">
+            <Lock size={14}/> Cerrar mes
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Modal reabrir con clave ───────────────────────────────────────────────────
+function ReopenMonthModal({ month, year, section, onSuccess, onClose }: {
+  month: string; year: number; section: string
+  onSuccess: () => void; onClose: () => void
+}) {
+  const [pwd, setPwd]       = useState('')
+  const [error, setError]   = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const submit = async () => {
+    if (!pwd.trim()) return
+    setLoading(true); setError('')
+    try {
+      await api.post(`/expenses/reopen/${section}/${year}/${month}`, { password: pwd })
+      onSuccess()
+    } catch (err: any) {
+      const msg: string = err?.message ?? ''
+      setError(msg.includes('403') ? 'Clave incorrecta' : 'Error al reabrir el mes')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(7,6,20,0.55)' }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+            <Unlock size={18} className="text-green-600" />
+          </div>
+          <div>
+            <h3 className="font-bold text-brand-body">Reabrir {month} {year}</h3>
+            <p className="text-xs text-brand-muted">Ingresá la clave de administrador</p>
+          </div>
+        </div>
+        <input
+          type="password"
+          placeholder="Clave de administrador"
+          className="input w-full text-sm"
+          value={pwd}
+          autoFocus
+          onChange={e => setPwd(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && submit()}
+        />
+        {error && <p className="text-xs text-red-600">{error}</p>}
+        <div className="flex gap-2 justify-end">
+          <button onClick={onClose} className="btn-ghost text-sm">Cancelar</button>
+          <button onClick={submit} disabled={loading || !pwd.trim()} className="btn-primary text-sm">
+            {loading ? 'Verificando...' : 'Reabrir mes'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Hook: closure status ──────────────────────────────────────────────────────
+function useMonthClosure(section: string, month: string, year: number) {
+  const [isClosed, setIsClosed]   = useState(false)
+  const [closedAt, setClosedAt]   = useState<string | null>(null)
+  const [checking, setChecking]   = useState(true)
+
+  const check = useCallback(() => {
+    setChecking(true)
+    api.get<{ is_closed: boolean; closed_at: string | null }>(
+      `/expenses/is-closed/${section}/${year}/${month}`
+    ).then(d => {
+      setIsClosed(d.is_closed)
+      setClosedAt(d.closed_at)
+    }).finally(() => setChecking(false))
+  }, [section, month, year])
+
+  useEffect(() => { check() }, [check])
+
+  return { isClosed, closedAt, checking, refresh: check }
+}
+
+// ── Banner mes cerrado ────────────────────────────────────────────────────────
+function ClosedBanner({ closedAt, onReopen }: { closedAt: string | null; onReopen: () => void }) {
+  const date = closedAt ? new Date(closedAt).toLocaleDateString('es-AR', {
+    day: '2-digit', month: 'long', year: 'numeric'
+  }) : ''
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200">
+      <div className="flex items-center gap-2.5">
+        <Lock size={15} className="text-amber-600 shrink-0" />
+        <div>
+          <span className="text-sm font-semibold text-amber-800">Mes cerrado</span>
+          {date && <span className="text-xs text-amber-600 ml-2">· Cerrado el {date}</span>}
+        </div>
+      </div>
+      <button onClick={onReopen}
+        className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 hover:text-amber-900 transition-colors border border-amber-300 rounded-lg px-3 py-1.5 hover:bg-amber-100">
+        <Unlock size={12}/> Reabrir
+      </button>
     </div>
   )
 }
 
 // ── GastosCompartidos ─────────────────────────────────────────────────────────
-function GastosCompartidos({ month, year }: { month: string; year: number }) {
+function GastosCompartidos({ month, year, onMonthChange }: { month: string; year: number; onMonthChange: (m: string) => void }) {
+  const [view, setView]         = useState<'tabla' | 'historial'>('tabla')
   const [dbData, setDbData]     = useState<Record<string, any>>({})
   const [edits, setEdits]       = useState<Record<string, any>>({})
   const savingRef               = useRef<Record<string, boolean>>({})
@@ -75,6 +275,10 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
   const [savingCustom, setSavingCustom] = useState(false)
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editForm, setEditForm]     = useState({ pct: '50', detail: '', name: '' })
+  const [showCloseModal, setShowCloseModal]   = useState(false)
+  const [showReopenModal, setShowReopenModal] = useState(false)
+
+  const { isClosed, closedAt, refresh: refreshClosure } = useMonthClosure('compartidos', month, year)
 
   const customItems = Object.values(dbData).filter((r: any) => r.item_key?.startsWith('custom_'))
 
@@ -200,22 +404,24 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
             </span>
           </td>
 
-          {/* Monto total — input editable */}
+          {/* Monto total — input editable (bloqueado si cerrado) */}
           <td className="table-td p-1">
-            <input
-              type="number" placeholder="0"
-              className="input py-1 px-2 text-xs text-right w-36"
-              value={edits[key]?.total_amount ?? (m?.total_amount != null ? String(m.total_amount) : '')}
-              onChange={ev => setField(key, 'total_amount', ev.target.value)}
-              onBlur={async ev => {
-                const val = parseFloat(ev.target.value)
-                if (isNaN(val)) return
-                await saveField(key, 'total_amount', val)
-                await saveField(key, 'indep_amount', autoIndep(key, val))
-                setEdits(prev => { const n = { ...prev }; delete n[key]; return n })
-                load()
-              }}
-            />
+            {isClosed
+              ? <span className="text-xs text-right block pr-2 font-semibold">{total > 0 ? fmt$(total) : '—'}</span>
+              : <input
+                  type="number" placeholder="0"
+                  className="input py-1 px-2 text-xs text-right w-36"
+                  value={edits[key]?.total_amount ?? (m?.total_amount != null ? String(m.total_amount) : '')}
+                  onChange={ev => setField(key, 'total_amount', ev.target.value)}
+                  onBlur={async ev => {
+                    const val = parseFloat(ev.target.value)
+                    if (isNaN(val)) return
+                    await saveField(key, 'total_amount', val)
+                    await saveField(key, 'indep_amount', autoIndep(key, val))
+                    setEdits(prev => { const n = { ...prev }; delete n[key]; return n })
+                    load()
+                  }}
+                />}
           </td>
 
           {/* Independencia paga — read-only */}
@@ -231,23 +437,26 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
           {/* Pagado */}
           <td className="table-td text-center">
             <button
-              onClick={async () => { await saveField(key, 'paid_status', paid === 'SI' ? 'NO' : 'SI'); load() }}
-              className={['badge cursor-pointer', paid === 'SI' ? 'badge-green' : 'badge-red'].join(' ')}>
+              disabled={isClosed}
+              onClick={async () => { if (isClosed) return; await saveField(key, 'paid_status', paid === 'SI' ? 'NO' : 'SI'); load() }}
+              className={['badge', isClosed ? 'cursor-default opacity-70' : 'cursor-pointer', paid === 'SI' ? 'badge-green' : 'badge-red'].join(' ')}>
               {paid === 'SI' ? 'SI' : 'NO'}
             </button>
           </td>
 
-          {/* Lápiz editar */}
+          {/* Lápiz editar — oculto si cerrado */}
           <td className="table-td text-center p-1">
-            <button
-              onClick={() => openEdit(key)}
-              title="Editar porcentaje y detalle"
-              className={[
-                'p-1 rounded transition-colors',
-                isEditing ? 'text-coral bg-coral/10' : 'text-brand-muted hover:text-brand-body',
-              ].join(' ')}>
-              <Pencil size={13} />
-            </button>
+            {!isClosed && (
+              <button
+                onClick={() => openEdit(key)}
+                title="Editar porcentaje y detalle"
+                className={[
+                  'p-1 rounded transition-colors',
+                  isEditing ? 'text-coral bg-coral/10' : 'text-brand-muted hover:text-brand-body',
+                ].join(' ')}>
+                <Pencil size={13} />
+              </button>
+            )}
           </td>
         </tr>
 
@@ -390,28 +599,75 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
     setTimeout(() => { w.print() }, 400)
   }
 
+  const doCloseMonth = async () => {
+    await api.post(`/expenses/close/compartidos/${year}/${month}`, {})
+    setShowCloseModal(false)
+    refreshClosure()
+  }
+
   // ── JSX ──────────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
-      {/* KPIs + PDF */}
+      {/* Toolbar: tabs historial + botones */}
       <div className="flex flex-wrap justify-between items-center gap-3">
-        <div className="flex gap-3 flex-wrap">
-          <div className="kpi-card py-2 px-3">
-            <span className="kpi-label text-[10px]">Total General</span>
-            <span className="kpi-value text-base">{fmt$(totalGeneral)}</span>
-          </div>
-          <div className="kpi-card py-2 px-3">
-            <span className="kpi-label text-[10px]">Independencia debe</span>
-            <span className="kpi-value text-base">{fmt$(totalIndep)}</span>
-          </div>
-          <div className="kpi-card py-2 px-3">
-            <span className="kpi-label text-[10px]">Luro neto</span>
-            <span className="kpi-value text-base">{fmt$(totalLuro)}</span>
-          </div>
+        {/* Tabs */}
+        <div className="flex gap-2">
+          <button onClick={() => setView('tabla')}
+            className={['px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors',
+              view === 'tabla' ? 'bg-navy text-white' : 'bg-brand-off-white text-brand-muted hover:text-brand-body border border-brand-border'].join(' ')}>
+            Tabla del mes
+          </button>
+          <button onClick={() => setView('historial')}
+            className={['flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors',
+              view === 'historial' ? 'bg-navy text-white' : 'bg-brand-off-white text-brand-muted hover:text-brand-body border border-brand-border'].join(' ')}>
+            <History size={12}/> Historial
+          </button>
         </div>
-        <button onClick={exportPDF} className="btn-ghost text-sm">
-          <FileDown size={15} /> PDF
-        </button>
+        {/* Acciones */}
+        <div className="flex items-center gap-2">
+          <button onClick={exportPDF} className="btn-ghost text-sm">
+            <FileDown size={15}/> PDF
+          </button>
+          {!isClosed
+            ? <button onClick={() => setShowCloseModal(true)}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 transition-colors">
+                <Lock size={12}/> Cerrar mes
+              </button>
+            : <button onClick={() => setShowReopenModal(true)}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-green-300 text-green-700 hover:bg-green-50 transition-colors">
+                <Unlock size={12}/> Reabrir
+              </button>}
+        </div>
+      </div>
+
+      {/* Banner cerrado */}
+      {isClosed && view === 'tabla' && (
+        <ClosedBanner closedAt={closedAt} onReopen={() => setShowReopenModal(true)} />
+      )}
+
+      {/* Historial */}
+      {view === 'historial' && (
+        <HistorialView section="compartidos" onNavigate={(m, y) => {
+          onMonthChange(m)
+          setView('tabla')
+        }} />
+      )}
+
+      {view === 'tabla' && (<>
+      {/* KPIs */}
+      <div className="flex gap-3 flex-wrap">
+        <div className="kpi-card py-2 px-3">
+          <span className="kpi-label text-[10px]">Total General</span>
+          <span className="kpi-value text-base">{fmt$(totalGeneral)}</span>
+        </div>
+        <div className="kpi-card py-2 px-3">
+          <span className="kpi-label text-[10px]">Independencia debe</span>
+          <span className="kpi-value text-base">{fmt$(totalIndep)}</span>
+        </div>
+        <div className="kpi-card py-2 px-3">
+          <span className="kpi-label text-[10px]">Luro neto</span>
+          <span className="kpi-value text-base">{fmt$(totalLuro)}</span>
+        </div>
       </div>
 
       {/* Tabla */}
@@ -482,7 +738,7 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
       </div>
 
       {/* Agregar item personalizado */}
-      {addingCustom ? (
+      {!isClosed && (addingCustom ? (
         <div className="card p-3 flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-1">
             <label className="text-[10px] text-brand-muted uppercase tracking-wide">Nombre del item *</label>
@@ -513,6 +769,18 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
           className="flex items-center gap-1.5 text-xs text-brand-muted hover:text-brand-body transition-colors">
           <Plus size={13} /> Agregar item personalizado
         </button>
+      ))}
+      </>)}
+
+      {/* Modales */}
+      {showCloseModal && (
+        <CloseMonthModal month={month} year={year}
+          onConfirm={doCloseMonth} onClose={() => setShowCloseModal(false)} />
+      )}
+      {showReopenModal && (
+        <ReopenMonthModal month={month} year={year} section="compartidos"
+          onSuccess={() => { setShowReopenModal(false); refreshClosure() }}
+          onClose={() => setShowReopenModal(false)} />
       )}
     </div>
   )
@@ -571,12 +839,16 @@ function CatBadge({ name, color }: { name: string; color: string }) {
   )
 }
 
-type LuroView = 'registro' | 'reporte'
-
 // ── GastosLuro ────────────────────────────────────────────────────────────────
-function GastosLuro({ month, year }: { month: string; year: number }) {
+type LuroView = 'registro' | 'reporte' | 'historial'
+
+function GastosLuro({ month, year, onMonthChange }: { month: string; year: number; onMonthChange: (m: string) => void }) {
   const [view, setView]             = useState<LuroView>('registro')
   const [showSettings, setShowSettings] = useState(false)
+  const [showCloseModal, setShowCloseModal]   = useState(false)
+  const [showReopenModal, setShowReopenModal] = useState(false)
+
+  const { isClosed, closedAt, refresh: refreshClosure } = useMonthClosure('luro', month, year)
 
   // Categorías y colores — persisten en localStorage
   const [cats, setCats] = useState<Record<string, string[]>>(() => {
@@ -597,38 +869,70 @@ function GastosLuro({ month, year }: { month: string; year: number }) {
     localStorage.setItem('luro_colors', JSON.stringify(next))
   }
 
+  const doCloseMonth = async () => {
+    await api.post(`/expenses/close/luro/${year}/${month}`, {})
+    setShowCloseModal(false)
+    refreshClosure()
+  }
+
   return (
     <div className="space-y-4">
-      {/* Sub-tabs + tuerca */}
-      <div className="flex items-center justify-between">
-        <div className="flex gap-2">
-          {(['registro', 'reporte'] as LuroView[]).map(v => (
+      {/* Sub-tabs + acciones */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap">
+          {(['registro', 'reporte', 'historial'] as LuroView[]).map(v => (
             <button key={v} onClick={() => setView(v)}
               className={[
-                'px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors',
+                'flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors',
                 view === v ? 'bg-navy text-white' : 'bg-brand-off-white text-brand-muted hover:text-brand-body border border-brand-border',
               ].join(' ')}>
-              {v === 'registro' ? 'Registro mensual' : 'Reporte anual'}
+              {v === 'registro' ? 'Registro mensual' : v === 'reporte' ? 'Reporte anual' : <><History size={12}/>Historial</>}
             </button>
           ))}
         </div>
-        <button onClick={() => setShowSettings(true)}
-          className="flex items-center gap-1.5 text-xs text-brand-muted hover:text-brand-body border border-brand-border rounded-lg px-3 py-1.5 transition-colors">
-          <Settings size={13} /> Categorías
-        </button>
+        <div className="flex items-center gap-2">
+          {!isClosed
+            ? <button onClick={() => setShowCloseModal(true)}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 transition-colors">
+                <Lock size={12}/> Cerrar mes
+              </button>
+            : <button onClick={() => setShowReopenModal(true)}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-green-300 text-green-700 hover:bg-green-50 transition-colors">
+                <Unlock size={12}/> Reabrir
+              </button>}
+          <button onClick={() => setShowSettings(true)}
+            className="flex items-center gap-1.5 text-xs text-brand-muted hover:text-brand-body border border-brand-border rounded-lg px-3 py-1.5 transition-colors">
+            <Settings size={13}/> Categorías
+          </button>
+        </div>
       </div>
 
-      {view === 'registro'
-        ? <LuroRegistro month={month} year={year} cats={cats} colors={colors} />
-        : <LuroReporte  year={year} cats={cats} colors={colors} />}
+      {/* Banner cerrado */}
+      {isClosed && view !== 'historial' && (
+        <ClosedBanner closedAt={closedAt} onReopen={() => setShowReopenModal(true)} />
+      )}
 
-      {/* Modal de configuración */}
+      {/* Contenido según vista */}
+      {view === 'historial'
+        ? <HistorialView section="luro" onNavigate={(m, _y) => { onMonthChange(m); setView('registro') }} />
+        : view === 'registro'
+          ? <LuroRegistro month={month} year={year} cats={cats} colors={colors} isClosed={isClosed} />
+          : <LuroReporte  year={year} cats={cats} colors={colors} />}
+
+      {/* Modales */}
       {showSettings && (
-        <LuroCatSettings
-          cats={cats} colors={colors}
+        <LuroCatSettings cats={cats} colors={colors}
           onSaveCats={saveCats} onSaveColors={saveColors}
-          onClose={() => setShowSettings(false)}
-        />
+          onClose={() => setShowSettings(false)} />
+      )}
+      {showCloseModal && (
+        <CloseMonthModal month={month} year={year}
+          onConfirm={doCloseMonth} onClose={() => setShowCloseModal(false)} />
+      )}
+      {showReopenModal && (
+        <ReopenMonthModal month={month} year={year} section="luro"
+          onSuccess={() => { setShowReopenModal(false); refreshClosure() }}
+          onClose={() => setShowReopenModal(false)} />
       )}
     </div>
   )
@@ -794,7 +1098,7 @@ function LuroCatSettings({
 }
 
 // ── LuroRegistro ──────────────────────────────────────────────────────────────
-function LuroRegistro({ month, year, cats, colors }: { month: string; year: number; cats: Record<string, string[]>; colors: Record<string, string> }) {
+function LuroRegistro({ month, year, cats, colors, isClosed }: { month: string; year: number; cats: Record<string, string[]>; colors: Record<string, string>; isClosed: boolean }) {
   const [expenses, setExpenses] = useState<any[]>([])
   const [adding, setAdding]     = useState(false)
   const [saving, setSaving]     = useState(false)
@@ -860,9 +1164,11 @@ function LuroRegistro({ month, year, cats, colors }: { month: string; year: numb
             <span className="kpi-label text-[10px]">Total {month}</span>
             <span className="kpi-value text-base">{fmt$(totalMes)}</span>
           </div>
-          <button onClick={() => setAdding(!adding)} className="btn-primary text-sm">
-            <Plus size={15} /> Nuevo gasto
-          </button>
+          {!isClosed && (
+            <button onClick={() => setAdding(!adding)} className="btn-primary text-sm">
+              <Plus size={15}/> Nuevo gasto
+            </button>
+          )}
         </div>
 
         {/* Formulario nuevo gasto */}
@@ -967,10 +1273,12 @@ function LuroRegistro({ month, year, cats, colors }: { month: string; year: numb
                       </button>
                     </td>
                     <td className="table-td p-1">
-                      <button onClick={async () => { await api.delete(`/expenses/luro/${e.id}`); load() }}
-                        className="text-red-400 hover:text-red-600 transition-colors p-1">
-                        <Trash2 size={13} />
-                      </button>
+                      {!isClosed && (
+                        <button onClick={async () => { await api.delete(`/expenses/luro/${e.id}`); load() }}
+                          className="text-red-400 hover:text-red-600 transition-colors p-1">
+                          <Trash2 size={13}/>
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

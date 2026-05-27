@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Date, Numeric, Boolean, Text, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Date, Numeric, Boolean, Text, ForeignKey, UniqueConstraint, DateTime
+from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -85,3 +86,19 @@ class GastoCompartido(Base):
     paid_status  = Column(String(20), default="NO")
     custom_name  = Column(String(150))                    # solo para items custom
     split_type   = Column(String(10),  default="half")    # 'half' | 'full'
+
+
+class MonthClosure(Base):
+    """
+    Registra los meses cerrados por sección.
+    section: 'luro' | 'compartidos'
+    Una vez cerrado, el mes queda en modo lectura hasta que se reabra con clave.
+    """
+    __tablename__ = "month_closures"
+    __table_args__ = (UniqueConstraint("section", "year", "month", name="uq_month_closure"),)
+
+    id         = Column(Integer, primary_key=True)
+    section    = Column(String(20), nullable=False)
+    year       = Column(Integer,    nullable=False)
+    month      = Column(String(20), nullable=False)
+    closed_at  = Column(DateTime(timezone=True), server_default=func.now())
