@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Plus, Trash2, FileDown } from 'lucide-react'
+import { Plus, Trash2, FileDown, Pencil, Check, X } from 'lucide-react'
 import { api, fmt$, MONTHS, CURRENT_YEAR } from '../api'
 
 type Tab = 'compartidos' | 'luro'
@@ -93,6 +93,35 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
 
   // custom rows = entries in dbData whose key starts with 'custom_'
   const customItems = Object.values(dbData).filter((r: any) => r.item_key?.startsWith('custom_'))
+
+  // inline edit panel
+  const [editingKey, setEditingKey] = useState<string | null>(null)
+  const [editForm, setEditForm]     = useState({ pct: '50', detail: '', name: '' })
+
+  const openEdit = (key: string) => {
+    if (editingKey === key) { setEditingKey(null); return }
+    const m     = merged(key)
+    const total = parseFloat(m?.total_amount) || 0
+    const indep = getIndep(key)
+    const fixedItem = FIXED_ITEMS.find(i => i.key === key)
+    const defaultPct = fixedItem?.split === 'full' ? 100 : 50
+    const pct = total > 0 ? Math.round((indep / total) * 100) : defaultPct
+    setEditForm({ pct: String(pct), detail: m?.detail ?? '', name: m?.custom_name ?? '' })
+    setEditingKey(key)
+  }
+
+  const applyEdit = async (key: string) => {
+    const m     = merged(key)
+    const total = parseFloat(m?.total_amount) || 0
+    const pct   = Math.min(100, Math.max(0, parseFloat(editForm.pct) || 0))
+    await saveField(key, 'indep_amount', total * (pct / 100))
+    await saveField(key, 'detail', editForm.detail || null)
+    if (key.startsWith('custom_') && editForm.name.trim()) {
+      await saveField(key, 'custom_name', editForm.name.trim())
+    }
+    load()
+    setEditingKey(null)
+  }
 
   const load = useCallback(() => {
     api.get<Record<string, any>>(`/expenses/compartidos/${year}/${month}`).then(data => {
@@ -268,116 +297,210 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
               <tr>
                 <th className="table-th">Concepto</th>
                 <th className="table-th text-center">% Indep.</th>
-                <th className="table-th text-right">Monto total $<br/><span className="font-normal text-wood-400 text-[10px] normal-case">lo que paga Luro</span></th>
-                <th className="table-th text-right">Independencia paga $<br/><span className="font-normal text-wood-400 text-[10px] normal-case">lo que debe reintegrar</span></th>
-                <th className="table-th text-right">Luro neto $<br/><span className="font-normal text-wood-400 text-[10px] normal-case">queda a cargo de Luro</span></th>
+                <th className="table-th text-right">
+                  Monto total $
+                  <div className="font-normal text-wood-400 text-[10px] normal-case leading-tight">lo que adelanta Luro</div>
+                </th>
+                <th className="table-th text-right">
+                  Independencia paga $
+                  <div className="font-normal text-wood-400 text-[10px] normal-case leading-tight">lo que debe reintegrar</div>
+                </th>
+                <th className="table-th text-right">
+                  Luro neto $
+                  <div className="font-normal text-wood-400 text-[10px] normal-case leading-tight">queda a cargo de Luro</div>
+                </th>
                 <th className="table-th text-center">Pagado</th>
+                <th className="table-th w-8" />
               </tr>
             </thead>
             <tbody>
               {/* ── Items fijos ── */}
               {FIXED_ITEMS.map(item => {
-                const m     = merged(item.key)
-                const total = parseFloat(m?.total_amount) || 0
-                const indep = getIndep(item.key)
-                const luro  = total - indep
-                const paid  = m?.paid_status ?? 'NO'
-                const pct   = item.split === 'full' ? '100%' : '50%'
+                const m       = merged(item.key)
+                const total   = parseFloat(m?.total_amount) || 0
+                const indep   = getIndep(item.key)
+                const luro    = total - indep
+                const paid    = m?.paid_status ?? 'NO'
+                const rawPct  = total > 0 ? Math.round((indep / total) * 100) : (item.split === 'full' ? 100 : 50)
+                const pctLabel = `${rawPct}%`
+                const isEditing = editingKey === item.key
                 return (
-                  <tr key={item.key} className="table-tr">
-                    <td className="table-td text-xs font-medium">{item.name}</td>
-                    <td className="table-td text-center">
-                      <span className={[
-                        'text-xs font-bold px-2 py-0.5 rounded-full',
-                        item.split === 'full'
-                          ? 'bg-orange-100 text-orange-700'
-                          : 'bg-wood-100 text-wood-600',
-                      ].join(' ')}>{pct}</span>
-                    </td>
-                    <td className="table-td p-1">
-                      <input
-                        type="number" placeholder="0"
-                        className="input py-1 px-2 text-xs text-right w-36"
-                        value={edits[item.key]?.total_amount ?? (m?.total_amount != null ? String(m.total_amount) : '')}
-                        onChange={ev => setField(item.key, 'total_amount', ev.target.value)}
-                        onBlur={async ev => {
-                          const val = parseFloat(ev.target.value)
-                          if (isNaN(val)) return
-                          await saveField(item.key, 'total_amount', val)
-                          await saveField(item.key, 'indep_amount', autoIndep(item.key, val))
-                          setEdits(prev => { const n = { ...prev }; delete n[item.key]; return n })
-                          load()
-                        }}
-                      />
-                    </td>
-                    <td className="table-td text-xs text-right font-semibold text-wood-800">
-                      {total > 0 ? fmt$(indep) : <span className="text-wood-300">—</span>}
-                    </td>
-                    <td className="table-td text-xs text-right text-wood-500">
-                      {total > 0 ? fmt$(luro) : <span className="text-wood-300">—</span>}
-                    </td>
-                    <td className="table-td text-center">
-                      <button
-                        onClick={async () => { await saveField(item.key, 'paid_status', paid === 'SI' ? 'NO' : 'SI'); load() }}
-                        className={['badge cursor-pointer', paid === 'SI' ? 'badge-green' : 'badge-red'].join(' ')}>
-                        {paid === 'SI' ? 'SI' : 'NO'}
-                      </button>
-                    </td>
-                  </tr>
+                  <>
+                    <tr key={item.key} className={['table-tr', isEditing ? 'bg-amber-50/40' : ''].join(' ')}>
+                      <td className="table-td text-xs font-medium">{item.name}</td>
+                      <td className="table-td text-center">
+                        <span className={['text-xs font-bold px-2 py-0.5 rounded-full',
+                          rawPct === 100 ? 'bg-orange-100 text-orange-700' : 'bg-wood-100 text-wood-600'].join(' ')}>
+                          {pctLabel}
+                        </span>
+                      </td>
+                      <td className="table-td p-1">
+                        <input type="number" placeholder="0"
+                          className="input py-1 px-2 text-xs text-right w-36"
+                          value={edits[item.key]?.total_amount ?? (m?.total_amount != null ? String(m.total_amount) : '')}
+                          onChange={ev => setField(item.key, 'total_amount', ev.target.value)}
+                          onBlur={async ev => {
+                            const val = parseFloat(ev.target.value); if (isNaN(val)) return
+                            await saveField(item.key, 'total_amount', val)
+                            await saveField(item.key, 'indep_amount', autoIndep(item.key, val))
+                            setEdits(prev => { const n = { ...prev }; delete n[item.key]; return n })
+                            load()
+                          }}
+                        />
+                      </td>
+                      <td className="table-td text-xs text-right font-semibold text-wood-800">
+                        {total > 0 ? fmt$(indep) : <span className="text-wood-300">—</span>}
+                      </td>
+                      <td className="table-td text-xs text-right text-wood-500">
+                        {total > 0 ? fmt$(luro) : <span className="text-wood-300">—</span>}
+                      </td>
+                      <td className="table-td text-center">
+                        <button onClick={async () => { await saveField(item.key, 'paid_status', paid === 'SI' ? 'NO' : 'SI'); load() }}
+                          className={['badge cursor-pointer', paid === 'SI' ? 'badge-green' : 'badge-red'].join(' ')}>
+                          {paid === 'SI' ? 'SI' : 'NO'}
+                        </button>
+                      </td>
+                      <td className="table-td text-center p-1">
+                        <button onClick={() => openEdit(item.key)}
+                          className={['p-1 rounded transition-colors', isEditing ? 'text-amber-600 bg-amber-100' : 'text-wood-300 hover:text-wood-600'].join(' ')}>
+                          <Pencil size={13} />
+                        </button>
+                      </td>
+                    </tr>
+                    {isEditing && (
+                      <tr key={`${item.key}-edit`} className="bg-amber-50/40 border-b border-amber-100">
+                        <td colSpan={7} className="px-6 py-3">
+                          <div className="flex flex-wrap items-end gap-4">
+                            <div className="flex flex-col gap-1">
+                              <label className="text-[10px] text-wood-400 uppercase tracking-wide">% que paga Independencia</label>
+                              <div className="flex items-center gap-1">
+                                <input type="number" min="0" max="100"
+                                  className="input py-1 px-2 text-xs text-right w-20"
+                                  value={editForm.pct}
+                                  onChange={e => setEditForm(f => ({ ...f, pct: e.target.value }))}
+                                />
+                                <span className="text-xs text-wood-500">%</span>
+                              </div>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <label className="text-[10px] text-wood-400 uppercase tracking-wide">Nota / Detalle</label>
+                              <input type="text" placeholder="Opcional..."
+                                className="input py-1 px-2 text-xs w-52"
+                                value={editForm.detail}
+                                onChange={e => setEditForm(f => ({ ...f, detail: e.target.value }))}
+                              />
+                            </div>
+                            <div className="flex gap-2 ml-auto">
+                              <button onClick={() => applyEdit(item.key)} className="btn-primary text-xs py-1 px-3 flex items-center gap-1"><Check size={13} /> Guardar</button>
+                              <button onClick={() => setEditingKey(null)} className="btn-ghost text-xs py-1 px-3 flex items-center gap-1"><X size={13} /> Cancelar</button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 )
               })}
 
               {/* ── Items custom ── */}
               {customItems.map((row: any) => {
-                const key    = row.item_key
-                const m      = merged(key)
-                const total  = parseFloat(m?.total_amount) || 0
-                const indep  = getIndep(key)
-                const luro   = total - indep
-                const paid   = m?.paid_status ?? 'NO'
-                const split  = m?.split_type ?? 'half'
-                const pct    = split === 'full' ? '100%' : '50%'
+                const key     = row.item_key
+                const m       = merged(key)
+                const total   = parseFloat(m?.total_amount) || 0
+                const indep   = getIndep(key)
+                const luro    = total - indep
+                const paid    = m?.paid_status ?? 'NO'
+                const split   = m?.split_type ?? 'half'
+                const rawPct  = total > 0 ? Math.round((indep / total) * 100) : (split === 'full' ? 100 : 50)
+                const isEditing = editingKey === key
                 return (
-                  <tr key={key} className="table-tr">
-                    <td className="table-td text-xs font-medium">
-                      <div className="flex items-center gap-2">
-                        <span>{m?.custom_name ?? key}</span>
-                        <button onClick={() => deleteCustomItem(key)} className="text-red-300 hover:text-red-500"><Trash2 size={11} /></button>
-                      </div>
-                    </td>
-                    <td className="table-td text-center">
-                      <span className={[
-                        'text-xs font-bold px-2 py-0.5 rounded-full',
-                        split === 'full' ? 'bg-orange-100 text-orange-700' : 'bg-wood-100 text-wood-600',
-                      ].join(' ')}>{pct}</span>
-                    </td>
-                    <td className="table-td p-1">
-                      <input type="number" placeholder="0"
-                        className="input py-1 px-2 text-xs text-right w-36"
-                        value={edits[key]?.total_amount ?? (m?.total_amount != null ? String(m.total_amount) : '')}
-                        onChange={ev => setField(key, 'total_amount', ev.target.value)}
-                        onBlur={async ev => {
-                          const val = parseFloat(ev.target.value); if (isNaN(val)) return
-                          await saveField(key, 'total_amount', val)
-                          await saveField(key, 'indep_amount', autoIndep(key, val))
-                          setEdits(prev => { const n = { ...prev }; delete n[key]; return n })
-                          load()
-                        }}
-                      />
-                    </td>
-                    <td className="table-td text-xs text-right font-semibold text-wood-800">
-                      {total > 0 ? fmt$(indep) : <span className="text-wood-300">—</span>}
-                    </td>
-                    <td className="table-td text-xs text-right text-wood-500">
-                      {total > 0 ? fmt$(luro) : <span className="text-wood-300">—</span>}
-                    </td>
-                    <td className="table-td text-center">
-                      <button onClick={async () => { await saveField(key, 'paid_status', paid === 'SI' ? 'NO' : 'SI'); load() }}
-                        className={['badge cursor-pointer', paid === 'SI' ? 'badge-green' : 'badge-red'].join(' ')}>
-                        {paid === 'SI' ? 'SI' : 'NO'}
-                      </button>
-                    </td>
-                  </tr>
+                  <>
+                    <tr key={key} className={['table-tr', isEditing ? 'bg-amber-50/40' : ''].join(' ')}>
+                      <td className="table-td text-xs font-medium">
+                        <div className="flex items-center gap-2">
+                          <span>{m?.custom_name ?? key}</span>
+                          <button onClick={() => deleteCustomItem(key)} className="text-red-300 hover:text-red-500"><Trash2 size={11} /></button>
+                        </div>
+                      </td>
+                      <td className="table-td text-center">
+                        <span className={['text-xs font-bold px-2 py-0.5 rounded-full',
+                          rawPct === 100 ? 'bg-orange-100 text-orange-700' : 'bg-wood-100 text-wood-600'].join(' ')}>
+                          {rawPct}%
+                        </span>
+                      </td>
+                      <td className="table-td p-1">
+                        <input type="number" placeholder="0"
+                          className="input py-1 px-2 text-xs text-right w-36"
+                          value={edits[key]?.total_amount ?? (m?.total_amount != null ? String(m.total_amount) : '')}
+                          onChange={ev => setField(key, 'total_amount', ev.target.value)}
+                          onBlur={async ev => {
+                            const val = parseFloat(ev.target.value); if (isNaN(val)) return
+                            await saveField(key, 'total_amount', val)
+                            await saveField(key, 'indep_amount', autoIndep(key, val))
+                            setEdits(prev => { const n = { ...prev }; delete n[key]; return n })
+                            load()
+                          }}
+                        />
+                      </td>
+                      <td className="table-td text-xs text-right font-semibold text-wood-800">
+                        {total > 0 ? fmt$(indep) : <span className="text-wood-300">—</span>}
+                      </td>
+                      <td className="table-td text-xs text-right text-wood-500">
+                        {total > 0 ? fmt$(luro) : <span className="text-wood-300">—</span>}
+                      </td>
+                      <td className="table-td text-center">
+                        <button onClick={async () => { await saveField(key, 'paid_status', paid === 'SI' ? 'NO' : 'SI'); load() }}
+                          className={['badge cursor-pointer', paid === 'SI' ? 'badge-green' : 'badge-red'].join(' ')}>
+                          {paid === 'SI' ? 'SI' : 'NO'}
+                        </button>
+                      </td>
+                      <td className="table-td text-center p-1">
+                        <button onClick={() => openEdit(key)}
+                          className={['p-1 rounded transition-colors', isEditing ? 'text-amber-600 bg-amber-100' : 'text-wood-300 hover:text-wood-600'].join(' ')}>
+                          <Pencil size={13} />
+                        </button>
+                      </td>
+                    </tr>
+                    {isEditing && (
+                      <tr key={`${key}-edit`} className="bg-amber-50/40 border-b border-amber-100">
+                        <td colSpan={7} className="px-6 py-3">
+                          <div className="flex flex-wrap items-end gap-4">
+                            <div className="flex flex-col gap-1">
+                              <label className="text-[10px] text-wood-400 uppercase tracking-wide">Nombre del item</label>
+                              <input type="text"
+                                className="input py-1 px-2 text-xs w-44"
+                                value={editForm.name}
+                                onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <label className="text-[10px] text-wood-400 uppercase tracking-wide">% que paga Independencia</label>
+                              <div className="flex items-center gap-1">
+                                <input type="number" min="0" max="100"
+                                  className="input py-1 px-2 text-xs text-right w-20"
+                                  value={editForm.pct}
+                                  onChange={e => setEditForm(f => ({ ...f, pct: e.target.value }))}
+                                />
+                                <span className="text-xs text-wood-500">%</span>
+                              </div>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <label className="text-[10px] text-wood-400 uppercase tracking-wide">Nota / Detalle</label>
+                              <input type="text" placeholder="Opcional..."
+                                className="input py-1 px-2 text-xs w-52"
+                                value={editForm.detail}
+                                onChange={e => setEditForm(f => ({ ...f, detail: e.target.value }))}
+                              />
+                            </div>
+                            <div className="flex gap-2 ml-auto">
+                              <button onClick={() => applyEdit(key)} className="btn-primary text-xs py-1 px-3 flex items-center gap-1"><Check size={13} /> Guardar</button>
+                              <button onClick={() => setEditingKey(null)} className="btn-ghost text-xs py-1 px-3 flex items-center gap-1"><X size={13} /> Cancelar</button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 )
               })}
 
@@ -386,7 +509,7 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
                 <td className="table-td text-right">{fmt$(totalGeneral)}</td>
                 <td className="table-td text-right">{fmt$(totalIndep)}</td>
                 <td className="table-td text-right">{fmt$(totalLuro)}</td>
-                <td />
+                <td colSpan={2} />
               </tr>
             </tbody>
           </table>
