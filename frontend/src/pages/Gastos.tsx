@@ -51,21 +51,21 @@ export default function Gastos() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Gastos</h1>
-          <p className="text-wood-500 text-sm">Compartidos entre sucursales · Gastos Luro</p>
+          <p className="text-brand-muted text-sm">Compartidos entre sucursales · Gastos Luro</p>
         </div>
         <select value={month} onChange={e => setMonth(e.target.value)} className="input w-36 text-sm">
           {MONTHS.map(m => <option key={m}>{m}</option>)}
         </select>
       </div>
 
-      <div className="flex gap-2 border-b border-wood-100 pb-0">
+      <div className="flex gap-2 border-b border-brand-border pb-0">
         {(['compartidos', 'luro'] as Tab[]).map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={[
               'px-4 py-2 text-sm font-medium rounded-t-lg transition-colors',
               tabParam === t
-                ? 'bg-white border border-b-white border-wood-100 text-wood-900 -mb-px'
-                : 'text-wood-500 hover:text-wood-800',
+                ? 'bg-white border border-b-white border-brand-border text-brand-body -mb-px'
+                : 'text-brand-muted hover:text-brand-body',
             ].join(' ')}>
             {t === 'compartidos' ? 'Compartidos' : 'Gastos Luro'}
           </button>
@@ -191,7 +191,7 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
 
     return (
       <>
-        <tr key={key} className={['table-tr', isEditing ? 'bg-amber-50/40' : ''].join(' ')}>
+        <tr key={key} className={['table-tr', isEditing ? 'bg-coral/5' : ''].join(' ')}>
           {/* Concepto */}
           <td className="table-td text-xs font-medium">
             {isCustom ? (
@@ -208,7 +208,7 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
           <td className="table-td text-center">
             <span className={[
               'text-xs font-bold px-2 py-0.5 rounded-full',
-              rawPct === 100 ? 'bg-orange-100 text-orange-700' : 'bg-wood-100 text-wood-600',
+              rawPct === 100 ? 'bg-coral/20 text-coral-dark' : 'bg-brand-border text-brand-body',
             ].join(' ')}>
               {rawPct}%
             </span>
@@ -233,13 +233,13 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
           </td>
 
           {/* Independencia paga — read-only */}
-          <td className="table-td text-xs text-right font-semibold text-wood-800">
-            {total > 0 ? fmt$(indep) : <span className="text-wood-300">—</span>}
+          <td className="table-td text-xs text-right font-semibold text-brand-body">
+            {total > 0 ? fmt$(indep) : <span className="text-brand-muted">—</span>}
           </td>
 
           {/* Luro neto — read-only */}
-          <td className="table-td text-xs text-right text-wood-500">
-            {total > 0 ? fmt$(luro) : <span className="text-wood-300">—</span>}
+          <td className="table-td text-xs text-right text-brand-muted">
+            {total > 0 ? fmt$(luro) : <span className="text-brand-muted">—</span>}
           </td>
 
           {/* Pagado */}
@@ -258,7 +258,7 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
               title="Editar porcentaje y detalle"
               className={[
                 'p-1 rounded transition-colors',
-                isEditing ? 'text-amber-600 bg-amber-100' : 'text-wood-300 hover:text-wood-600',
+                isEditing ? 'text-coral bg-coral/10' : 'text-brand-muted hover:text-brand-body',
               ].join(' ')}>
               <Pencil size={13} />
             </button>
@@ -267,13 +267,13 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
 
         {/* Panel de edición inline */}
         {isEditing && (
-          <tr key={`${key}-edit`} className="bg-amber-50/60 border-b border-amber-100">
+          <tr key={`${key}-edit`} className="bg-coral/5 border-b border-brand-border">
             <td colSpan={7} className="px-6 py-4">
               <div className="flex flex-wrap items-end gap-4">
                 {/* Nombre (solo custom) */}
                 {isCustom && (
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] text-wood-400 uppercase tracking-wide font-semibold">Nombre del item</label>
+                    <label className="text-[10px] text-brand-muted uppercase tracking-wide font-semibold">Nombre del item</label>
                     <input type="text"
                       className="input py-1 px-2 text-xs w-44"
                       value={editForm.name}
@@ -283,19 +283,19 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
                 )}
                 {/* % Independencia */}
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] text-wood-400 uppercase tracking-wide font-semibold">% que paga Independencia</label>
+                  <label className="text-[10px] text-brand-muted uppercase tracking-wide font-semibold">% que paga Independencia</label>
                   <div className="flex items-center gap-1">
                     <input type="number" min="0" max="100"
                       className="input py-1 px-2 text-xs text-right w-20"
                       value={editForm.pct}
                       onChange={e => setEditForm(f => ({ ...f, pct: e.target.value }))}
                     />
-                    <span className="text-xs text-wood-500">%</span>
+                    <span className="text-xs text-brand-muted">%</span>
                   </div>
                 </div>
                 {/* Nota */}
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] text-wood-400 uppercase tracking-wide font-semibold">Nota / Detalle</label>
+                  <label className="text-[10px] text-brand-muted uppercase tracking-wide font-semibold">Nota / Detalle</label>
                   <input type="text" placeholder="Opcional..."
                     className="input py-1 px-2 text-xs w-56"
                     value={editForm.detail}
@@ -433,7 +433,7 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[700px]">
             <thead>
-              <tr className="bg-wood-700 text-white">
+              <tr className="bg-navy text-white">
                 <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-widest">Concepto</th>
                 <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-widest">
                   % Indep.
@@ -459,8 +459,8 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
               {/* Items fijos agrupados por categoría */}
               {categories.map(cat => (
                 <>
-                  <tr key={`cat-${cat}`} className="bg-wood-50/80">
-                    <td colSpan={7} className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-wood-400 border-t border-wood-100">
+                  <tr key={`cat-${cat}`} className="bg-brand-off-white">
+                    <td colSpan={7} className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-brand-muted border-t border-brand-border">
                       {cat}
                     </td>
                   </tr>
@@ -472,8 +472,8 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
 
               {/* Items personalizados */}
               {customItems.length > 0 && (
-                <tr key="cat-custom" className="bg-wood-50/80">
-                  <td colSpan={7} className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-wood-400 border-t border-wood-100">
+                <tr key="cat-custom" className="bg-brand-off-white">
+                  <td colSpan={7} className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-brand-muted border-t border-brand-border">
                     Personalizados
                   </td>
                 </tr>
@@ -483,7 +483,7 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
               )}
 
               {/* Fila de totales */}
-              <tr className="bg-wood-50 border-t-2 border-wood-200 font-bold text-xs">
+              <tr className="bg-brand-off-white border-t-2 border-brand-border font-bold text-xs">
                 <td className="table-td" colSpan={2}>TOTAL MES</td>
                 <td className="table-td text-right">{fmt$(totalGeneral)}</td>
                 <td className="table-td text-right">{fmt$(totalIndep)}</td>
@@ -499,7 +499,7 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
       {addingCustom ? (
         <div className="card p-3 flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] text-wood-400 uppercase tracking-wide">Nombre del item *</label>
+            <label className="text-[10px] text-brand-muted uppercase tracking-wide">Nombre del item *</label>
             <input type="text" placeholder="ej: Monotributo" autoFocus
               className="input py-1 px-2 text-xs w-48"
               value={customForm.name}
@@ -508,7 +508,7 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] text-wood-400 uppercase tracking-wide">Reparto</label>
+            <label className="text-[10px] text-brand-muted uppercase tracking-wide">Reparto</label>
             <select className="input py-1 px-2 text-xs w-36"
               value={customForm.split_type}
               onChange={e => setCustomForm(f => ({ ...f, split_type: e.target.value as SplitType }))}>
@@ -524,7 +524,7 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
         </div>
       ) : (
         <button onClick={() => setAddingCustom(true)}
-          className="flex items-center gap-1.5 text-xs text-wood-400 hover:text-wood-700 transition-colors">
+          className="flex items-center gap-1.5 text-xs text-brand-muted hover:text-brand-body transition-colors">
           <Plus size={13} /> Agregar item personalizado
         </button>
       )}
@@ -620,7 +620,7 @@ function GastosLuro({ month, year }: { month: string; year: number }) {
       <div className="card p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[600px]">
-            <thead className="bg-wood-50 border-b border-wood-100">
+            <thead className="bg-brand-off-white border-b border-brand-border">
               <tr>
                 <th className="table-th">Fecha</th>
                 <th className="table-th">Categoria</th>
@@ -636,10 +636,10 @@ function GastosLuro({ month, year }: { month: string; year: number }) {
                 <tr key={e.id} className="table-tr">
                   <td className="table-td text-xs">{e.expense_date ?? '—'}</td>
                   <td className="table-td text-xs">{e.category_name ?? '—'}</td>
-                  <td className="table-td text-xs text-wood-500">{e.subcategory_name ?? '—'}</td>
+                  <td className="table-td text-xs text-brand-muted">{e.subcategory_name ?? '—'}</td>
                   <td className="table-td text-xs">{e.detail ?? '—'}</td>
                   <td className="table-td text-xs text-right font-medium">{fmt$(parseFloat(e.amount))}</td>
-                  <td className="table-td text-xs text-wood-500">{e.payment_method ?? '—'}</td>
+                  <td className="table-td text-xs text-brand-muted">{e.payment_method ?? '—'}</td>
                   <td className="table-td p-1">
                     <button onClick={async () => { await api.delete(`/expenses/luro/${e.id}`); load() }}
                       className="text-red-400 hover:text-red-600 transition-colors p-1">
@@ -649,9 +649,9 @@ function GastosLuro({ month, year }: { month: string; year: number }) {
                 </tr>
               ))}
               {expenses.length === 0 && (
-                <tr><td colSpan={7} className="table-td text-center text-wood-400 py-10">No hay gastos para {month} {year}</td></tr>
+                <tr><td colSpan={7} className="table-td text-center text-brand-muted py-10">No hay gastos para {month} {year}</td></tr>
               )}
-              <tr className="bg-wood-50 border-t-2 border-wood-200">
+              <tr className="bg-brand-off-white border-t-2 border-brand-border">
                 <td colSpan={4} className="table-td font-bold text-xs">TOTAL MES</td>
                 <td className="table-td text-xs text-right font-bold">{fmt$(total)}</td>
                 <td colSpan={2} />
