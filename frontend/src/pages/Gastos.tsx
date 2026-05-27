@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Plus, Trash2, FileDown, Pencil, Check, X } from 'lucide-react'
+import { Plus, Trash2, FileDown, Pencil, Check, X, Settings } from 'lucide-react'
 import { api, fmt$, MONTHS, CURRENT_YEAR } from '../api'
 
 type Tab = 'compartidos' | 'luro'
@@ -533,36 +533,268 @@ const LURO_CATS: Record<string, string[]> = {
 }
 const MEDIOS_PAGO = ['Transferencia', 'Efectivo', 'Tarjeta', 'Cheque', 'Débito']
 
+// ── Colores por defecto para cada categoría ──────────────────────────────────
+const DEFAULT_CAT_COLORS: Record<string, string> = {
+  'Varios':            '#3b82f6',
+  'Gastos_Fijos':      '#8b5cf6',
+  'Sueldos':           '#22c55e',
+  'Proveedores':       '#f97316',
+  'Transporte':        '#06b6d4',
+  'Impuestos':         '#ef4444',
+  'Insumos':           '#eab308',
+  'Aguinaldo':         '#ec4899',
+  'Marketing_Digital': '#6366f1',
+  'Comision':          '#14b8a6',
+}
+
+// Paleta de colores disponibles en el selector
+const COLOR_PALETTE = [
+  '#3b82f6','#8b5cf6','#22c55e','#f97316','#06b6d4',
+  '#ef4444','#eab308','#ec4899','#6366f1','#14b8a6',
+  '#f59e0b','#84cc16','#0ea5e9','#a855f7','#C8603A','#64748b',
+]
+
+function hexToRgba(hex: string, alpha: number): string {
+  const h = hex.replace('#','')
+  const r = parseInt(h.slice(0,2), 16)
+  const g = parseInt(h.slice(2,4), 16)
+  const b = parseInt(h.slice(4,6), 16)
+  return `rgba(${r},${g},${b},${alpha})`
+}
+
+function CatBadge({ name, color }: { name: string; color: string }) {
+  return (
+    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap"
+      style={{ backgroundColor: hexToRgba(color, 0.13), color, border: `1px solid ${hexToRgba(color, 0.35)}` }}>
+      {name}
+    </span>
+  )
+}
+
 type LuroView = 'registro' | 'reporte'
 
 // ── GastosLuro ────────────────────────────────────────────────────────────────
 function GastosLuro({ month, year }: { month: string; year: number }) {
-  const [view, setView] = useState<LuroView>('registro')
+  const [view, setView]             = useState<LuroView>('registro')
+  const [showSettings, setShowSettings] = useState(false)
+
+  // Categorías y colores — persisten en localStorage
+  const [cats, setCats] = useState<Record<string, string[]>>(() => {
+    try { return JSON.parse(localStorage.getItem('luro_cats') ?? 'null') || LURO_CATS }
+    catch { return LURO_CATS }
+  })
+  const [colors, setColors] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem('luro_colors') ?? 'null') || DEFAULT_CAT_COLORS }
+    catch { return DEFAULT_CAT_COLORS }
+  })
+
+  const saveCats = (next: Record<string, string[]>) => {
+    setCats(next)
+    localStorage.setItem('luro_cats', JSON.stringify(next))
+  }
+  const saveColors = (next: Record<string, string>) => {
+    setColors(next)
+    localStorage.setItem('luro_colors', JSON.stringify(next))
+  }
 
   return (
     <div className="space-y-4">
-      {/* Sub-tabs */}
-      <div className="flex gap-2">
-        {(['registro', 'reporte'] as LuroView[]).map(v => (
-          <button key={v} onClick={() => setView(v)}
-            className={[
-              'px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors',
-              view === v ? 'bg-navy text-white' : 'bg-brand-off-white text-brand-muted hover:text-brand-body border border-brand-border',
-            ].join(' ')}>
-            {v === 'registro' ? 'Registro mensual' : 'Reporte anual'}
-          </button>
-        ))}
+      {/* Sub-tabs + tuerca */}
+      <div className="flex items-center justify-between">
+        <div className="flex gap-2">
+          {(['registro', 'reporte'] as LuroView[]).map(v => (
+            <button key={v} onClick={() => setView(v)}
+              className={[
+                'px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors',
+                view === v ? 'bg-navy text-white' : 'bg-brand-off-white text-brand-muted hover:text-brand-body border border-brand-border',
+              ].join(' ')}>
+              {v === 'registro' ? 'Registro mensual' : 'Reporte anual'}
+            </button>
+          ))}
+        </div>
+        <button onClick={() => setShowSettings(true)}
+          className="flex items-center gap-1.5 text-xs text-brand-muted hover:text-brand-body border border-brand-border rounded-lg px-3 py-1.5 transition-colors">
+          <Settings size={13} /> Categorías
+        </button>
       </div>
 
       {view === 'registro'
-        ? <LuroRegistro month={month} year={year} />
-        : <LuroReporte  year={year} />}
+        ? <LuroRegistro month={month} year={year} cats={cats} colors={colors} />
+        : <LuroReporte  year={year} cats={cats} colors={colors} />}
+
+      {/* Modal de configuración */}
+      {showSettings && (
+        <LuroCatSettings
+          cats={cats} colors={colors}
+          onSaveCats={saveCats} onSaveColors={saveColors}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── Modal de configuración de categorías ──────────────────────────────────────
+function LuroCatSettings({
+  cats, colors, onSaveCats, onSaveColors, onClose
+}: {
+  cats: Record<string, string[]>
+  colors: Record<string, string>
+  onSaveCats: (c: Record<string, string[]>) => void
+  onSaveColors: (c: Record<string, string>) => void
+  onClose: () => void
+}) {
+  const [localCats, setLocalCats]     = useState<Record<string, string[]>>({ ...cats })
+  const [localColors, setLocalColors] = useState<Record<string, string>>({ ...colors })
+  const [expanded, setExpanded]       = useState<string | null>(null)
+  const [newSub, setNewSub]           = useState('')
+  const [newCatName, setNewCatName]   = useState('')
+  const [colorPicker, setColorPicker] = useState<string | null>(null) // cat with open picker
+
+  const addSub = (cat: string) => {
+    const v = newSub.trim()
+    if (!v) return
+    const next = { ...localCats, [cat]: [...(localCats[cat] || []), v] }
+    setLocalCats(next)
+    setNewSub('')
+  }
+  const removeSub = (cat: string, sub: string) => {
+    setLocalCats({ ...localCats, [cat]: localCats[cat].filter(s => s !== sub) })
+  }
+  const addCat = () => {
+    const v = newCatName.trim()
+    if (!v || localCats[v]) return
+    setLocalCats({ ...localCats, [v]: [] })
+    setLocalColors({ ...localColors, [v]: COLOR_PALETTE[Object.keys(localCats).length % COLOR_PALETTE.length] })
+    setNewCatName('')
+    setExpanded(v)
+  }
+  const removeCat = (cat: string) => {
+    const next = { ...localCats }
+    delete next[cat]
+    setLocalCats(next)
+    if (expanded === cat) setExpanded(null)
+  }
+  const setColor = (cat: string, color: string) => {
+    setLocalColors({ ...localColors, [cat]: color })
+    setColorPicker(null)
+  }
+  const save = () => {
+    onSaveCats(localCats)
+    onSaveColors(localColors)
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(7,6,20,0.55)' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-brand-border">
+          <div>
+            <h3 className="font-bold text-brand-body text-base">Categorías y subcategorías</h3>
+            <p className="text-xs text-brand-muted mt-0.5">Los cambios se guardan localmente en este navegador</p>
+          </div>
+          <button onClick={onClose} className="text-brand-muted hover:text-brand-body p-1"><X size={18}/></button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
+          {Object.keys(localCats).map(cat => {
+            const color  = localColors[cat] || '#888'
+            const isOpen = expanded === cat
+            return (
+              <div key={cat} className="rounded-xl border border-brand-border overflow-hidden">
+                {/* Fila categoría */}
+                <div className="flex items-center gap-2 px-3 py-2.5 cursor-pointer hover:bg-brand-off-white/60"
+                  onClick={() => setExpanded(isOpen ? null : cat)}>
+                  {/* Color swatch + picker */}
+                  <div className="relative" onClick={e => e.stopPropagation()}>
+                    <button
+                      className="w-5 h-5 rounded-full border-2 border-white shadow-sm shrink-0"
+                      style={{ backgroundColor: color }}
+                      onClick={() => setColorPicker(colorPicker === cat ? null : cat)}
+                    />
+                    {colorPicker === cat && (
+                      <div className="absolute left-0 top-7 z-10 bg-white rounded-xl shadow-xl border border-brand-border p-2.5 grid grid-cols-8 gap-1.5"
+                        style={{ width: 188 }}>
+                        {COLOR_PALETTE.map(c => (
+                          <button key={c} onClick={() => setColor(cat, c)}
+                            className="w-5 h-5 rounded-full border-2 transition-transform hover:scale-110"
+                            style={{ backgroundColor: c, borderColor: localColors[cat] === c ? '#000' : 'transparent' }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <span className="flex-1 text-sm font-semibold text-brand-body">{cat}</span>
+                  <span className="text-[10px] text-brand-muted">{localCats[cat].length} subcat.</span>
+                  <button onClick={e => { e.stopPropagation(); removeCat(cat) }}
+                    className="text-red-300 hover:text-red-500 p-0.5 transition-colors ml-1">
+                    <Trash2 size={12}/>
+                  </button>
+                  <span className={['text-brand-muted transition-transform', isOpen ? 'rotate-90' : ''].join(' ')} style={{ fontSize: 12 }}>▶</span>
+                </div>
+
+                {/* Subcategorías (expandible) */}
+                {isOpen && (
+                  <div className="px-3 pb-3 pt-1 border-t border-brand-border/50 space-y-2">
+                    <div className="flex flex-wrap gap-1.5 min-h-[24px]">
+                      {localCats[cat].map(sub => (
+                        <span key={sub} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs"
+                          style={{ backgroundColor: hexToRgba(color, 0.12), color, border: `1px solid ${hexToRgba(color, 0.3)}` }}>
+                          {sub}
+                          <button onClick={() => removeSub(cat, sub)} className="hover:opacity-70 ml-0.5"><X size={10}/></button>
+                        </span>
+                      ))}
+                      {localCats[cat].length === 0 && (
+                        <span className="text-xs text-brand-muted italic">Sin subcategorías</span>
+                      )}
+                    </div>
+                    <div className="flex gap-1.5">
+                      <input className="input text-xs py-1 px-2 flex-1"
+                        placeholder="Nueva subcategoría..."
+                        value={newSub}
+                        onChange={e => setNewSub(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && addSub(cat)}
+                      />
+                      <button onClick={() => addSub(cat)}
+                        className="btn-primary text-xs py-1 px-2">
+                        <Plus size={12}/>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+
+          {/* Agregar categoría */}
+          <div className="flex gap-2 pt-1">
+            <input className="input text-xs py-1.5 px-2 flex-1" placeholder="Nueva categoría..."
+              value={newCatName}
+              onChange={e => setNewCatName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addCat()}
+            />
+            <button onClick={addCat} disabled={!newCatName.trim()}
+              className="btn-ghost text-xs py-1.5 px-3 flex items-center gap-1">
+              <Plus size={12}/> Agregar
+            </button>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-2 px-5 py-3 border-t border-brand-border">
+          <button onClick={onClose} className="btn-ghost text-sm">Cancelar</button>
+          <button onClick={save} className="btn-primary text-sm">Guardar cambios</button>
+        </div>
+      </div>
     </div>
   )
 }
 
 // ── LuroRegistro ──────────────────────────────────────────────────────────────
-function LuroRegistro({ month, year }: { month: string; year: number }) {
+function LuroRegistro({ month, year, cats, colors }: { month: string; year: number; cats: Record<string, string[]>; colors: Record<string, string> }) {
   const [expenses, setExpenses] = useState<any[]>([])
   const [adding, setAdding]     = useState(false)
   const [saving, setSaving]     = useState(false)
@@ -570,7 +802,7 @@ function LuroRegistro({ month, year }: { month: string; year: number }) {
   const EMPTY_FORM = { expense_date: '', categoria: '', subcategoria: '', detail: '', amount: '', payment_method: '', pagado: 'NO' }
   const [form, setForm]         = useState(EMPTY_FORM)
 
-  const subCats = form.categoria ? (LURO_CATS[form.categoria] ?? []) : []
+  const subCats = form.categoria ? (cats[form.categoria] ?? []) : []
 
   const load = useCallback(() => {
     api.get<any[]>(`/expenses/luro?month=${month}&year=${year}`).then(setExpenses)
@@ -646,7 +878,7 @@ function LuroRegistro({ month, year }: { month: string; year: number }) {
               <select className="input text-sm" value={form.categoria} required
                 onChange={e => setForm(f => ({ ...f, categoria: e.target.value, subcategoria: '' }))}>
                 <option value="">Seleccionar...</option>
-                {Object.keys(LURO_CATS).map(c => <option key={c}>{c}</option>)}
+                {Object.keys(cats).map(c => <option key={c}>{c}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1">
@@ -719,7 +951,11 @@ function LuroRegistro({ month, year }: { month: string; year: number }) {
                 {expenses.map(e => (
                   <tr key={e.id} className="table-tr">
                     <td className="table-td text-xs">{e.expense_date ?? '—'}</td>
-                    <td className="table-td text-xs font-medium">{e.categoria ?? '—'}</td>
+                    <td className="table-td text-xs">
+                      {e.categoria
+                        ? <CatBadge name={e.categoria} color={colors[e.categoria] || '#888'} />
+                        : <span className="text-brand-muted">—</span>}
+                    </td>
                     <td className="table-td text-xs text-brand-muted">{e.subcategoria ?? '—'}</td>
                     <td className="table-td text-xs">{e.detail ?? '—'}</td>
                     <td className="table-td text-xs text-right font-semibold">{fmt$(parseFloat(e.amount))}</td>
@@ -758,14 +994,20 @@ function LuroRegistro({ month, year }: { month: string; year: number }) {
       <div className="w-56 shrink-0 space-y-2">
         <p className="text-[10px] font-bold uppercase tracking-widest text-brand-muted px-1">Resumen {month}</p>
         <div className="card p-3 space-y-1.5">
-          {Object.keys(LURO_CATS).map(cat => (
+          {Object.keys(cats).map(cat => {
+            const color = colors[cat] || '#888'
+            return (
             <div key={cat} className="flex justify-between items-center gap-2">
-              <span className="text-xs text-brand-muted truncate">{cat}</span>
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                <span className="text-xs text-brand-muted truncate">{cat}</span>
+              </div>
               <span className={['text-xs font-bold tabular-nums', resumen[cat] ? 'text-brand-body' : 'text-brand-muted/40'].join(' ')}>
                 {resumen[cat] ? fmt$(resumen[cat]) : '—'}
               </span>
             </div>
-          ))}
+            )
+          })}
           <div className="border-t border-brand-border pt-1.5 mt-1 flex justify-between">
             <span className="text-xs font-bold text-brand-body">TOTAL</span>
             <span className="text-xs font-bold text-brand-body">{fmt$(totalMes)}</span>
@@ -777,7 +1019,7 @@ function LuroRegistro({ month, year }: { month: string; year: number }) {
 }
 
 // ── LuroReporte (anual) ───────────────────────────────────────────────────────
-function LuroReporte({ year }: { year: number }) {
+function LuroReporte({ year, cats: _cats, colors }: { year: number; cats: Record<string, string[]>; colors: Record<string, string> }) {
   const [rows, setRows] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const MESES = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE']
@@ -831,15 +1073,20 @@ function LuroReporte({ year }: { year: number }) {
               return (
                 <>
                   {/* Fila categoría (bold) */}
-                  <tr key={`cat-${cat}`} className="bg-brand-off-white border-t border-brand-border">
-                    <td className="px-3 py-2 font-bold text-brand-body sticky left-0 bg-brand-off-white">{cat}</td>
+                  <tr key={`cat-${cat}`} className="border-t border-brand-border"
+                    style={{ backgroundColor: hexToRgba(colors[cat] || '#888', 0.07) }}>
+                    <td className="px-3 py-2 font-bold sticky left-0"
+                      style={{ backgroundColor: hexToRgba(colors[cat] || '#888', 0.07) }}>
+                      <CatBadge name={cat} color={colors[cat] || '#888'} />
+                    </td>
                     {MESES.map(m => (
-                      <td key={m} className="px-2 py-2 text-right font-semibold text-brand-body">
+                      <td key={m} className="px-2 py-2 text-right font-semibold"
+                        style={{ color: catByMes[m] > 0 ? (colors[cat] || '#888') : undefined }}>
                         {catByMes[m] > 0 ? fmt$(catByMes[m]) : <span className="text-brand-muted/40">—</span>}
                       </td>
                     ))}
-                    <td className="px-3 py-2 text-right font-bold text-brand-body">{catTotal > 0 ? fmt$(catTotal) : '—'}</td>
-                    <td className="px-3 py-2 text-right font-bold text-coral">{pct}%</td>
+                    <td className="px-3 py-2 text-right font-bold" style={{ color: colors[cat] || '#888' }}>{catTotal > 0 ? fmt$(catTotal) : '—'}</td>
+                    <td className="px-3 py-2 text-right font-bold text-brand-muted">{pct}%</td>
                   </tr>
                   {/* Filas subcategorías */}
                   {subs.map((row: any) => (
