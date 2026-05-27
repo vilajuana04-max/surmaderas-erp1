@@ -6,3 +6,4 @@ from .expenses import router as expenses_router
 from .dashboard import router as dashboard_router
 from .employees import router as employees_router
 from .receipts import router as receipts_router
+from .cashflow import router as cashflow_router

@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingCart, Package,
-  Users, Receipt, Menu, X, ChevronDown,
+  Users, Receipt, Menu, X, ChevronDown, TrendingUp,
 } from 'lucide-react'
 
 const NAVY  = '#070614'
@@ -166,6 +166,17 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
             })}
           </div>
         )}
+
+        {/* ── Flujo de Caja ── */}
+        <NavLink
+          to="/flujocaja"
+          onClick={onClose}
+          className={({ isActive }) => navLinkClass(isActive)}
+          style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
+          <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>06</span>
+          <TrendingUp size={16} strokeWidth={2} />
+          <span className="tracking-[1px] uppercase text-[12px]">Flujo de Caja</span>
+        </NavLink>
       </nav>
 
       {/* Footer */}

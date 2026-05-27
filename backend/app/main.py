@@ -7,7 +7,7 @@ from app import models  # noqa: registers all ORM models
 from app.routers import (
     sales_router, purchases_router, payroll_router,
     vacations_router, expenses_router, dashboard_router, employees_router,
-    receipts_router,
+    receipts_router, cashflow_router,
 )
 
 Base.metadata.create_all(bind=engine)
@@ -55,6 +55,7 @@ app.include_router(expenses_router)
 app.include_router(dashboard_router)
 app.include_router(employees_router)
 app.include_router(receipts_router)
+app.include_router(cashflow_router)
 
 
 @app.get("/")
