@@ -257,111 +257,59 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
 
       <div className="card p-0 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px]">
+          <table className="w-full min-w-[500px]">
             <thead className="bg-wood-50 border-b border-wood-100">
               <tr>
                 <th className="table-th">Item</th>
-                <th className="table-th">Categoria</th>
-                <th className="table-th text-right">Total $</th>
-                <th className="table-th text-right">Indep. $</th>
-                <th className="table-th text-right">Luro $</th>
-                <th className="table-th">Vencimiento</th>
-                <th className="table-th">Detalle</th>
+                <th className="table-th text-right">Monto total $</th>
+                <th className="table-th text-right">Indep. paga $</th>
+                <th className="table-th text-right">Luro paga $</th>
                 <th className="table-th text-center">Pagado</th>
               </tr>
             </thead>
             <tbody>
+              {/* ── Items fijos ── */}
               {FIXED_ITEMS.map(item => {
                 const m     = merged(item.key)
                 const total = parseFloat(m?.total_amount) || 0
-                const indep = parseFloat(m?.indep_amount) || 0
+                const indep = total > 0
+                  ? (m?.indep_amount != null ? parseFloat(m.indep_amount) : autoIndep(item.key, total))
+                  : 0
                 const luro  = total - indep
                 const paid  = m?.paid_status ?? 'NO'
-
                 return (
                   <tr key={item.key} className="table-tr">
-                    {/* Item */}
-                    <td className="table-td text-xs font-medium">{item.name}</td>
-                    {/* Categoria */}
-                    <td className="table-td text-xs text-wood-400">{item.category}</td>
-                    {/* Total $ */}
+                    <td className="table-td text-xs font-medium">{item.name}
+                      {item.split === 'full' && <span className="ml-1 text-[10px] text-wood-400">(100% Indep.)</span>}
+                    </td>
+                    {/* Monto total — única columna editable */}
                     <td className="table-td p-1">
                       <input
                         type="number" placeholder="0"
-                        className="input py-1 px-2 text-xs text-right w-28"
+                        className="input py-1 px-2 text-xs text-right w-32"
                         value={edits[item.key]?.total_amount ?? (m?.total_amount != null ? String(m.total_amount) : '')}
-                        onChange={ev => {
-                          const val = ev.target.value
-                          const num = parseFloat(val)
-                          setEdits(prev => ({
-                            ...prev,
-                            [item.key]: {
-                              ...prev[item.key],
-                              total_amount: val,
-                              // auto-set indep unless user has already overridden it
-                              ...(prev[item.key]?.indep_amount === undefined && !isNaN(num)
-                                ? { indep_amount: String(autoIndep(item.key, num)) }
-                                : {}),
-                            },
-                          }))
-                        }}
+                        onChange={ev => setField(item.key, 'total_amount', ev.target.value)}
                         onBlur={async ev => {
                           const val = parseFloat(ev.target.value)
                           if (isNaN(val)) return
-                          const indepVal = parseFloat(edits[item.key]?.indep_amount) ?? autoIndep(item.key, val)
                           await saveField(item.key, 'total_amount', val)
-                          await saveField(item.key, 'indep_amount', isNaN(indepVal) ? autoIndep(item.key, val) : indepVal)
+                          await saveField(item.key, 'indep_amount', autoIndep(item.key, val))
                           setEdits(prev => { const n = { ...prev }; delete n[item.key]; return n })
                         }}
                       />
                     </td>
-                    {/* Indep. $ — editable, auto-filled based on split */}
-                    <td className="table-td p-1">
-                      <input
-                        type="number" placeholder="auto"
-                        className="input py-1 px-2 text-xs text-right w-28"
-                        value={edits[item.key]?.indep_amount ?? (m?.indep_amount != null ? String(m.indep_amount) : '')}
-                        onChange={ev => setField(item.key, 'indep_amount', ev.target.value)}
-                        onBlur={async ev => {
-                          const val = parseFloat(ev.target.value)
-                          if (isNaN(val)) return
-                          await saveField(item.key, 'indep_amount', val)
-                          setEdits(prev => { const n = { ...prev }; delete n[item.key]?.indep_amount; return n })
-                        }}
-                      />
+                    {/* Indep. — solo lectura, calculado */}
+                    <td className="table-td text-xs text-right text-wood-700 font-medium">
+                      {total > 0 ? fmt$(indep) : <span className="text-wood-300">—</span>}
                     </td>
-                    {/* Luro $ — computed */}
-                    <td className="table-td text-xs text-right font-medium text-wood-600">
-                      {total > 0 ? fmt$(luro) : '—'}
-                    </td>
-                    {/* Vencimiento */}
-                    <td className="table-td p-1">
-                      <input
-                        type="date"
-                        className="input py-1 px-2 text-xs w-32"
-                        value={edits[item.key]?.due_date ?? (m?.due_date ?? '')}
-                        onChange={ev => setField(item.key, 'due_date', ev.target.value)}
-                        onBlur={ev => saveField(item.key, 'due_date', ev.target.value || null)}
-                      />
-                    </td>
-                    {/* Detalle */}
-                    <td className="table-td p-1">
-                      <input
-                        type="text" placeholder="—"
-                        className="input py-1 px-2 text-xs w-32"
-                        value={edits[item.key]?.detail ?? (m?.detail ?? '')}
-                        onChange={ev => setField(item.key, 'detail', ev.target.value)}
-                        onBlur={ev => saveField(item.key, 'detail', ev.target.value || null)}
-                      />
+                    {/* Luro — solo lectura, calculado */}
+                    <td className="table-td text-xs text-right text-wood-500">
+                      {total > 0 ? fmt$(luro) : <span className="text-wood-300">—</span>}
                     </td>
                     {/* Pagado */}
                     <td className="table-td text-center">
                       <button
-                        onClick={async () => {
-                          const np = paid === 'SI' ? 'NO' : 'SI'
-                          await saveField(item.key, 'paid_status', np)
-                          load()
-                        }}
+                        onClick={async () => { await saveField(item.key, 'paid_status', paid === 'SI' ? 'NO' : 'SI'); load() }}
                         className={['badge cursor-pointer', paid === 'SI' ? 'badge-green' : 'badge-red'].join(' ')}>
                         {paid === 'SI' ? 'SI' : 'NO'}
                       </button>
@@ -369,110 +317,63 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
                   </tr>
                 )
               })}
-              {/* Custom items */}
+
+              {/* ── Items custom ── */}
               {customItems.map((row: any) => {
                 const key   = row.item_key
                 const m     = merged(key)
                 const total = parseFloat(m?.total_amount) || 0
-                const indep = parseFloat(m?.indep_amount) || 0
+                const indep = total > 0
+                  ? (m?.indep_amount != null ? parseFloat(m.indep_amount) : autoIndep(key, total))
+                  : 0
                 const luro  = total - indep
                 const paid  = m?.paid_status ?? 'NO'
                 return (
-                  <tr key={key} className="table-tr bg-amber-50/30">
-                    {/* Item name — editable for custom */}
-                    <td className="table-td p-1" colSpan={1}>
-                      <input type="text"
-                        className="input py-1 px-2 text-xs w-full font-medium"
-                        value={edits[key]?.custom_name ?? (m?.custom_name ?? '')}
-                        onChange={ev => setField(key, 'custom_name', ev.target.value)}
-                        onBlur={ev => saveField(key, 'custom_name', ev.target.value)}
-                      />
+                  <tr key={key} className="table-tr">
+                    <td className="table-td text-xs font-medium">
+                      <div className="flex items-center gap-2">
+                        <span>{m?.custom_name ?? key}</span>
+                        <span className="text-[10px] text-wood-400">
+                          {(m?.split_type ?? 'half') === 'half' ? '(mitad)' : '(100% Indep.)'}
+                        </span>
+                        <button onClick={() => deleteCustomItem(key)} className="text-red-300 hover:text-red-500 ml-auto"><Trash2 size={11} /></button>
+                      </div>
                     </td>
-                    {/* Split type */}
-                    <td className="table-td p-1">
-                      <select
-                        className="input py-1 px-2 text-xs w-24"
-                        value={edits[key]?.split_type ?? (m?.split_type ?? 'half')}
-                        onChange={async ev => {
-                          setField(key, 'split_type', ev.target.value)
-                          await saveField(key, 'split_type', ev.target.value)
-                        }}>
-                        <option value="half">Mitad</option>
-                        <option value="full">Total Indep.</option>
-                      </select>
-                    </td>
-                    {/* Total $ */}
                     <td className="table-td p-1">
                       <input type="number" placeholder="0"
-                        className="input py-1 px-2 text-xs text-right w-28"
+                        className="input py-1 px-2 text-xs text-right w-32"
                         value={edits[key]?.total_amount ?? (m?.total_amount != null ? String(m.total_amount) : '')}
-                        onChange={ev => {
-                          const val = ev.target.value; const num = parseFloat(val)
-                          setEdits(prev => ({ ...prev, [key]: { ...prev[key], total_amount: val,
-                            ...(prev[key]?.indep_amount === undefined && !isNaN(num) ? { indep_amount: String(autoIndep(key, num)) } : {}) } }))
-                        }}
+                        onChange={ev => setField(key, 'total_amount', ev.target.value)}
                         onBlur={async ev => {
                           const val = parseFloat(ev.target.value); if (isNaN(val)) return
-                          const indepVal = parseFloat(edits[key]?.indep_amount) ?? autoIndep(key, val)
                           await saveField(key, 'total_amount', val)
-                          await saveField(key, 'indep_amount', isNaN(indepVal) ? autoIndep(key, val) : indepVal)
+                          await saveField(key, 'indep_amount', autoIndep(key, val))
                           setEdits(prev => { const n = { ...prev }; delete n[key]; return n })
                         }}
                       />
                     </td>
-                    {/* Indep. $ */}
-                    <td className="table-td p-1">
-                      <input type="number" placeholder="auto"
-                        className="input py-1 px-2 text-xs text-right w-28"
-                        value={edits[key]?.indep_amount ?? (m?.indep_amount != null ? String(m.indep_amount) : '')}
-                        onChange={ev => setField(key, 'indep_amount', ev.target.value)}
-                        onBlur={async ev => {
-                          const val = parseFloat(ev.target.value); if (isNaN(val)) return
-                          await saveField(key, 'indep_amount', val)
-                          setEdits(prev => { const n = { ...prev }; delete n[key]?.indep_amount; return n })
-                        }}
-                      />
+                    <td className="table-td text-xs text-right text-wood-700 font-medium">
+                      {total > 0 ? fmt$(indep) : <span className="text-wood-300">—</span>}
                     </td>
-                    {/* Luro $ */}
-                    <td className="table-td text-xs text-right font-medium text-wood-600">
-                      {total > 0 ? fmt$(luro) : '—'}
+                    <td className="table-td text-xs text-right text-wood-500">
+                      {total > 0 ? fmt$(luro) : <span className="text-wood-300">—</span>}
                     </td>
-                    {/* Vencimiento */}
-                    <td className="table-td p-1">
-                      <input type="date" className="input py-1 px-2 text-xs w-32"
-                        value={edits[key]?.due_date ?? (m?.due_date ?? '')}
-                        onChange={ev => setField(key, 'due_date', ev.target.value)}
-                        onBlur={ev => saveField(key, 'due_date', ev.target.value || null)}
-                      />
-                    </td>
-                    {/* Detalle */}
-                    <td className="table-td p-1">
-                      <input type="text" placeholder="—" className="input py-1 px-2 text-xs w-32"
-                        value={edits[key]?.detail ?? (m?.detail ?? '')}
-                        onChange={ev => setField(key, 'detail', ev.target.value)}
-                        onBlur={ev => saveField(key, 'detail', ev.target.value || null)}
-                      />
-                    </td>
-                    {/* Pagado + delete */}
                     <td className="table-td text-center">
-                      <div className="flex items-center gap-1 justify-center">
-                        <button onClick={async () => { await saveField(key, 'paid_status', paid === 'SI' ? 'NO' : 'SI'); load() }}
-                          className={['badge cursor-pointer', paid === 'SI' ? 'badge-green' : 'badge-red'].join(' ')}>
-                          {paid === 'SI' ? 'SI' : 'NO'}
-                        </button>
-                        <button onClick={() => deleteCustomItem(key)} className="text-red-300 hover:text-red-500 ml-1"><Trash2 size={12} /></button>
-                      </div>
+                      <button onClick={async () => { await saveField(key, 'paid_status', paid === 'SI' ? 'NO' : 'SI'); load() }}
+                        className={['badge cursor-pointer', paid === 'SI' ? 'badge-green' : 'badge-red'].join(' ')}>
+                        {paid === 'SI' ? 'SI' : 'NO'}
+                      </button>
                     </td>
                   </tr>
                 )
               })}
 
               <tr className="bg-wood-50 border-t-2 border-wood-200">
-                <td colSpan={2} className="table-td font-bold text-xs">TOTAL MES</td>
+                <td className="table-td font-bold text-xs">TOTAL MES</td>
                 <td className="table-td text-xs text-right font-bold">{fmt$(totalGeneral)}</td>
                 <td className="table-td text-xs text-right font-bold">{fmt$(totalIndep)}</td>
                 <td className="table-td text-xs text-right font-bold">{fmt$(totalLuro)}</td>
-                <td colSpan={3} />
+                <td />
               </tr>
             </tbody>
           </table>
