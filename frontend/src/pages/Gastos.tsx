@@ -149,13 +149,19 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
     setDbData(prev => { const n = { ...prev }; delete n[key]; return n })
   }
 
+  // Calcula el monto que paga Independencia para un item,
+  // usando el valor guardado en DB si existe, o el auto-calculado si no
+  const getIndep = (key: string) => {
+    const m = merged(key)
+    const total = parseFloat(m?.total_amount) || 0
+    if (total === 0) return 0
+    return m?.indep_amount != null ? parseFloat(m.indep_amount) : autoIndep(key, total)
+  }
+
   // All keys to sum (fixed + custom)
-  const allKeys = [
-    ...FIXED_ITEMS.map(i => i.key),
-    ...customItems.map((r: any) => r.item_key),
-  ]
+  const allKeys      = [...FIXED_ITEMS.map(i => i.key), ...customItems.map((r: any) => r.item_key)]
   const totalGeneral = allKeys.reduce((a, k) => a + (parseFloat(merged(k)?.total_amount) || 0), 0)
-  const totalIndep   = allKeys.reduce((a, k) => a + (parseFloat(merged(k)?.indep_amount) || 0), 0)
+  const totalIndep   = allKeys.reduce((a, k) => a + getIndep(k), 0)
   const totalLuro    = totalGeneral - totalIndep
 
   const exportPDF = () => {
@@ -257,13 +263,14 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
 
       <div className="card p-0 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[500px]">
+          <table className="w-full min-w-[580px]">
             <thead className="bg-wood-50 border-b border-wood-100">
               <tr>
-                <th className="table-th">Item</th>
-                <th className="table-th text-right">Monto total $</th>
-                <th className="table-th text-right">Indep. paga $</th>
-                <th className="table-th text-right">Luro paga $</th>
+                <th className="table-th">Concepto</th>
+                <th className="table-th text-center">% Indep.</th>
+                <th className="table-th text-right">Monto total $<br/><span className="font-normal text-wood-400 text-[10px] normal-case">lo que paga Luro</span></th>
+                <th className="table-th text-right">Independencia paga $<br/><span className="font-normal text-wood-400 text-[10px] normal-case">lo que debe reintegrar</span></th>
+                <th className="table-th text-right">Luro neto $<br/><span className="font-normal text-wood-400 text-[10px] normal-case">queda a cargo de Luro</span></th>
                 <th className="table-th text-center">Pagado</th>
               </tr>
             </thead>
@@ -272,21 +279,25 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
               {FIXED_ITEMS.map(item => {
                 const m     = merged(item.key)
                 const total = parseFloat(m?.total_amount) || 0
-                const indep = total > 0
-                  ? (m?.indep_amount != null ? parseFloat(m.indep_amount) : autoIndep(item.key, total))
-                  : 0
+                const indep = getIndep(item.key)
                 const luro  = total - indep
                 const paid  = m?.paid_status ?? 'NO'
+                const pct   = item.split === 'full' ? '100%' : '50%'
                 return (
                   <tr key={item.key} className="table-tr">
-                    <td className="table-td text-xs font-medium">{item.name}
-                      {item.split === 'full' && <span className="ml-1 text-[10px] text-wood-400">(100% Indep.)</span>}
+                    <td className="table-td text-xs font-medium">{item.name}</td>
+                    <td className="table-td text-center">
+                      <span className={[
+                        'text-xs font-bold px-2 py-0.5 rounded-full',
+                        item.split === 'full'
+                          ? 'bg-orange-100 text-orange-700'
+                          : 'bg-wood-100 text-wood-600',
+                      ].join(' ')}>{pct}</span>
                     </td>
-                    {/* Monto total — única columna editable */}
                     <td className="table-td p-1">
                       <input
                         type="number" placeholder="0"
-                        className="input py-1 px-2 text-xs text-right w-32"
+                        className="input py-1 px-2 text-xs text-right w-36"
                         value={edits[item.key]?.total_amount ?? (m?.total_amount != null ? String(m.total_amount) : '')}
                         onChange={ev => setField(item.key, 'total_amount', ev.target.value)}
                         onBlur={async ev => {
@@ -295,18 +306,16 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
                           await saveField(item.key, 'total_amount', val)
                           await saveField(item.key, 'indep_amount', autoIndep(item.key, val))
                           setEdits(prev => { const n = { ...prev }; delete n[item.key]; return n })
+                          load()
                         }}
                       />
                     </td>
-                    {/* Indep. — solo lectura, calculado */}
-                    <td className="table-td text-xs text-right text-wood-700 font-medium">
+                    <td className="table-td text-xs text-right font-semibold text-wood-800">
                       {total > 0 ? fmt$(indep) : <span className="text-wood-300">—</span>}
                     </td>
-                    {/* Luro — solo lectura, calculado */}
                     <td className="table-td text-xs text-right text-wood-500">
                       {total > 0 ? fmt$(luro) : <span className="text-wood-300">—</span>}
                     </td>
-                    {/* Pagado */}
                     <td className="table-td text-center">
                       <button
                         onClick={async () => { await saveField(item.key, 'paid_status', paid === 'SI' ? 'NO' : 'SI'); load() }}
@@ -320,28 +329,31 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
 
               {/* ── Items custom ── */}
               {customItems.map((row: any) => {
-                const key   = row.item_key
-                const m     = merged(key)
-                const total = parseFloat(m?.total_amount) || 0
-                const indep = total > 0
-                  ? (m?.indep_amount != null ? parseFloat(m.indep_amount) : autoIndep(key, total))
-                  : 0
-                const luro  = total - indep
-                const paid  = m?.paid_status ?? 'NO'
+                const key    = row.item_key
+                const m      = merged(key)
+                const total  = parseFloat(m?.total_amount) || 0
+                const indep  = getIndep(key)
+                const luro   = total - indep
+                const paid   = m?.paid_status ?? 'NO'
+                const split  = m?.split_type ?? 'half'
+                const pct    = split === 'full' ? '100%' : '50%'
                 return (
                   <tr key={key} className="table-tr">
                     <td className="table-td text-xs font-medium">
                       <div className="flex items-center gap-2">
                         <span>{m?.custom_name ?? key}</span>
-                        <span className="text-[10px] text-wood-400">
-                          {(m?.split_type ?? 'half') === 'half' ? '(mitad)' : '(100% Indep.)'}
-                        </span>
-                        <button onClick={() => deleteCustomItem(key)} className="text-red-300 hover:text-red-500 ml-auto"><Trash2 size={11} /></button>
+                        <button onClick={() => deleteCustomItem(key)} className="text-red-300 hover:text-red-500"><Trash2 size={11} /></button>
                       </div>
+                    </td>
+                    <td className="table-td text-center">
+                      <span className={[
+                        'text-xs font-bold px-2 py-0.5 rounded-full',
+                        split === 'full' ? 'bg-orange-100 text-orange-700' : 'bg-wood-100 text-wood-600',
+                      ].join(' ')}>{pct}</span>
                     </td>
                     <td className="table-td p-1">
                       <input type="number" placeholder="0"
-                        className="input py-1 px-2 text-xs text-right w-32"
+                        className="input py-1 px-2 text-xs text-right w-36"
                         value={edits[key]?.total_amount ?? (m?.total_amount != null ? String(m.total_amount) : '')}
                         onChange={ev => setField(key, 'total_amount', ev.target.value)}
                         onBlur={async ev => {
@@ -349,10 +361,11 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
                           await saveField(key, 'total_amount', val)
                           await saveField(key, 'indep_amount', autoIndep(key, val))
                           setEdits(prev => { const n = { ...prev }; delete n[key]; return n })
+                          load()
                         }}
                       />
                     </td>
-                    <td className="table-td text-xs text-right text-wood-700 font-medium">
+                    <td className="table-td text-xs text-right font-semibold text-wood-800">
                       {total > 0 ? fmt$(indep) : <span className="text-wood-300">—</span>}
                     </td>
                     <td className="table-td text-xs text-right text-wood-500">
@@ -368,11 +381,11 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
                 )
               })}
 
-              <tr className="bg-wood-50 border-t-2 border-wood-200">
-                <td className="table-td font-bold text-xs">TOTAL MES</td>
-                <td className="table-td text-xs text-right font-bold">{fmt$(totalGeneral)}</td>
-                <td className="table-td text-xs text-right font-bold">{fmt$(totalIndep)}</td>
-                <td className="table-td text-xs text-right font-bold">{fmt$(totalLuro)}</td>
+              <tr className="bg-wood-50 border-t-2 border-wood-200 font-bold text-xs">
+                <td className="table-td" colSpan={2}>TOTAL MES</td>
+                <td className="table-td text-right">{fmt$(totalGeneral)}</td>
+                <td className="table-td text-right">{fmt$(totalIndep)}</td>
+                <td className="table-td text-right">{fmt$(totalLuro)}</td>
                 <td />
               </tr>
             </tbody>
