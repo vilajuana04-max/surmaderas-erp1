@@ -13,22 +13,29 @@ if not DATABASE_URL:
 
 engine = create_engine(DATABASE_URL)
 
-SQL = """
-CREATE TABLE IF NOT EXISTS gastos_compartidos (
-    id           SERIAL PRIMARY KEY,
-    year         INTEGER      NOT NULL,
-    month        VARCHAR(20)  NOT NULL,
-    item_key     VARCHAR(100) NOT NULL,
-    total_amount NUMERIC(15,2),
-    indep_amount NUMERIC(15,2),
-    due_date     DATE,
-    detail       TEXT,
-    paid_status  VARCHAR(20) DEFAULT 'NO',
-    CONSTRAINT uq_gasto_compartido UNIQUE (year, month, item_key)
-);
-"""
+SQL = [
+    """
+    CREATE TABLE IF NOT EXISTS gastos_compartidos (
+        id           SERIAL PRIMARY KEY,
+        year         INTEGER      NOT NULL,
+        month        VARCHAR(20)  NOT NULL,
+        item_key     VARCHAR(100) NOT NULL,
+        total_amount NUMERIC(15,2),
+        indep_amount NUMERIC(15,2),
+        due_date     DATE,
+        detail       TEXT,
+        paid_status  VARCHAR(20) DEFAULT 'NO',
+        custom_name  VARCHAR(150),
+        split_type   VARCHAR(10)  DEFAULT 'half',
+        CONSTRAINT uq_gasto_compartido UNIQUE (year, month, item_key)
+    );
+    """,
+    "ALTER TABLE gastos_compartidos ADD COLUMN IF NOT EXISTS custom_name VARCHAR(150);",
+    "ALTER TABLE gastos_compartidos ADD COLUMN IF NOT EXISTS split_type VARCHAR(10) DEFAULT 'half';",
+]
 
 with engine.connect() as conn:
-    conn.execute(text(SQL))
+    for stmt in SQL:
+        conn.execute(text(stmt))
     conn.commit()
     print("OK — tabla gastos_compartidos lista.")

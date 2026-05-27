@@ -299,7 +299,7 @@ def _enrich_luro(e: LuroExpense) -> dict:
 
 @router.get("/compartidos/{year}/{month}")
 def get_compartidos(year: int, month: str, db: Session = Depends(get_db)):
-    """Retorna dict {item_key: {total_amount, indep_amount, due_date, detail, paid_status}}."""
+    """Retorna dict {item_key: row_data}. Incluye items fijos y custom."""
     rows = db.query(GastoCompartido).filter(
         GastoCompartido.year  == year,
         GastoCompartido.month == month.upper()
@@ -307,13 +307,27 @@ def get_compartidos(year: int, month: str, db: Session = Depends(get_db)):
     return {r.item_key: _enrich_compartido(r) for r in rows}
 
 
+@router.post("/compartidos/{year}/{month}/custom", status_code=201)
+def add_custom_compartido(year: int, month: str, data: dict, db: Session = Depends(get_db)):
+    """Crea un item personalizado para el mes. data: {name, split_type}."""
+    import uuid
+    key = f"custom_{uuid.uuid4().hex[:8]}"
+    row = GastoCompartido(
+        year        = year,
+        month       = month.upper(),
+        item_key    = key,
+        custom_name = data.get("name", "Item personalizado"),
+        split_type  = data.get("split_type", "half"),
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return _enrich_compartido(row)
+
+
 @router.put("/compartidos/{year}/{month}/{item_key}")
-def upsert_compartido(
-    year: int, month: str, item_key: str,
-    data: dict,
-    db: Session = Depends(get_db)
-):
-    """Upsert de un item por clave. Acepta total_amount, indep_amount, due_date, detail, paid_status."""
+def upsert_compartido(year: int, month: str, item_key: str, data: dict, db: Session = Depends(get_db)):
+    """Upsert de un item. Acepta total_amount, indep_amount, due_date, detail, paid_status."""
     row = db.query(GastoCompartido).filter(
         GastoCompartido.year     == year,
         GastoCompartido.month    == month.upper(),
@@ -324,20 +338,29 @@ def upsert_compartido(
         row = GastoCompartido(year=year, month=month.upper(), item_key=item_key)
         db.add(row)
 
-    if "total_amount" in data:
-        row.total_amount = data["total_amount"]
-    if "indep_amount" in data:
-        row.indep_amount = data["indep_amount"]
-    if "due_date" in data:
-        row.due_date = data["due_date"] or None
-    if "detail" in data:
-        row.detail = data["detail"] or None
-    if "paid_status" in data:
-        row.paid_status = data["paid_status"]
+    for field in ("total_amount", "indep_amount", "due_date", "detail", "paid_status", "custom_name", "split_type"):
+        if field in data:
+            setattr(row, field, data[field] if data[field] != "" else None)
 
     db.commit()
     db.refresh(row)
     return _enrich_compartido(row)
+
+
+@router.delete("/compartidos/{year}/{month}/{item_key}", status_code=204)
+def delete_custom_compartido(year: int, month: str, item_key: str, db: Session = Depends(get_db)):
+    """Solo permite borrar items custom (item_key empieza con 'custom_')."""
+    if not item_key.startswith("custom_"):
+        from fastapi import HTTPException
+        raise HTTPException(400, "Solo se pueden eliminar items personalizados")
+    row = db.query(GastoCompartido).filter(
+        GastoCompartido.year     == year,
+        GastoCompartido.month    == month.upper(),
+        GastoCompartido.item_key == item_key
+    ).first()
+    if row:
+        db.delete(row)
+        db.commit()
 
 
 def _enrich_compartido(r: GastoCompartido) -> dict:
@@ -348,4 +371,6 @@ def _enrich_compartido(r: GastoCompartido) -> dict:
         "due_date":     str(r.due_date) if r.due_date else None,
         "detail":       r.detail,
         "paid_status":  r.paid_status or "NO",
+        "custom_name":  r.custom_name,
+        "split_type":   r.split_type or "half",
     }

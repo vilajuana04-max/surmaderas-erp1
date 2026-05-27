@@ -63,6 +63,8 @@ class GastoCompartido(Base):
     """
     Tabla simple para gastos compartidos entre sucursales.
     Keyed por (year, month, item_key). Sin catálogo externo.
+    Items fijos: item_key coincide con slug definido en el frontend.
+    Items custom: item_key = 'custom_XXXX', custom_name = nombre del item.
     """
     __tablename__ = "gastos_compartidos"
     __table_args__ = (UniqueConstraint("year", "month", "item_key", name="uq_gasto_compartido"),)
@@ -70,9 +72,11 @@ class GastoCompartido(Base):
     id           = Column(Integer, primary_key=True)
     year         = Column(Integer,      nullable=False)
     month        = Column(String(20),   nullable=False)
-    item_key     = Column(String(100),  nullable=False)   # slug del item, ej: 'luz', 'gas'
+    item_key     = Column(String(100),  nullable=False)
     total_amount = Column(Numeric(15, 2))
-    indep_amount = Column(Numeric(15, 2))                 # cuánto paga Independencia
+    indep_amount = Column(Numeric(15, 2))
     due_date     = Column(Date)
     detail       = Column(Text)
     paid_status  = Column(String(20), default="NO")
+    custom_name  = Column(String(150))                    # solo para items custom
+    split_type   = Column(String(10),  default="half")    # 'half' | 'full'

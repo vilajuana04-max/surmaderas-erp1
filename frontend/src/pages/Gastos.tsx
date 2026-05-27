@@ -5,27 +5,34 @@ import { api, fmt$, MONTHS, CURRENT_YEAR } from '../api'
 
 type Tab = 'compartidos' | 'luro'
 
-// ── Items fijos — editar aquí para agregar/quitar filas ──────────────────────
+// ── Items fijos — editar aquí para agregar/quitar filas permanentes ──────────
 // split: 'half'  → Indep paga el 50%  (se auto-calcula al ingresar Total)
 // split: 'full'  → Indep paga el 100% (ítem exclusivo de Independencia)
 type SplitType = 'half' | 'full'
 const FIXED_ITEMS: { key: string; name: string; category: string; split: SplitType }[] = [
-  { key: 'luz',        name: 'Luz / Energía Eléctrica',    category: 'Servicios',              split: 'half' },
-  { key: 'gas',        name: 'Gas',                        category: 'Servicios',              split: 'half' },
-  { key: 'agua',       name: 'Agua',                       category: 'Servicios',              split: 'half' },
-  { key: 'internet',   name: 'Internet',                   category: 'Servicios',              split: 'half' },
-  { key: 'telefono',   name: 'Teléfono',                   category: 'Servicios',              split: 'half' },
-  { key: 'alarma',     name: 'Alarma',                     category: 'Seguridad',              split: 'half' },
-  { key: 'seguro',     name: 'Seguro',                     category: 'Seguridad',              split: 'half' },
-  { key: 'expensas',   name: 'Expensas',                   category: 'Edificio',               split: 'half' },
-  { key: 'alquiler',   name: 'Alquiler',                   category: 'Edificio',               split: 'half' },
-  { key: 'contador',   name: 'Contador / Estudio Contable',category: 'Administración',         split: 'half' },
-  { key: 'inacap',     name: 'INACAP',                     category: 'Gestión de empleados',   split: 'half' },
-  { key: 'avila',      name: 'Sueldo Avila Alejandro',     category: 'Personal Independencia', split: 'full' },
-  { key: 'salinas',    name: 'Sueldo Salinas Adrian',      category: 'Personal Independencia', split: 'full' },
-  { key: 'ponasso',    name: 'Sueldo Ponasso Martin',      category: 'Personal Independencia', split: 'full' },
-  { key: 'limpieza',   name: 'Limpieza',                   category: 'Varios',                 split: 'half' },
-  { key: 'otros',      name: 'Otros',                      category: 'Varios',                 split: 'half' },
+  // Impuestos y cargas sociales
+  { key: 'f931',       name: 'Formulario 931',               category: 'Impuestos',       split: 'half' },
+  { key: 'iva',        name: 'IVA',                          category: 'Impuestos',       split: 'half' },
+  { key: 'autonomo',   name: 'Autónomo',                     category: 'Impuestos',       split: 'half' },
+  { key: 'iibb',       name: 'Ingresos Brutos',              category: 'Impuestos',       split: 'half' },
+  { key: 'tsh',        name: 'Tasa de Seguridad e Higiene',  category: 'Impuestos',       split: 'half' },
+  // Sindicatos y obras sociales
+  { key: 'sec',        name: 'SEC',                          category: 'Sindicatos',      split: 'half' },
+  { key: 'faecys',     name: 'FAECYS',                       category: 'Sindicatos',      split: 'half' },
+  { key: 'osecac',     name: 'OSECAC',                       category: 'Sindicatos',      split: 'half' },
+  { key: 'usimra',     name: 'USIMRA',                       category: 'Sindicatos',      split: 'half' },
+  // Administración y servicios
+  { key: 'inacap',     name: 'INACAP',                       category: 'Administración',  split: 'half' },
+  { key: 'contador',   name: 'Contador',                     category: 'Administración',  split: 'half' },
+  { key: 'hosting',    name: 'Hosting web',                  category: 'Administración',  split: 'half' },
+  { key: 'claro',      name: 'Claro',                        category: 'Servicios',       split: 'half' },
+  { key: 'seguro',     name: 'Seguro de comercio integral',  category: 'Servicios',       split: 'half' },
+  { key: 'posnet',     name: 'POSNET (2 terminales)',        category: 'Servicios',       split: 'full' },
+  // Personal
+  { key: 'avila',      name: 'Avila, Alejandro',             category: 'Personal',        split: 'half' },
+  { key: 'salinas',    name: 'Salinas, Adrian',              category: 'Personal',        split: 'half' },
+  { key: 'ponasso',    name: 'Ponasso, Martin',              category: 'Personal',        split: 'half' },
+  { key: 'juana',      name: 'Juana',                        category: 'Personal',        split: 'half' },
 ]
 
 // ── Page ─────────────────────────────────────────────────────────────────────
@@ -74,11 +81,18 @@ export default function Gastos() {
 
 // ── GastosCompartidos ─────────────────────────────────────────────────────────
 function GastosCompartidos({ month, year }: { month: string; year: number }) {
-  // dbData: { [item_key]: { total_amount, indep_amount, due_date, detail, paid_status } }
-  const [dbData, setDbData] = useState<Record<string, any>>({})
+  // dbData: { [item_key]: row_data } — from server
+  const [dbData, setDbData]     = useState<Record<string, any>>({})
   // localEdits: { [item_key]: { field: value } } — live while typing
-  const [edits, setEdits]   = useState<Record<string, any>>({})
-  const savingRef           = useRef<Record<string, boolean>>({})
+  const [edits, setEdits]       = useState<Record<string, any>>({})
+  const savingRef               = useRef<Record<string, boolean>>({})
+  // custom items form
+  const [addingCustom, setAddingCustom] = useState(false)
+  const [customForm, setCustomForm]     = useState({ name: '', split_type: 'half' as SplitType })
+  const [savingCustom, setSavingCustom] = useState(false)
+
+  // custom rows = entries in dbData whose key starts with 'custom_'
+  const customItems = Object.values(dbData).filter((r: any) => r.item_key?.startsWith('custom_'))
 
   const load = useCallback(() => {
     api.get<Record<string, any>>(`/expenses/compartidos/${year}/${month}`).then(data => {
@@ -111,23 +125,55 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
 
   // Compute indep_amount based on split type when total changes
   const autoIndep = (key: string, total: number): number => {
-    const item = FIXED_ITEMS.find(i => i.key === key)
-    return item?.split === 'full' ? total : total / 2
+    const fixed = FIXED_ITEMS.find(i => i.key === key)
+    if (fixed) return fixed.split === 'full' ? total : total / 2
+    // custom item: use split_type from DB
+    const db = dbData[key]
+    return db?.split_type === 'full' ? total : total / 2
   }
 
-  // Totals
-  const totalGeneral = FIXED_ITEMS.reduce((a, i) => a + (parseFloat(merged(i.key)?.total_amount) || 0), 0)
-  const totalIndep   = FIXED_ITEMS.reduce((a, i) => a + (parseFloat(merged(i.key)?.indep_amount) || 0), 0)
+  const addCustomItem = async () => {
+    if (!customForm.name.trim()) return
+    setSavingCustom(true)
+    const row = await api.post<any>(`/expenses/compartidos/${year}/${month}/custom`, {
+      name: customForm.name.trim(), split_type: customForm.split_type,
+    })
+    setDbData(prev => ({ ...prev, [row.item_key]: row }))
+    setCustomForm({ name: '', split_type: 'half' })
+    setAddingCustom(false)
+    setSavingCustom(false)
+  }
+
+  const deleteCustomItem = async (key: string) => {
+    await api.delete(`/expenses/compartidos/${year}/${month}/${key}`)
+    setDbData(prev => { const n = { ...prev }; delete n[key]; return n })
+  }
+
+  // All keys to sum (fixed + custom)
+  const allKeys = [
+    ...FIXED_ITEMS.map(i => i.key),
+    ...customItems.map((r: any) => r.item_key),
+  ]
+  const totalGeneral = allKeys.reduce((a, k) => a + (parseFloat(merged(k)?.total_amount) || 0), 0)
+  const totalIndep   = allKeys.reduce((a, k) => a + (parseFloat(merged(k)?.indep_amount) || 0), 0)
   const totalLuro    = totalGeneral - totalIndep
 
   const exportPDF = () => {
-    const rows = FIXED_ITEMS.map(item => {
+    const fixedRows = FIXED_ITEMS.map(item => {
       const m = merged(item.key)
       const total = parseFloat(m?.total_amount) || 0
       const indep = parseFloat(m?.indep_amount) || 0
       return { name: item.name, cat: item.category, total, indep, luro: total - indep,
                due: m?.due_date ?? '', detail: m?.detail ?? '', paid: m?.paid_status ?? 'NO' }
     }).filter(r => r.total > 0)
+    const customRows = customItems.map((row: any) => {
+      const m = merged(row.item_key)
+      const total = parseFloat(m?.total_amount) || 0
+      const indep = parseFloat(m?.indep_amount) || 0
+      return { name: m?.custom_name ?? row.item_key, cat: 'Personalizado', total, indep, luro: total - indep,
+               due: m?.due_date ?? '', detail: m?.detail ?? '', paid: m?.paid_status ?? 'NO' }
+    }).filter((r: any) => r.total > 0)
+    const rows = [...fixedRows, ...customRows]
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
 <title>Gastos Compartidos ${month} ${year}</title>
@@ -323,6 +369,104 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
                   </tr>
                 )
               })}
+              {/* Custom items */}
+              {customItems.map((row: any) => {
+                const key   = row.item_key
+                const m     = merged(key)
+                const total = parseFloat(m?.total_amount) || 0
+                const indep = parseFloat(m?.indep_amount) || 0
+                const luro  = total - indep
+                const paid  = m?.paid_status ?? 'NO'
+                return (
+                  <tr key={key} className="table-tr bg-amber-50/30">
+                    {/* Item name — editable for custom */}
+                    <td className="table-td p-1" colSpan={1}>
+                      <input type="text"
+                        className="input py-1 px-2 text-xs w-full font-medium"
+                        value={edits[key]?.custom_name ?? (m?.custom_name ?? '')}
+                        onChange={ev => setField(key, 'custom_name', ev.target.value)}
+                        onBlur={ev => saveField(key, 'custom_name', ev.target.value)}
+                      />
+                    </td>
+                    {/* Split type */}
+                    <td className="table-td p-1">
+                      <select
+                        className="input py-1 px-2 text-xs w-24"
+                        value={edits[key]?.split_type ?? (m?.split_type ?? 'half')}
+                        onChange={async ev => {
+                          setField(key, 'split_type', ev.target.value)
+                          await saveField(key, 'split_type', ev.target.value)
+                        }}>
+                        <option value="half">Mitad</option>
+                        <option value="full">Total Indep.</option>
+                      </select>
+                    </td>
+                    {/* Total $ */}
+                    <td className="table-td p-1">
+                      <input type="number" placeholder="0"
+                        className="input py-1 px-2 text-xs text-right w-28"
+                        value={edits[key]?.total_amount ?? (m?.total_amount != null ? String(m.total_amount) : '')}
+                        onChange={ev => {
+                          const val = ev.target.value; const num = parseFloat(val)
+                          setEdits(prev => ({ ...prev, [key]: { ...prev[key], total_amount: val,
+                            ...(prev[key]?.indep_amount === undefined && !isNaN(num) ? { indep_amount: String(autoIndep(key, num)) } : {}) } }))
+                        }}
+                        onBlur={async ev => {
+                          const val = parseFloat(ev.target.value); if (isNaN(val)) return
+                          const indepVal = parseFloat(edits[key]?.indep_amount) ?? autoIndep(key, val)
+                          await saveField(key, 'total_amount', val)
+                          await saveField(key, 'indep_amount', isNaN(indepVal) ? autoIndep(key, val) : indepVal)
+                          setEdits(prev => { const n = { ...prev }; delete n[key]; return n })
+                        }}
+                      />
+                    </td>
+                    {/* Indep. $ */}
+                    <td className="table-td p-1">
+                      <input type="number" placeholder="auto"
+                        className="input py-1 px-2 text-xs text-right w-28"
+                        value={edits[key]?.indep_amount ?? (m?.indep_amount != null ? String(m.indep_amount) : '')}
+                        onChange={ev => setField(key, 'indep_amount', ev.target.value)}
+                        onBlur={async ev => {
+                          const val = parseFloat(ev.target.value); if (isNaN(val)) return
+                          await saveField(key, 'indep_amount', val)
+                          setEdits(prev => { const n = { ...prev }; delete n[key]?.indep_amount; return n })
+                        }}
+                      />
+                    </td>
+                    {/* Luro $ */}
+                    <td className="table-td text-xs text-right font-medium text-wood-600">
+                      {total > 0 ? fmt$(luro) : '—'}
+                    </td>
+                    {/* Vencimiento */}
+                    <td className="table-td p-1">
+                      <input type="date" className="input py-1 px-2 text-xs w-32"
+                        value={edits[key]?.due_date ?? (m?.due_date ?? '')}
+                        onChange={ev => setField(key, 'due_date', ev.target.value)}
+                        onBlur={ev => saveField(key, 'due_date', ev.target.value || null)}
+                      />
+                    </td>
+                    {/* Detalle */}
+                    <td className="table-td p-1">
+                      <input type="text" placeholder="—" className="input py-1 px-2 text-xs w-32"
+                        value={edits[key]?.detail ?? (m?.detail ?? '')}
+                        onChange={ev => setField(key, 'detail', ev.target.value)}
+                        onBlur={ev => saveField(key, 'detail', ev.target.value || null)}
+                      />
+                    </td>
+                    {/* Pagado + delete */}
+                    <td className="table-td text-center">
+                      <div className="flex items-center gap-1 justify-center">
+                        <button onClick={async () => { await saveField(key, 'paid_status', paid === 'SI' ? 'NO' : 'SI'); load() }}
+                          className={['badge cursor-pointer', paid === 'SI' ? 'badge-green' : 'badge-red'].join(' ')}>
+                          {paid === 'SI' ? 'SI' : 'NO'}
+                        </button>
+                        <button onClick={() => deleteCustomItem(key)} className="text-red-300 hover:text-red-500 ml-1"><Trash2 size={12} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+
               <tr className="bg-wood-50 border-t-2 border-wood-200">
                 <td colSpan={2} className="table-td font-bold text-xs">TOTAL MES</td>
                 <td className="table-td text-xs text-right font-bold">{fmt$(totalGeneral)}</td>
@@ -334,6 +478,40 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
           </table>
         </div>
       </div>
+
+      {/* Agregar item personalizado */}
+      {addingCustom ? (
+        <div className="card p-3 flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] text-wood-400 uppercase tracking-wide">Nombre del item *</label>
+            <input type="text" placeholder="ej: Monotributo" autoFocus
+              className="input py-1 px-2 text-xs w-48"
+              value={customForm.name}
+              onChange={e => setCustomForm(f => ({ ...f, name: e.target.value }))}
+              onKeyDown={e => e.key === 'Enter' && addCustomItem()}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] text-wood-400 uppercase tracking-wide">Reparto</label>
+            <select className="input py-1 px-2 text-xs w-36"
+              value={customForm.split_type}
+              onChange={e => setCustomForm(f => ({ ...f, split_type: e.target.value as SplitType }))}>
+              <option value="half">Mitad (50/50)</option>
+              <option value="full">Total Independencia</option>
+            </select>
+          </div>
+          <button onClick={addCustomItem} disabled={savingCustom || !customForm.name.trim()}
+            className="btn-primary text-xs py-1 px-3">
+            {savingCustom ? 'Guardando...' : 'Agregar'}
+          </button>
+          <button onClick={() => setAddingCustom(false)} className="btn-ghost text-xs py-1 px-3">Cancelar</button>
+        </div>
+      ) : (
+        <button onClick={() => setAddingCustom(true)}
+          className="flex items-center gap-1.5 text-xs text-wood-400 hover:text-wood-700 transition-colors">
+          <Plus size={13} /> Agregar item personalizado
+        </button>
+      )}
     </div>
   )
 }
