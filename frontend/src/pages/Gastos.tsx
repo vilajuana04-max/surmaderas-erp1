@@ -432,27 +432,27 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
       <div className="card p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[700px]">
-            <thead className="bg-wood-50 border-b-2 border-wood-200">
-              <tr>
-                <th className="table-th py-3 text-xs font-bold text-wood-700">Concepto</th>
-                <th className="table-th py-3 text-center text-xs font-bold text-wood-700">
+            <thead>
+              <tr className="bg-wood-700 text-white">
+                <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-widest">Concepto</th>
+                <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-widest">
                   % Indep.
-                  <div className="font-normal text-wood-400 text-[10px] normal-case leading-tight">porcentaje a cargo</div>
+                  <div className="font-normal text-white/60 text-[10px] normal-case leading-tight tracking-normal">porcentaje a cargo</div>
                 </th>
-                <th className="table-th py-3 text-right text-xs font-bold text-wood-700">
+                <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-widest">
                   Monto total $
-                  <div className="font-normal text-wood-400 text-[10px] normal-case leading-tight">lo que adelanta Luro</div>
+                  <div className="font-normal text-white/60 text-[10px] normal-case leading-tight tracking-normal">lo que adelanta Luro</div>
                 </th>
-                <th className="table-th py-3 text-right text-xs font-bold text-wood-700">
+                <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-widest">
                   Independencia paga $
-                  <div className="font-normal text-wood-400 text-[10px] normal-case leading-tight">lo que debe reintegrar</div>
+                  <div className="font-normal text-white/60 text-[10px] normal-case leading-tight tracking-normal">lo que debe reintegrar</div>
                 </th>
-                <th className="table-th py-3 text-right text-xs font-bold text-wood-700">
+                <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-widest">
                   Luro neto $
-                  <div className="font-normal text-wood-400 text-[10px] normal-case leading-tight">queda a cargo de Luro</div>
+                  <div className="font-normal text-white/60 text-[10px] normal-case leading-tight tracking-normal">queda a cargo de Luro</div>
                 </th>
-                <th className="table-th py-3 text-center text-xs font-bold text-wood-700">Pagado</th>
-                <th className="table-th py-3 w-10 text-center text-xs font-normal text-wood-400">Edit.</th>
+                <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-widest">Pagado</th>
+                <th className="px-4 py-3 w-10 text-center text-[11px] font-normal uppercase tracking-widest opacity-60">Edit.</th>
               </tr>
             </thead>
             <tbody>
