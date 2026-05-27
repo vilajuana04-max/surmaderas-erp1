@@ -4,6 +4,26 @@ from typing import Optional
 from decimal import Decimal
 
 
+class SharedExpenseItemOut(BaseModel):
+    id:         int
+    name:       str
+    category:   Optional[str] = None
+    is_active:  bool
+
+    model_config = {"from_attributes": True}
+
+
+class SharedExpenseItemCreate(BaseModel):
+    name:     str
+    category: Optional[str] = None
+
+
+class SharedExpenseItemUpdate(BaseModel):
+    name:      Optional[str]  = None
+    category:  Optional[str]  = None
+    is_active: Optional[bool] = None
+
+
 class SharedExpenseOut(BaseModel):
     id:             int
     item_id:        int

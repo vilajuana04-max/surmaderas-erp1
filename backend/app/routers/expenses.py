@@ -6,10 +6,63 @@ from typing import Optional
 from app.database import get_db
 from app.models import SharedExpenseItem, SharedExpense, ExpenseCategory, LuroExpense
 from app.schemas import (SharedExpenseOut, SharedExpenseUpdate,
+                          SharedExpenseItemOut, SharedExpenseItemCreate, SharedExpenseItemUpdate,
                           LuroExpenseCreate, LuroExpenseOut, ExpenseCategoryOut)
 from app.services.pdf_generator import generate_shared_expenses_pdf, generate_luro_expenses_pdf
 
 router = APIRouter(prefix="/expenses", tags=["Gastos"])
+
+
+# ─── Catálogo de Items Compartidos ────────────────────────────
+
+@router.get("/shared/items", response_model=list[SharedExpenseItemOut])
+def list_shared_items(include_inactive: bool = False, db: Session = Depends(get_db)):
+    q = db.query(SharedExpenseItem)
+    if not include_inactive:
+        q = q.filter(SharedExpenseItem.is_active == True)
+    return q.order_by(SharedExpenseItem.category, SharedExpenseItem.name).all()
+
+
+@router.post("/shared/items", response_model=SharedExpenseItemOut, status_code=201)
+def create_shared_item(data: SharedExpenseItemCreate, db: Session = Depends(get_db)):
+    existing = db.query(SharedExpenseItem).filter(SharedExpenseItem.name == data.name).first()
+    if existing:
+        existing.is_active = True
+        if data.category:
+            existing.category = data.category
+        db.commit()
+        db.refresh(existing)
+        return existing
+    item = SharedExpenseItem(name=data.name, category=data.category, is_active=True)
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.put("/shared/items/{item_id}", response_model=SharedExpenseItemOut)
+def update_shared_item(item_id: int, data: SharedExpenseItemUpdate, db: Session = Depends(get_db)):
+    item = db.query(SharedExpenseItem).filter(SharedExpenseItem.id == item_id).first()
+    if not item:
+        raise HTTPException(404, "Item no encontrado")
+    if data.name is not None:
+        item.name = data.name
+    if data.category is not None:
+        item.category = data.category
+    if data.is_active is not None:
+        item.is_active = data.is_active
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.delete("/shared/items/{item_id}", status_code=204)
+def delete_shared_item(item_id: int, db: Session = Depends(get_db)):
+    item = db.query(SharedExpenseItem).filter(SharedExpenseItem.id == item_id).first()
+    if not item:
+        raise HTTPException(404, "Item no encontrado")
+    item.is_active = False
+    db.commit()
 
 
 # ─── Gastos Compartidos ───────────────────────────────────────

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Plus, Trash2, FileDown } from 'lucide-react'
+import { Plus, Trash2, FileDown, Settings } from 'lucide-react'
 import { api, fmt$, MONTHS, CURRENT_YEAR } from '../api'
 
 type Tab = 'compartidos' | 'luro'
@@ -57,8 +57,16 @@ export default function Gastos() {
 
 // ── GastosCompartidos ─────────────────────────────────────────────────────────
 function GastosCompartidos({ month, year }: { month: string; year: number }) {
-  const [expenses, setExpenses] = useState<any[]>([])
-  const [edits, setEdits]       = useState<Record<number, any>>({})
+  const [expenses, setExpenses]   = useState<any[]>([])
+  const [edits, setEdits]         = useState<Record<number, any>>({})
+  const [showCatalog, setShowCatalog] = useState(false)
+  const [catalog, setCatalog]     = useState<any[]>([])
+  const [newItem, setNewItem]     = useState({ name: '', category: '' })
+  const [savingNew, setSavingNew] = useState(false)
+
+  const loadCatalog = useCallback(() => {
+    api.get<any[]>('/expenses/shared/items').then(setCatalog)
+  }, [])
 
   const load = useCallback(() => {
     api.get<any[]>(`/expenses/shared/${year}/${month}`).then(rows => {
@@ -68,6 +76,23 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
   }, [month, year])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => { if (showCatalog) loadCatalog() }, [showCatalog, loadCatalog])
+
+  const addNewItem = async () => {
+    if (!newItem.name.trim()) return
+    setSavingNew(true)
+    await api.post('/expenses/shared/items', { name: newItem.name.trim(), category: newItem.category.trim() || null })
+    setNewItem({ name: '', category: '' })
+    setSavingNew(false)
+    loadCatalog()
+    load()  // reload table — new item will auto-appear
+  }
+
+  const removeItem = async (itemId: number) => {
+    await api.delete(`/expenses/shared/items/${itemId}`)
+    loadCatalog()
+    load()
+  }
 
   const setField = (id: number, key: string, value: any) => {
     setEdits(prev => ({ ...prev, [id]: { ...prev[id], [key]: value } }))
@@ -311,8 +336,74 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
 
       <p className="text-xs text-wood-400">
         Luro adelanta todos los gastos. Independencia reintegra su parte (columna Indep. $).
-        Para items exclusivos de una sucursal, edite manualmente el campo "Luro $".
+        Para items exclusivos de una sucursal, escriba 0 en el campo "Luro $".
       </p>
+
+      {/* Catalog management */}
+      <div className="border-t border-wood-100 pt-4">
+        <button
+          onClick={() => setShowCatalog(v => !v)}
+          className="flex items-center gap-2 text-xs text-wood-400 hover:text-wood-700 transition-colors">
+          <Settings size={13} />
+          {showCatalog ? 'Ocultar' : 'Gestionar items del catálogo'}
+        </button>
+
+        {showCatalog && (
+          <div className="mt-3 card p-4 space-y-3">
+            <p className="text-xs font-semibold text-wood-600 uppercase tracking-wide">Items del catálogo</p>
+
+            {/* Add new item */}
+            <div className="flex gap-2 items-end">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] text-wood-400 uppercase tracking-wide">Nombre *</label>
+                <input
+                  type="text" placeholder="ej: Luz Eléctrica"
+                  className="input py-1 px-2 text-xs w-48"
+                  value={newItem.name}
+                  onChange={e => setNewItem(p => ({ ...p, name: e.target.value }))}
+                  onKeyDown={e => e.key === 'Enter' && addNewItem()}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] text-wood-400 uppercase tracking-wide">Categoría</label>
+                <input
+                  type="text" placeholder="ej: Servicios"
+                  className="input py-1 px-2 text-xs w-36"
+                  value={newItem.category}
+                  onChange={e => setNewItem(p => ({ ...p, category: e.target.value }))}
+                  onKeyDown={e => e.key === 'Enter' && addNewItem()}
+                />
+              </div>
+              <button
+                onClick={addNewItem}
+                disabled={savingNew || !newItem.name.trim()}
+                className="btn-primary text-xs py-1 px-3 h-8">
+                <Plus size={13} /> Agregar
+              </button>
+            </div>
+
+            {/* Item list */}
+            <div className="space-y-1 max-h-48 overflow-y-auto">
+              {catalog.length === 0 && (
+                <p className="text-xs text-wood-400 py-2">No hay items. Agrega uno arriba.</p>
+              )}
+              {catalog.map(item => (
+                <div key={item.id} className="flex items-center justify-between py-1 px-2 rounded hover:bg-wood-50">
+                  <div>
+                    <span className="text-xs font-medium">{item.name}</span>
+                    {item.category && <span className="text-[10px] text-wood-400 ml-2">{item.category}</span>}
+                  </div>
+                  <button
+                    onClick={() => removeItem(item.id)}
+                    className="text-red-300 hover:text-red-500 transition-colors p-1">
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
