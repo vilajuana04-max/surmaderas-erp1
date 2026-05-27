@@ -65,6 +65,43 @@ def delete_shared_item(item_id: int, db: Session = Depends(get_db)):
     db.commit()
 
 
+@router.post("/shared/items/seed-defaults", status_code=201)
+def seed_default_items(db: Session = Depends(get_db)):
+    """Carga los items predeterminados de la planilla de gastos compartidos."""
+    DEFAULTS = [
+        ("Luz / Energía Eléctrica",     "Servicios"),
+        ("Gas",                          "Servicios"),
+        ("Agua",                         "Servicios"),
+        ("Internet",                     "Servicios"),
+        ("Teléfono",                     "Servicios"),
+        ("Alarma",                       "Seguridad"),
+        ("Seguro",                       "Seguridad"),
+        ("Expensas",                     "Edificio"),
+        ("Alquiler",                     "Edificio"),
+        ("Contador / Estudio Contable",  "Administración"),
+        ("Monotributo / AFIP",           "Administración"),
+        ("INACAP",                       "Gestión de empleados"),
+        ("Sueldo Avila Alejandro",       "Personal Independencia"),
+        ("Sueldo Salinas Adrian",        "Personal Independencia"),
+        ("Sueldo Ponasso Martin",        "Personal Independencia"),
+        ("Limpieza",                     "Varios"),
+        ("Mantenimiento",                "Varios"),
+        ("Insumos / Librería",           "Varios"),
+        ("Publicidad / Marketing",       "Varios"),
+        ("Otros",                        "Varios"),
+    ]
+    inserted = 0
+    for name, category in DEFAULTS:
+        existing = db.query(SharedExpenseItem).filter(SharedExpenseItem.name == name).first()
+        if not existing:
+            db.add(SharedExpenseItem(name=name, category=category, is_active=True))
+            inserted += 1
+        elif not existing.is_active:
+            existing.is_active = True
+    db.commit()
+    return {"inserted": inserted, "message": f"{inserted} items cargados"}
+
+
 # ─── Gastos Compartidos ───────────────────────────────────────
 
 @router.get("/shared/{year}/{month}", response_model=list[SharedExpenseOut])

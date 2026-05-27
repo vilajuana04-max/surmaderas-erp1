@@ -85,11 +85,19 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
     setNewItem({ name: '', category: '' })
     setSavingNew(false)
     loadCatalog()
-    load()  // reload table — new item will auto-appear
+    load()
   }
 
   const removeItem = async (itemId: number) => {
     await api.delete(`/expenses/shared/items/${itemId}`)
+    loadCatalog()
+    load()
+  }
+
+  const seedDefaults = async () => {
+    setSavingNew(true)
+    await api.post('/expenses/shared/items/seed-defaults', {})
+    setSavingNew(false)
     loadCatalog()
     load()
   }
@@ -350,7 +358,17 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
 
         {showCatalog && (
           <div className="mt-3 card p-4 space-y-3">
-            <p className="text-xs font-semibold text-wood-600 uppercase tracking-wide">Items del catálogo</p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-wood-600 uppercase tracking-wide">Items del catálogo</p>
+              {catalog.length === 0 && (
+                <button
+                  onClick={seedDefaults}
+                  disabled={savingNew}
+                  className="btn-ghost text-xs py-1 px-2">
+                  {savingNew ? 'Cargando...' : 'Cargar plantilla base'}
+                </button>
+              )}
+            </div>
 
             {/* Add new item */}
             <div className="flex gap-2 items-end">
@@ -385,7 +403,9 @@ function GastosCompartidos({ month, year }: { month: string; year: number }) {
             {/* Item list */}
             <div className="space-y-1 max-h-48 overflow-y-auto">
               {catalog.length === 0 && (
-                <p className="text-xs text-wood-400 py-2">No hay items. Agrega uno arriba.</p>
+                <p className="text-xs text-wood-400 py-2">
+                  No hay items. Usa "Cargar plantilla base" para agregar los items típicos, o agrega uno arriba.
+                </p>
               )}
               {catalog.map(item => (
                 <div key={item.id} className="flex items-center justify-between py-1 px-2 rounded hover:bg-wood-50">
