@@ -57,15 +57,15 @@ class ExpenseCategoryOut(BaseModel):
 
 
 class LuroExpenseCreate(BaseModel):
-    month:          Optional[str] = None
-    year:           Optional[int] = None
+    month:          Optional[str]  = None
+    year:           Optional[int]  = None
     expense_date:   Optional[date] = None
-    category_id:    int
-    subcategory_id: Optional[int] = None
-    detail:         Optional[str] = None
+    categoria:      str
+    subcategoria:   Optional[str]  = None
+    detail:         Optional[str]  = None
     amount:         Decimal
-    payment_method: Optional[str] = None
-    paid_status:    bool = False
+    payment_method: Optional[str]  = None
+    pagado:         str = 'NO'
 
 
 class LuroExpenseOut(BaseModel):
@@ -73,13 +73,11 @@ class LuroExpenseOut(BaseModel):
     month:          Optional[str]
     year:           Optional[int]
     expense_date:   Optional[date]
-    category_id:    int
-    category_name:  Optional[str] = None
-    subcategory_id: Optional[int]
-    subcategory_name: Optional[str] = None
+    categoria:      Optional[str]
+    subcategoria:   Optional[str]
     detail:         Optional[str]
     amount:         Decimal
     payment_method: Optional[str]
-    paid_status:    bool
+    pagado:         Optional[str]
 
     model_config = {"from_attributes": True}

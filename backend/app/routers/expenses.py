@@ -171,9 +171,8 @@ def export_shared_pdf(year: int, month: str, db: Session = Depends(get_db)):
 
 @router.get("/luro", response_model=list[LuroExpenseOut])
 def list_luro_expenses(
-    year:       Optional[int] = None,
-    month:      Optional[str] = None,
-    category_id: Optional[int] = None,
+    year:  Optional[int] = None,
+    month: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     q = db.query(LuroExpense)
@@ -181,10 +180,7 @@ def list_luro_expenses(
         q = q.filter(LuroExpense.year == year)
     if month:
         q = q.filter(LuroExpense.month == month.upper())
-    if category_id:
-        q = q.filter(LuroExpense.category_id == category_id)
-    expenses = q.order_by(LuroExpense.expense_date.desc()).all()
-    return [_enrich_luro(e) for e in expenses]
+    return q.order_by(LuroExpense.expense_date.desc(), LuroExpense.id.desc()).all()
 
 
 @router.post("/luro", response_model=LuroExpenseOut, status_code=201)
@@ -201,17 +197,30 @@ def create_luro_expense(data: LuroExpenseCreate, db: Session = Depends(get_db)):
         month          = month,
         year           = year,
         expense_date   = data.expense_date,
-        category_id    = data.category_id,
-        subcategory_id = data.subcategory_id,
+        categoria      = data.categoria,
+        subcategoria   = data.subcategoria,
         detail         = data.detail,
         amount         = data.amount,
         payment_method = data.payment_method,
-        paid_status    = data.paid_status,
+        pagado         = data.pagado,
     )
     db.add(expense)
     db.commit()
     db.refresh(expense)
-    return _enrich_luro(expense)
+    return expense
+
+
+@router.put("/luro/{expense_id}", response_model=LuroExpenseOut)
+def update_luro_expense(expense_id: int, data: dict, db: Session = Depends(get_db)):
+    e = db.query(LuroExpense).filter(LuroExpense.id == expense_id).first()
+    if not e:
+        raise HTTPException(404, "Gasto no encontrado")
+    for field in ("categoria","subcategoria","detail","amount","payment_method","pagado","expense_date","month","year"):
+        if field in data:
+            setattr(e, field, data[field] if data[field] != "" else None)
+    db.commit()
+    db.refresh(e)
+    return e
 
 
 @router.delete("/luro/{expense_id}", status_code=204)
@@ -223,23 +232,34 @@ def delete_luro_expense(expense_id: int, db: Session = Depends(get_db)):
     db.commit()
 
 
-@router.get("/luro/report/{year}", response_model=list[dict])
-def luro_annual_report(year: int, db: Session = Depends(get_db)):
+@router.get("/luro/reporte/{year}")
+def luro_reporte_anual(year: int, db: Session = Depends(get_db)):
+    """Reporte anual: {categoria: {subcategoria: {mes: total}}}"""
     MONTHS = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO",
               "JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"]
-    cats = db.query(ExpenseCategory).filter(ExpenseCategory.parent_id == None).all()
+    rows = db.query(LuroExpense).filter(LuroExpense.year == year).all()
+
+    # Acumula por categoría > subcategoría > mes
+    report: dict = {}
+    for e in rows:
+        cat  = e.categoria  or "Sin categoría"
+        sub  = e.subcategoria or "—"
+        mes  = e.month or "—"
+        amt  = float(e.amount or 0)
+        report.setdefault(cat, {}).setdefault(sub, {m: 0.0 for m in MONTHS})
+        if mes in report[cat][sub]:
+            report[cat][sub][mes] += amt
+
+    # Serializa en lista plana para el frontend
     result = []
-    for cat in cats:
-        row = {"category": cat.name, "total": 0, "months": {}}
-        for m in MONTHS:
-            total = db.query(func.sum(LuroExpense.amount)).filter(
-                LuroExpense.year == year,
-                LuroExpense.month == m,
-                LuroExpense.category_id == cat.id
-            ).scalar() or 0
-            row["months"][m] = float(total)
-            row["total"] += float(total)
-        result.append(row)
+    for cat, subs in report.items():
+        for sub, months in subs.items():
+            result.append({
+                "categoria":   cat,
+                "subcategoria": sub,
+                "months":      months,
+                "total":       sum(months.values()),
+            })
     return result
 
 
@@ -278,21 +298,6 @@ def _enrich_shared(e: SharedExpense, item: SharedExpenseItem) -> dict:
     }
 
 
-def _enrich_luro(e: LuroExpense) -> dict:
-    return {
-        "id":               e.id,
-        "month":            e.month,
-        "year":             e.year,
-        "expense_date":     e.expense_date,
-        "category_id":      e.category_id,
-        "category_name":    e.category.name if e.category else None,
-        "subcategory_id":   e.subcategory_id,
-        "subcategory_name": e.subcategory.name if e.subcategory else None,
-        "detail":           e.detail,
-        "amount":           e.amount,
-        "payment_method":   e.payment_method,
-        "paid_status":      e.paid_status,
-    }
 
 
 # ─── Gastos Compartidos v2 (tabla simple, sin catálogo) ──────────────────────
