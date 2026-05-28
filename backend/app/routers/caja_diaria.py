@@ -82,7 +82,7 @@ def _serialize_caja(c: CajaDiaria) -> dict:
     }
 
 
-# ── PDF Template ─────────────────────────────────────────────────
+# ── PDF Template (WeasyPrint — solo tables, sin grid/flex) ────────
 _PDF_TEMPLATE = """
 <!DOCTYPE html>
 <html>
@@ -90,248 +90,203 @@ _PDF_TEMPLATE = """
 <meta charset="utf-8">
 <style>
   @page { margin: 1.2cm 1.5cm; size: A4; }
-  * { box-sizing: border-box; }
-  body { font-family: Arial, sans-serif; font-size: 9pt; color: #1a1a1a; margin: 0; }
+  body  { font-family: Arial, sans-serif; font-size: 9pt; color: #1a1a1a; margin: 0; }
 
-  .header { display: flex; justify-content: space-between; align-items: flex-start;
-            border-bottom: 3px solid {{ coral }}; padding-bottom: 10px; margin-bottom: 14px; }
-  .brand-name { font-size: 18pt; font-weight: bold; color: {{ navy }}; letter-spacing: 1px; }
-  .brand-sub { font-size: 8pt; color: #666; margin-top: 2px; }
-  .doc-info { text-align: right; font-size: 8pt; color: #555; }
-  .doc-title { font-size: 12pt; font-weight: bold; color: {{ coral }}; }
+  /* Header */
+  table.header { width: 100%; border-bottom: 3px solid {{ coral }}; margin-bottom: 12px; border-collapse: collapse; }
+  .brand-name  { font-size: 18pt; font-weight: bold; color: {{ navy }}; }
+  .brand-sub   { font-size: 8pt; color: #777; }
+  .doc-title   { font-size: 12pt; font-weight: bold; color: {{ coral }}; text-align: right; }
+  .doc-gen     { font-size: 8pt; color: #777; text-align: right; }
 
-  .meta-strip { display: flex; gap: 20px; background: {{ navy }}; color: white;
-                padding: 8px 12px; border-radius: 6px; margin-bottom: 14px; font-size: 8.5pt; }
-  .meta-item label { opacity: 0.6; display: block; font-size: 7pt; text-transform: uppercase; letter-spacing: 0.5px; }
-  .meta-item span  { font-weight: bold; }
-  .badge-open   { background: #16a34a; padding: 2px 8px; border-radius: 10px; font-size: 7.5pt; }
-  .badge-closed { background: #dc2626; padding: 2px 8px; border-radius: 10px; font-size: 7.5pt; }
+  /* Meta strip */
+  table.meta   { width: 100%; background: {{ navy }}; color: white;
+                 margin-bottom: 12px; border-collapse: collapse; }
+  table.meta td { padding: 7px 12px; font-size: 8.5pt; }
+  .meta-label  { font-size: 7pt; color: rgba(255,255,255,0.55);
+                 text-transform: uppercase; display: block; }
+  .meta-val    { font-weight: bold; }
+  .badge-open  { background: #16a34a; color: white; padding: 1px 7px;
+                 font-size: 7.5pt; font-weight: bold; }
+  .badge-closed{ background: #dc2626; color: white; padding: 1px 7px;
+                 font-size: 7.5pt; font-weight: bold; }
 
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
-  .section { border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden; }
-  .section-header { display: flex; justify-content: space-between; align-items: center;
-                    padding: 6px 10px; font-weight: bold; font-size: 8.5pt; }
-  .section-body { padding: 0 10px 6px; }
-  .section-body table { width: 100%; border-collapse: collapse; }
-  .section-body td { padding: 3px 0; font-size: 8.5pt; border-bottom: 1px solid #f3f4f6; }
-  .section-body td:last-child { text-align: right; font-weight: 500; }
-  .section-body .empty { color: #9ca3af; font-style: italic; font-size: 8pt; padding: 4px 0; }
+  /* Sections wrapper — 2 cols via table */
+  table.sections { width: 100%; border-collapse: separate; border-spacing: 6px;
+                   margin-bottom: 10px; }
+  table.sections td.sec-cell { width: 50%; vertical-align: top; }
 
-  .section-header.gastos  { background: #fee2e2; color: #dc2626; border-left: 3px solid #dc2626; }
-  .section-header.transf  { background: #dbeafe; color: #2563eb; border-left: 3px solid #2563eb; }
-  .section-header.retiros { background: #fef3c7; color: #d97706; border-left: 3px solid #d97706; }
-  .section-header.tarjetas{ background: #ede9fe; color: #7c3aed; border-left: 3px solid #7c3aed; }
+  .section     { border: 1px solid #e5e7eb; }
 
-  .terminal-row { display: flex; justify-content: space-between; padding: 3px 0;
-                  font-size: 8.5pt; border-bottom: 1px solid #f3f4f6; }
-  .terminal-row .t-label { color: #6b7280; font-weight: bold; font-size: 7.5pt; }
+  table.sec-hdr { width: 100%; border-collapse: collapse; }
+  table.sec-hdr td { padding: 5px 9px; font-weight: bold; font-size: 8.5pt; }
+  .hdr-gastos  { background: #fee2e2; color: #dc2626; border-left: 4px solid #dc2626; }
+  .hdr-transf  { background: #dbeafe; color: #2563eb; border-left: 4px solid #2563eb; }
+  .hdr-retiros { background: #fef3c7; color: #d97706; border-left: 4px solid #d97706; }
+  .hdr-tarjetas{ background: #ede9fe; color: #7c3aed; border-left: 4px solid #7c3aed; }
 
-  .efectivo-box { border: 2px solid {{ coral }}; border-radius: 6px; padding: 8px 12px;
-                  display: flex; justify-content: space-between; align-items: center;
-                  margin-bottom: 12px; }
-  .efectivo-box .label { font-size: 8pt; color: #6b7280; text-transform: uppercase;
-                          letter-spacing: 0.5px; font-weight: bold; }
-  .efectivo-box .value { font-size: 14pt; font-weight: bold; color: {{ navy }}; }
+  table.rows   { width: 100%; border-collapse: collapse; }
+  table.rows td{ padding: 3px 9px; font-size: 8.5pt; border-bottom: 1px solid #f3f4f6; }
+  td.amt       { text-align: right; font-weight: 500; width: 35%; }
+  .empty-row   { padding: 5px 9px; font-size: 8pt; color: #9ca3af; font-style: italic; }
 
-  .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr);
-                  gap: 8px; margin-bottom: 12px; }
-  .summary-card { border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px 10px; }
-  .summary-card .s-label { font-size: 7pt; color: #6b7280; text-transform: uppercase;
-                            letter-spacing: 0.4px; margin-bottom: 2px; }
-  .summary-card .s-value { font-size: 11pt; font-weight: bold; }
-  .s-transf  { color: #2563eb; }
-  .s-efectivo{ color: #16a34a; }
-  .s-tarjeta { color: #7c3aed; }
-  .s-salidas { color: #dc2626; }
+  /* Efectivo */
+  table.efectivo { width: 100%; border: 2px solid {{ coral }};
+                   margin-bottom: 10px; border-collapse: collapse; }
+  table.efectivo td { padding: 7px 12px; font-size: 9pt; }
+  .ef-label    { color: #6b7280; text-transform: uppercase; font-size: 7.5pt;
+                 font-weight: bold; letter-spacing: 0.5px; }
+  .ef-value    { text-align: right; font-size: 14pt; font-weight: bold; color: {{ navy }}; }
 
-  .total-box { background: {{ navy }}; color: white; border-radius: 6px; padding: 10px 16px;
-               display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-  .total-box .t-label { font-size: 9pt; text-transform: uppercase; letter-spacing: 1px; opacity: 0.7; }
-  .total-box .t-value { font-size: 20pt; font-weight: bold; color: {{ coral }}; }
+  /* Summary */
+  table.summary { width: 100%; border-collapse: separate; border-spacing: 5px;
+                  margin-bottom: 10px; }
+  table.summary td { width: 25%; border: 1px solid #e5e7eb; padding: 7px 9px;
+                     vertical-align: top; }
+  .sum-label   { font-size: 7pt; color: #6b7280; text-transform: uppercase;
+                 letter-spacing: 0.4px; display: block; margin-bottom: 2px; }
+  .sum-val     { font-size: 11pt; font-weight: bold; display: block; }
+  .c-transf  { color: #2563eb; }
+  .c-efectivo{ color: #16a34a; }
+  .c-tarjeta { color: #7c3aed; }
+  .c-salidas { color: #dc2626; }
 
-  .obs-box { border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px 12px; }
-  .obs-box .obs-title { font-size: 7.5pt; font-weight: bold; color: #6b7280;
-                         text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
-  .obs-box .obs-text  { font-size: 8.5pt; color: #374151; }
+  /* Total */
+  table.total-row { width: 100%; background: {{ navy }}; color: white;
+                    border-collapse: collapse; margin-bottom: 10px; }
+  table.total-row td { padding: 9px 14px; }
+  .tot-label { font-size: 9pt; text-transform: uppercase; letter-spacing: 1px;
+               opacity: 0.65; }
+  .tot-val   { text-align: right; font-size: 20pt; font-weight: bold;
+               color: {{ coral }}; }
 
-  .footer { margin-top: 16px; border-top: 1px solid #e5e7eb; padding-top: 6px;
-            text-align: center; font-size: 7.5pt; color: #9ca3af; }
+  /* Observaciones */
+  .obs-box   { border: 1px solid #e5e7eb; padding: 8px 12px; margin-bottom: 8px; }
+  .obs-title { font-size: 7.5pt; font-weight: bold; color: #6b7280;
+               text-transform: uppercase; margin-bottom: 4px; }
+  .obs-text  { font-size: 8.5pt; color: #374151; }
+
+  .footer    { border-top: 1px solid #e5e7eb; padding-top: 5px; margin-top: 12px;
+               text-align: center; font-size: 7.5pt; color: #9ca3af; }
 </style>
 </head>
 <body>
 
 <!-- Header -->
-<div class="header">
-  <div>
-    <div class="brand-name">SUR MADERAS</div>
-    <div class="brand-sub">Mar del Plata · Sistema ERP v1.0</div>
-  </div>
-  <div class="doc-info">
-    <div class="doc-title">Cierre de Caja</div>
-    <div>Generado: {{ generated }}</div>
-  </div>
-</div>
+<table class="header"><tr>
+  <td><div class="brand-name">SUR MADERAS</div><div class="brand-sub">Mar del Plata · Sistema ERP v1.0</div></td>
+  <td><div class="doc-title">Cierre de Caja</div><div class="doc-gen">Generado: {{ generated }}</div></td>
+</tr></table>
 
 <!-- Meta strip -->
-<div class="meta-strip">
-  <div class="meta-item">
-    <label>Fecha</label>
-    <span>{{ fecha }}</span>
-  </div>
-  <div class="meta-item">
-    <label>Sucursal</label>
-    <span>{{ sucursal }}</span>
-  </div>
-  <div class="meta-item">
-    <label>Estado</label>
-    <span>
-      {% if cerrada %}
-        <span class="badge-closed">CERRADA</span>
-      {% else %}
-        <span class="badge-open">ABIERTA</span>
-      {% endif %}
-    </span>
-  </div>
-</div>
+<table class="meta"><tr>
+  <td><span class="meta-label">Fecha</span><span class="meta-val">{{ fecha }}</span></td>
+  <td><span class="meta-label">Sucursal</span><span class="meta-val">{{ sucursal }}</span></td>
+  <td><span class="meta-label">Estado</span>
+      {% if cerrada %}<span class="badge-closed">CERRADA</span>
+      {% else %}<span class="badge-open">ABIERTA</span>{% endif %}
+  </td>
+</tr></table>
 
-<!-- 4 sections grid -->
-<div class="grid">
-
+<!-- 4 sections: 2 rows x 2 cols -->
+<table class="sections">
+<tr>
   <!-- Gastos -->
-  <div class="section">
-    <div class="section-header gastos">
-      <span>⬆ Gastos</span>
-      <span>{{ fmt(total_gastos) }}</span>
-    </div>
-    <div class="section-body">
+  <td class="sec-cell">
+    <div class="section">
+      <table class="sec-hdr"><tr>
+        <td class="hdr-gastos">Gastos</td>
+        <td class="hdr-gastos" style="text-align:right">{{ fmt(total_gastos) }}</td>
+      </tr></table>
       {% if gastos %}
-        <table>
+        <table class="rows">
           {% for m in gastos %}
-          <tr>
-            <td>{{ m.descripcion or '—' }}</td>
-            <td>{{ fmt(m.monto) }}</td>
-          </tr>
+          <tr><td>{{ m.descripcion or '—' }}</td><td class="amt">{{ fmt(m.monto) }}</td></tr>
           {% endfor %}
         </table>
-      {% else %}
-        <p class="empty">Sin registros</p>
-      {% endif %}
+      {% else %}<div class="empty-row">Sin registros</div>{% endif %}
     </div>
-  </div>
-
+  </td>
   <!-- Transferencias -->
-  <div class="section">
-    <div class="section-header transf">
-      <span>⬇ Transferencias</span>
-      <span>{{ fmt(total_transf) }}</span>
-    </div>
-    <div class="section-body">
+  <td class="sec-cell">
+    <div class="section">
+      <table class="sec-hdr"><tr>
+        <td class="hdr-transf">Transferencias</td>
+        <td class="hdr-transf" style="text-align:right">{{ fmt(total_transf) }}</td>
+      </tr></table>
       {% if transf %}
-        <table>
+        <table class="rows">
           {% for m in transf %}
-          <tr>
-            <td>{{ m.descripcion or '—' }}</td>
-            <td>{{ fmt(m.monto) }}</td>
-          </tr>
+          <tr><td>{{ m.descripcion or '—' }}</td><td class="amt">{{ fmt(m.monto) }}</td></tr>
           {% endfor %}
         </table>
-      {% else %}
-        <p class="empty">Sin registros</p>
-      {% endif %}
+      {% else %}<div class="empty-row">Sin registros</div>{% endif %}
     </div>
-  </div>
-
+  </td>
+</tr>
+<tr>
   <!-- Retiro de caja -->
-  <div class="section">
-    <div class="section-header retiros">
-      <span>💵 Retiro de Caja</span>
-      <span>{{ fmt(total_retiros) }}</span>
-    </div>
-    <div class="section-body">
+  <td class="sec-cell">
+    <div class="section">
+      <table class="sec-hdr"><tr>
+        <td class="hdr-retiros">Retiro de Caja</td>
+        <td class="hdr-retiros" style="text-align:right">{{ fmt(total_retiros) }}</td>
+      </tr></table>
       {% if retiros %}
-        <table>
+        <table class="rows">
           {% for m in retiros %}
-          <tr>
-            <td>{{ m.descripcion or '—' }}</td>
-            <td>{{ fmt(m.monto) }}</td>
-          </tr>
+          <tr><td>{{ m.descripcion or '—' }}</td><td class="amt">{{ fmt(m.monto) }}</td></tr>
           {% endfor %}
         </table>
-      {% else %}
-        <p class="empty">Sin registros</p>
-      {% endif %}
+      {% else %}<div class="empty-row">Sin registros</div>{% endif %}
     </div>
-  </div>
-
+  </td>
   <!-- Tarjetas -->
-  <div class="section">
-    <div class="section-header tarjetas">
-      <span>💳 Tarjetas</span>
-      <span>{{ fmt(total_tarjetas) }}</span>
+  <td class="sec-cell">
+    <div class="section">
+      <table class="sec-hdr"><tr>
+        <td class="hdr-tarjetas">Tarjetas</td>
+        <td class="hdr-tarjetas" style="text-align:right">{{ fmt(total_tarjetas) }}</td>
+      </tr></table>
+      <table class="rows">
+        <tr><td>PROVINCIA</td><td class="amt">{{ fmt(tarjeta_provincia) }}</td></tr>
+        <tr><td>NAVE</td><td class="amt">{{ fmt(tarjeta_nave) }}</td></tr>
+        <tr><td>FRANCES</td><td class="amt">{{ fmt(tarjeta_frances) }}</td></tr>
+        <tr><td>COMAFI</td><td class="amt">{{ fmt(tarjeta_comafi) }}</td></tr>
+      </table>
     </div>
-    <div class="section-body" style="padding-top:6px">
-      <div class="terminal-row">
-        <span class="t-label">PROVINCIA</span>
-        <span>{{ fmt(tarjeta_provincia) }}</span>
-      </div>
-      <div class="terminal-row">
-        <span class="t-label">NAVE</span>
-        <span>{{ fmt(tarjeta_nave) }}</span>
-      </div>
-      <div class="terminal-row">
-        <span class="t-label">FRANCÉS</span>
-        <span>{{ fmt(tarjeta_frances) }}</span>
-      </div>
-      <div class="terminal-row" style="border-bottom:none">
-        <span class="t-label">COMAFI</span>
-        <span>{{ fmt(tarjeta_comafi) }}</span>
-      </div>
-    </div>
-  </div>
-
-</div>
+  </td>
+</tr>
+</table>
 
 <!-- Efectivo del día -->
-<div class="efectivo-box">
-  <span class="label">Efectivo del día</span>
-  <span class="value">{{ fmt(efectivo_del_dia) }}</span>
-</div>
+<table class="efectivo"><tr>
+  <td class="ef-label">Efectivo del día</td>
+  <td class="ef-value">{{ fmt(efectivo_del_dia) }}</td>
+</tr></table>
 
-<!-- Summary -->
-<div class="summary-grid">
-  <div class="summary-card">
-    <div class="s-label">Transferencias</div>
-    <div class="s-value s-transf">{{ fmt(total_transf) }}</div>
-  </div>
-  <div class="summary-card">
-    <div class="s-label">Efectivo</div>
-    <div class="s-value s-efectivo">{{ fmt(efectivo_del_dia) }}</div>
-  </div>
-  <div class="summary-card">
-    <div class="s-label">Tarjetas</div>
-    <div class="s-value s-tarjeta">{{ fmt(total_tarjetas) }}</div>
-  </div>
-  <div class="summary-card">
-    <div class="s-label">Gastos + Retiros</div>
-    <div class="s-value s-salidas">- {{ fmt(total_salidas) }}</div>
-  </div>
-</div>
+<!-- Resumen -->
+<table class="summary"><tr>
+  <td><span class="sum-label">Transferencias</span><span class="sum-val c-transf">{{ fmt(total_transf) }}</span></td>
+  <td><span class="sum-label">Efectivo</span><span class="sum-val c-efectivo">{{ fmt(efectivo_del_dia) }}</span></td>
+  <td><span class="sum-label">Tarjetas</span><span class="sum-val c-tarjeta">{{ fmt(total_tarjetas) }}</span></td>
+  <td><span class="sum-label">Gastos + Retiros</span><span class="sum-val c-salidas">- {{ fmt(total_salidas) }}</span></td>
+</tr></table>
 
 <!-- Total del día -->
-<div class="total-box">
-  <span class="t-label">Total del Día</span>
-  <span class="t-value">{{ fmt(total_del_dia) }}</span>
-</div>
+<table class="total-row"><tr>
+  <td class="tot-label">Total del Día</td>
+  <td class="tot-val">{{ fmt(total_del_dia) }}</td>
+</tr></table>
 
 {% if observaciones %}
 <div class="obs-box">
-  <div class="obs-title">Observaciones del día</div>
+  <div class="obs-title">Observaciones</div>
   <div class="obs-text">{{ observaciones }}</div>
 </div>
 {% endif %}
 
-<div class="footer">Sur Maderas · Mar del Plata · Sistema ERP v1.0 — Documento generado automáticamente</div>
-
+<div class="footer">Sur Maderas · Mar del Plata · Sistema ERP v1.0 — Documento interno</div>
 </body>
 </html>
 """
@@ -342,8 +297,8 @@ def _generate_caja_pdf(data: dict) -> bytes:
     env.globals["fmt"] = _fmt
     tmpl = env.get_template("t")
 
-    fecha_parts = data["fecha"].split("-")
-    fecha_str   = f"{fecha_parts[2]}/{fecha_parts[1]}/{fecha_parts[0]}"
+    fecha_parts    = data["fecha"].split("-")
+    fecha_str      = f"{fecha_parts[2]}/{fecha_parts[1]}/{fecha_parts[0]}"
     sucursal_label = "Sucursal Luro" if data["sucursal"] == "luro" else "Sucursal Independencia"
 
     html_str = tmpl.render(
@@ -381,7 +336,7 @@ def _generate_caja_pdf(data: dict) -> bytes:
 
 # ── GET /caja-diaria/historial/{sucursal} ────────────────────────
 @router.get("/historial/{sucursal}")
-def historial(sucursal: str, db: Session = Depends(get_db)):
+def get_historial(sucursal: str, db: Session = Depends(get_db)):
     cajas = (
         db.query(CajaDiaria)
         .filter(CajaDiaria.sucursal == sucursal)

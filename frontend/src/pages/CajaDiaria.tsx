@@ -3,8 +3,11 @@ import { api, fmt$ } from '../api'
 import {
   Plus, Trash2, Lock, Unlock,
   ArrowDownCircle, ArrowUpCircle, CreditCard, Banknote,
-  FileDown, History, CalendarDays, CheckCircle2,
+  FileDown, History, CalendarDays, CheckCircle2, MessageCircle,
 } from 'lucide-react'
+
+// ── WhatsApp — número de Gustavo (sin + ni espacios) ─────────────
+const GUSTAVO_WA = '5492235000000'  // ← reemplazar con el número real
 
 const CORAL = '#C8603A'
 const NAVY  = '#070614'
@@ -245,6 +248,33 @@ export default function CajaDiaria() {
     await api.pdf(`/caja-diaria/pdf/${cajaId}`, `caja_${suc}_${fecha}.pdf`)
   }
 
+  // ── WhatsApp summary ─────────────────────────────────────────
+  function sendWhatsApp() {
+    if (!caja) return
+    const [y, m, d] = caja.fecha.split('-')
+    const sucLabel = caja.sucursal === 'luro' ? 'Luro' : 'Independencia'
+    const msg = [
+      `📋 *Resumen del día — Sur Maderas*`,
+      `📅 ${d}/${m}/${y} | Sucursal ${sucLabel}`,
+      ``,
+      `💵 Efectivo: ${fmt$(caja.efectivo_del_dia)}`,
+      `🔄 Transferencias: ${fmt$(caja.total_transf)}`,
+      `💳 Tarjetas: ${fmt$(caja.total_tarjetas)}`,
+      `   · PROVINCIA: ${fmt$(caja.tarjeta_provincia)}`,
+      `   · NAVE: ${fmt$(caja.tarjeta_nave)}`,
+      `   · FRANCÉS: ${fmt$(caja.tarjeta_frances)}`,
+      `   · COMAFI: ${fmt$(caja.tarjeta_comafi)}`,
+      ``,
+      `⬆️ Gastos + Retiros: ${fmt$(caja.total_salidas)}`,
+      ``,
+      `💰 *TOTAL DEL DÍA: ${fmt$(caja.total_del_dia)}*`,
+      caja.observaciones ? `\n📝 ${caja.observaciones}` : '',
+    ].filter(Boolean).join('\n')
+
+    const url = `https://wa.me/${GUSTAVO_WA}?text=${encodeURIComponent(msg)}`
+    window.open(url, '_blank')
+  }
+
   // ── Ver día desde historial ──────────────────────────────────
   function verDia(c: Caja) {
     setFecha(c.fecha)
@@ -430,6 +460,14 @@ export default function CajaDiaria() {
                 <button onClick={() => downloadPdf(caja.id, caja.fecha, caja.sucursal)}
                   className="flex items-center gap-2 px-5 py-3.5 rounded-2xl text-sm font-bold border-2 border-gray-200 text-gray-600 hover:bg-gray-50 transition-all">
                   <FileDown size={16} /> PDF
+                </button>
+
+                {/* WhatsApp */}
+                <button onClick={sendWhatsApp}
+                  className="flex items-center gap-2 px-5 py-3.5 rounded-2xl text-sm font-bold transition-all"
+                  style={{ background: '#25D366', color: 'white' }}
+                  title="Enviar resumen a Gustavo">
+                  <MessageCircle size={16} /> WA
                 </button>
               </div>
             </>
