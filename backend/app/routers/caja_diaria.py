@@ -39,6 +39,27 @@ class CajaUpdate(BaseModel):
 def _fmt(n: float) -> str:
     return f"$ {float(n):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
+# fpdf2 con Helvetica solo soporta Latin-1 (ISO 8859-1).
+# Esta funcion reemplaza cualquier caracter fuera de ese rango con '?'
+# para que jamas explote, sin importar lo que escribio el usuario.
+_LATIN1_SUBS = {
+    '—': '-',   # em dash —
+    '–': '-',   # en dash -
+    '‘': "'",   # comilla izq '
+    '’': "'",   # comilla der '
+    '“': '"',   # comilla doble izq "
+    '”': '"',   # comilla doble der "
+    '…': '...',  # puntos suspensivos
+    '·': '.',   # punto medio
+    '•': '*',   # bullet
+}
+def _safe(text: str) -> str:
+    if not text:
+        return ''
+    for src, dst in _LATIN1_SUBS.items():
+        text = text.replace(src, dst)
+    return text.encode('latin-1', errors='replace').decode('latin-1')
+
 def _serialize_caja(c: CajaDiaria) -> dict:
     movs = [
         {
@@ -170,7 +191,7 @@ def _generate_caja_pdf(data: dict) -> bytes:
         else:
             for m in items:
                 pdf.set_xy(x_off, y0)
-                desc = (m["descripcion"] or "-")[:32]
+                desc = _safe(m["descripcion"] or "-")[:32]
                 pdf.cell(col_w * 0.6, 6, f"  {desc}", ln=0, border="L")
                 pdf.set_xy(x_off + col_w * 0.6, y0)
                 pdf.cell(col_w * 0.4, 6, _fmt(m["monto"]), ln=0,
@@ -238,7 +259,7 @@ def _generate_caja_pdf(data: dict) -> bytes:
     pdf.set_xy(17, ef_y + 1.5)
     pdf.set_font("Helvetica", "B", 7.5)
     pdf.set_text_color(100, 100, 100)
-    pdf.cell(W * 0.5, 7, "EFECTIVO DEL DÍA", ln=0)
+    pdf.cell(W * 0.5, 7, "EFECTIVO DEL DIA", ln=0)
     pdf.set_xy(15, ef_y + 1.5)
     pdf.set_font("Helvetica", "B", 13)
     pdf.set_text_color(NAVY_R, NAVY_G, NAVY_B)
@@ -277,7 +298,7 @@ def _generate_caja_pdf(data: dict) -> bytes:
     pdf.set_xy(17, tot_y + 3)
     pdf.set_font("Helvetica", "B", 8)
     pdf.set_text_color(180, 180, 200)
-    pdf.cell(W * 0.5, 8, "TOTAL DEL DÍA", ln=0)
+    pdf.cell(W * 0.5, 8, "TOTAL DEL DIA", ln=0)
     pdf.set_xy(15, tot_y + 2)
     pdf.set_font("Helvetica", "B", 16)
     pdf.set_text_color(CORAL_R, CORAL_G, CORAL_B)
@@ -294,7 +315,8 @@ def _generate_caja_pdf(data: dict) -> bytes:
         pdf.cell(W, 5, "OBSERVACIONES", ln=1)
         pdf.set_font("Helvetica", "", 8.5)
         pdf.set_text_color(50, 50, 50)
-        pdf.multi_cell(W, 5, data["observaciones"])
+        obs_text = _safe(data.get("observaciones") or "")
+        pdf.multi_cell(W, 5, obs_text)
         pdf.ln(2)
 
     # ── Footer ────────────────────────────────────────────────────
