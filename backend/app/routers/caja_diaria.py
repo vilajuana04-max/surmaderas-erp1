@@ -102,9 +102,9 @@ def _serialize_caja(c: CajaDiaria) -> dict:
     }
 
 
-# ── PDF con fpdf2 (sin dependencias del sistema) ──────────────────
+# ── PDF con fpdf2 — Landscape A4 ─────────────────────────────────
 def _generate_caja_pdf(data: dict) -> bytes:
-    y_parts  = data["fecha"].split("-")
+    y_parts   = data["fecha"].split("-")
     fecha_str = f"{y_parts[2]}/{y_parts[1]}/{y_parts[0]}"
     suc_label = "Sucursal Luro" if data["sucursal"] == "luro" else "Sucursal Independencia"
     generado  = date.today().strftime("%d/%m/%Y")
@@ -113,221 +113,207 @@ def _generate_caja_pdf(data: dict) -> bytes:
     transf  = [m for m in data["movimientos"] if m["tipo"] == "transferencia"]
     retiros = [m for m in data["movimientos"] if m["tipo"] == "retiro"]
 
-    pdf = FPDF(format="A4")
-    pdf.set_auto_page_break(auto=True, margin=15)
+    # Landscape A4: 297 x 210 mm
+    pdf = FPDF(orientation="L", format="A4")
+    pdf.set_auto_page_break(auto=True, margin=14)
     pdf.add_page()
-    pdf.set_margins(15, 15, 15)
-    W = pdf.w - 30   # usable width
+    W  = 267.0   # 297 - 30 (margenes 15 c/u)
+    x0 = 15.0
 
     # ── Header ────────────────────────────────────────────────────
-    pdf.set_font("Helvetica", "B", 18)
+    pdf.set_y(15)
+    pdf.set_font("Helvetica", "B", 22)
     pdf.set_text_color(NAVY_R, NAVY_G, NAVY_B)
-    pdf.cell(W * 0.65, 8, "SUR MADERAS", ln=0)
-    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_x(x0)
+    pdf.cell(W * 0.65, 10, "SUR MADERAS", ln=0)
+    pdf.set_font("Helvetica", "B", 13)
     pdf.set_text_color(CORAL_R, CORAL_G, CORAL_B)
-    pdf.cell(W * 0.35, 8, "Cierre de Caja", ln=0, align="R")
-    pdf.ln(8)
+    pdf.cell(W * 0.35, 10, "Cierre de Caja Diaria", ln=0, align="R")
+    pdf.ln(10)
+    pdf.set_x(x0)
     pdf.set_font("Helvetica", "", 7)
-    pdf.set_text_color(120, 120, 120)
-    pdf.cell(W * 0.65, 5, "Mar del Plata  |  Sistema ERP v1.0", ln=0)
-    pdf.cell(W * 0.35, 5, f"Generado: {generado}", ln=0, align="R")
-    pdf.ln(5)
-    # separador coral
+    pdf.set_text_color(130, 130, 130)
+    pdf.cell(W * 0.65, 4, "Mar del Plata  |  Sistema ERP v1.0", ln=0)
+    pdf.cell(W * 0.35, 4, f"Generado: {generado}", ln=0, align="R")
+    pdf.ln(4)
+    # linea coral
     pdf.set_draw_color(CORAL_R, CORAL_G, CORAL_B)
     pdf.set_line_width(0.8)
-    pdf.line(15, pdf.get_y(), 15 + W, pdf.get_y())
-    pdf.ln(4)
+    pdf.line(x0, pdf.get_y(), x0 + W, pdf.get_y())
+    pdf.ln(3)
 
-    # ── Meta strip (fondo navy) ───────────────────────────────────
+    # ── Meta strip (navy, 4 columnas) ────────────────────────────
     strip_y = pdf.get_y()
     pdf.set_fill_color(NAVY_R, NAVY_G, NAVY_B)
-    pdf.rect(15, strip_y, W, 12, "F")
-    pdf.set_y(strip_y + 2)
-    pdf.set_font("Helvetica", "", 7)
-    pdf.set_text_color(180, 180, 200)
-
-    col = W / 3
-    for label, val in [("FECHA", fecha_str), ("SUCURSAL", suc_label),
-                        ("ESTADO", "CERRADA" if data["cerrada"] else "ABIERTA")]:
-        x = 15 + col * [("FECHA", fecha_str), ("SUCURSAL", suc_label),
-                          ("ESTADO", "CERRADA" if data["cerrada"] else "ABIERTA")].index((label, val))
-        pdf.set_xy(x, strip_y + 1.5)
-        pdf.cell(col, 4, label, ln=0)
-    pdf.set_y(strip_y + 5)
-    pdf.set_font("Helvetica", "B", 8.5)
-    pdf.set_text_color(255, 255, 255)
-    for i, val in enumerate([fecha_str, suc_label,
-                              "CERRADA" if data["cerrada"] else "ABIERTA"]):
-        pdf.set_xy(15 + col * i, strip_y + 6)
-        pdf.cell(col, 5, val, ln=0)
-    pdf.ln(16)
-    pdf.set_text_color(30, 30, 30)
-
-    # ── Secciones (2 columnas) ────────────────────────────────────
-    def section(title: str, items: list, total: float,
-                hdr_r: int, hdr_g: int, hdr_b: int,
-                x_off: float, col_w: float):
-        y0 = pdf.get_y()
-        # cabecera de sección
-        pdf.set_fill_color(hdr_r, hdr_g, hdr_b)
-        pdf.set_xy(x_off, y0)
-        pdf.set_font("Helvetica", "B", 8)
+    pdf.rect(x0, strip_y, W, 14, "F")
+    meta_items = [
+        ("FECHA",    fecha_str),
+        ("SUCURSAL", suc_label),
+        ("ESTADO",   "CERRADA" if data["cerrada"] else "ABIERTA"),
+        ("GENERADO", generado),
+    ]
+    cw_meta = W / 4
+    for i, (lbl, val) in enumerate(meta_items):
+        xi = x0 + cw_meta * i
+        pdf.set_xy(xi + 3, strip_y + 2)
+        pdf.set_font("Helvetica", "", 6)
+        pdf.set_text_color(140, 140, 170)
+        pdf.cell(cw_meta - 3, 4, lbl, ln=0)
+        pdf.set_xy(xi + 3, strip_y + 7)
+        pdf.set_font("Helvetica", "B", 9)
         pdf.set_text_color(255, 255, 255)
-        pdf.cell(col_w, 7, f"  {title}", ln=0, fill=True)
-        pdf.set_xy(x_off, y0)
-        pdf.cell(col_w, 7, _fmt(total), ln=0, align="R", fill=True)
-        y0 += 7
+        pdf.cell(cw_meta - 3, 5, val, ln=0)
+    pdf.set_y(strip_y + 18)
+
+    # ── Helper: dibujar una seccion con coordenadas fijas ─────────
+    def draw_section(title, items, total, hdr_r, hdr_g, hdr_b,
+                     x_off, y_off, col_width):
+        # cabecera coloreada
+        pdf.set_fill_color(hdr_r, hdr_g, hdr_b)
+        pdf.set_xy(x_off, y_off)
+        pdf.set_font("Helvetica", "B", 8.5)
+        pdf.set_text_color(255, 255, 255)
+        pdf.cell(col_width, 8, f"  {title}", ln=0, fill=True)
+        pdf.set_xy(x_off, y_off)
+        pdf.cell(col_width - 2, 8, _fmt(total), ln=0, align="R", fill=True)
+        y = y_off + 8
         # filas
-        pdf.set_font("Helvetica", "", 8)
-        pdf.set_text_color(40, 40, 40)
         if not items:
-            pdf.set_xy(x_off, y0)
+            pdf.set_xy(x_off, y)
             pdf.set_text_color(160, 160, 160)
             pdf.set_font("Helvetica", "I", 7.5)
-            pdf.cell(col_w, 6, "  Sin registros", ln=0,
-                     border="LRB", fill=False)
-            pdf.set_text_color(40, 40, 40)
-            y0 += 6
+            pdf.cell(col_width, 6, "  Sin registros", border="LRB", ln=0)
+            y += 6
         else:
-            for m in items:
-                pdf.set_xy(x_off, y0)
-                desc = _safe(m["descripcion"] or "-")[:32]
-                pdf.cell(col_w * 0.6, 6, f"  {desc}", ln=0, border="L")
-                pdf.set_xy(x_off + col_w * 0.6, y0)
-                pdf.cell(col_w * 0.4, 6, _fmt(m["monto"]), ln=0,
-                         align="R", border="R")
-                y0 += 6
-        # borde inferior
-        pdf.set_draw_color(220, 220, 220)
-        pdf.set_line_width(0.3)
-        pdf.line(x_off, y0, x_off + col_w, y0)
-        return y0
+            for idx, m in enumerate(items):
+                bg = (250, 250, 252) if idx % 2 == 1 else (255, 255, 255)
+                pdf.set_fill_color(*bg)
+                desc = _safe(m["descripcion"] or "-")[:42]
+                pdf.set_xy(x_off, y)
+                pdf.set_font("Helvetica", "", 8)
+                pdf.set_text_color(40, 40, 40)
+                pdf.cell(col_width * 0.65, 6, f"  {desc}",
+                         border="LB", fill=True, ln=0)
+                pdf.set_xy(x_off + col_width * 0.65, y)
+                pdf.set_font("Helvetica", "B", 8)
+                pdf.cell(col_width * 0.35, 6, _fmt(m["monto"]),
+                         border="RB", align="R", fill=True, ln=0)
+                y += 6
+        return y
 
-    gap  = 4
+    # ── Secciones en 2 columnas ───────────────────────────────────
+    gap   = 5.0
     col_w = (W - gap) / 2
-    x_l  = 15
-    x_r  = 15 + col_w + gap
+    x_l   = x0
+    x_r   = x0 + col_w + gap
 
-    y_start = pdf.get_y()
+    # Fila 1: Gastos | Transferencias — misma y de arranque
+    row1_y = pdf.get_y()
+    yL = draw_section("GASTOS",         gastos, data["total_gastos"],
+                      200, 70, 70,   x_l, row1_y, col_w)
+    yR = draw_section("TRANSFERENCIAS", transf, data["total_transf"],
+                      50, 100, 210,  x_r, row1_y, col_w)
 
-    # fila 1: Gastos | Transferencias
-    yL = section("Gastos",        gastos, data["total_gastos"],
-                 200, 80, 80,  x_l, col_w)
-    yR = section("Transferencias", transf, data["total_transf"],
-                 60, 100, 210, x_r, col_w)
-    pdf.set_y(max(yL, yR) + 4)
+    # Fila 2: Retiro de Caja | Tarjetas — misma y de arranque
+    row2_y = max(yL, yR) + 5
+    yL2 = draw_section("RETIRO DE CAJA", retiros, data["total_retiros"],
+                       200, 150, 40, x_l, row2_y, col_w)
 
-    # fila 2: Retiro de Caja | Tarjetas
-    yL2 = section("Retiro de Caja", retiros, data["total_retiros"],
-                  210, 160, 50, x_l, col_w)
-
-    # Tarjetas: sección especial con terminales fijas
-    y0t = pdf.get_y()
-    # Si la col izquierda terminó más abajo, ajustar
-    y0t = max(yL2, pdf.get_y()) - (max(yL2, pdf.get_y()) - pdf.get_y())
-    # Recalcular: usar misma y que col izquierda empezo
-    y0t_start = max(yL, yR) + 4
-    pdf.set_xy(x_r, y0t_start)
-
-    pdf.set_fill_color(120, 80, 200)
+    # Tarjetas (filas fijas de terminales)
+    pdf.set_fill_color(110, 70, 200)
+    pdf.set_xy(x_r, row2_y)
+    pdf.set_font("Helvetica", "B", 8.5)
     pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Helvetica", "B", 8)
-    pdf.cell(col_w, 7, "  Tarjetas", ln=0, fill=True)
-    pdf.set_xy(x_r, y0t_start)
-    pdf.cell(col_w, 7, _fmt(data["total_tarjetas"]), ln=0, align="R", fill=True)
-    y0t = y0t_start + 7
-    pdf.set_text_color(40, 40, 40)
-    pdf.set_font("Helvetica", "", 8)
-    for label, key in [("PROVINCIA", "tarjeta_provincia"), ("NAVE", "tarjeta_nave"),
-                        ("FRANCES",  "tarjeta_frances"),   ("COMAFI", "tarjeta_comafi")]:
-        pdf.set_xy(x_r, y0t)
-        pdf.cell(col_w * 0.55, 6, f"  {label}", ln=0, border="L")
-        pdf.set_xy(x_r + col_w * 0.55, y0t)
-        pdf.cell(col_w * 0.45, 6, _fmt(data[key]), ln=0, align="R", border="R")
-        y0t += 6
-    pdf.set_draw_color(220, 220, 220)
-    pdf.set_line_width(0.3)
-    pdf.line(x_r, y0t, x_r + col_w, y0t)
+    pdf.cell(col_w, 8, "  TARJETAS", ln=0, fill=True)
+    pdf.set_xy(x_r, row2_y)
+    pdf.cell(col_w - 2, 8, _fmt(data["total_tarjetas"]), ln=0, align="R", fill=True)
+    yT = row2_y + 8
+    for idx, (label, key) in enumerate([
+            ("PROVINCIA", "tarjeta_provincia"), ("NAVE",   "tarjeta_nave"),
+            ("FRANCES",   "tarjeta_frances"),   ("COMAFI", "tarjeta_comafi")]):
+        bg = (250, 250, 252) if idx % 2 == 1 else (255, 255, 255)
+        pdf.set_fill_color(*bg)
+        pdf.set_xy(x_r, yT)
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(40, 40, 40)
+        pdf.cell(col_w * 0.55, 6, f"  {label}", border="LB", fill=True, ln=0)
+        pdf.set_xy(x_r + col_w * 0.55, yT)
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.cell(col_w * 0.45, 6, _fmt(data[key]),
+                 border="RB", align="R", fill=True, ln=0)
+        yT += 6
 
-    pdf.set_y(max(yL2, y0t) + 5)
+    pdf.set_y(max(yL2, yT) + 6)
 
-    # ── Efectivo del día ──────────────────────────────────────────
-    pdf.set_draw_color(CORAL_R, CORAL_G, CORAL_B)
-    pdf.set_line_width(0.5)
-    ef_y = pdf.get_y()
-    pdf.rect(15, ef_y, W, 10)
-    pdf.set_xy(17, ef_y + 1.5)
-    pdf.set_font("Helvetica", "B", 7.5)
-    pdf.set_text_color(100, 100, 100)
-    pdf.cell(W * 0.5, 7, "EFECTIVO DEL DIA", ln=0)
-    pdf.set_xy(15, ef_y + 1.5)
-    pdf.set_font("Helvetica", "B", 13)
-    pdf.set_text_color(NAVY_R, NAVY_G, NAVY_B)
-    pdf.cell(W - 2, 7, _fmt(data["efectivo_del_dia"]), ln=0, align="R")
-    pdf.ln(14)
-
-    # ── Resumen 4 celdas ─────────────────────────────────────────
-    cw4 = W / 4
-    sum_y = pdf.get_y()
-    colors = [
-        ("Transferencias", data["total_transf"],      37, 99, 235),
-        ("Efectivo",       data["efectivo_del_dia"],  22, 163, 74),
-        ("Tarjetas",       data["total_tarjetas"],   124, 58, 237),
-        ("Gastos+Retiros", data["total_salidas"],    220, 38, 38),
+    # ── KPI: 4 boxes con borde superior de color ─────────────────
+    kpi_y  = pdf.get_y()
+    cw_kpi = W / 4
+    kpi_items = [
+        ("EFECTIVO DEL DIA",  data["efectivo_del_dia"],   22, 163,  74),
+        ("TRANSFERENCIAS",    data["total_transf"],        37,  99, 235),
+        ("TARJETAS",          data["total_tarjetas"],     124,  58, 237),
+        ("GASTOS + RETIROS",  data["total_salidas"],      200,  50,  50),
     ]
-    pdf.set_draw_color(220, 220, 220)
-    pdf.set_line_width(0.3)
-    for i, (lbl, val, r, g, b) in enumerate(colors):
-        x = 15 + cw4 * i
-        pdf.rect(x, sum_y, cw4, 14)
-        pdf.set_xy(x + 1, sum_y + 1.5)
+    for i, (lbl, val, r, g, b) in enumerate(kpi_items):
+        x = x0 + cw_kpi * i
+        # borde superior coloreado
+        pdf.set_draw_color(r, g, b)
+        pdf.set_line_width(2.0)
+        pdf.line(x, kpi_y, x + cw_kpi, kpi_y)
+        # caja
+        pdf.set_draw_color(215, 215, 215)
+        pdf.set_line_width(0.3)
+        pdf.rect(x, kpi_y, cw_kpi, 18)
+        # etiqueta
+        pdf.set_xy(x + 3, kpi_y + 3)
         pdf.set_font("Helvetica", "", 6.5)
         pdf.set_text_color(120, 120, 120)
-        pdf.cell(cw4 - 2, 4, lbl.upper(), ln=0)
-        pdf.set_xy(x + 1, sum_y + 6)
-        pdf.set_font("Helvetica", "B", 9.5)
+        pdf.cell(cw_kpi - 6, 4, lbl, ln=0)
+        # valor
+        pdf.set_xy(x + 3, kpi_y + 9)
+        pdf.set_font("Helvetica", "B", 11)
         pdf.set_text_color(r, g, b)
-        prefix = "- " if lbl == "Gastos+Retiros" else ""
-        pdf.cell(cw4 - 2, 6, prefix + _fmt(val), ln=0)
-    pdf.ln(18)
+        prefix = "- " if "GASTO" in lbl else ""
+        pdf.cell(cw_kpi - 6, 7, prefix + _fmt(val), ln=0)
+    pdf.set_y(kpi_y + 23)
 
-    # ── Total del día ─────────────────────────────────────────────
+    # ── Total del Dia (banner navy) ───────────────────────────────
     tot_y = pdf.get_y()
     pdf.set_fill_color(NAVY_R, NAVY_G, NAVY_B)
-    pdf.rect(15, tot_y, W, 14, "F")
-    pdf.set_xy(17, tot_y + 3)
-    pdf.set_font("Helvetica", "B", 8)
-    pdf.set_text_color(180, 180, 200)
-    pdf.cell(W * 0.5, 8, "TOTAL DEL DIA", ln=0)
-    pdf.set_xy(15, tot_y + 2)
-    pdf.set_font("Helvetica", "B", 16)
+    pdf.rect(x0, tot_y, W, 16, "F")
+    pdf.set_xy(x0 + 5, tot_y + 4)
+    pdf.set_font("Helvetica", "B", 8.5)
+    pdf.set_text_color(140, 140, 180)
+    pdf.cell(W * 0.45, 8, "TOTAL DEL DIA", ln=0)
+    pdf.set_xy(x0, tot_y + 2)
+    pdf.set_font("Helvetica", "B", 19)
     pdf.set_text_color(CORAL_R, CORAL_G, CORAL_B)
-    pdf.cell(W - 2, 10, _fmt(data["total_del_dia"]), ln=0, align="R")
-    pdf.ln(18)
+    pdf.cell(W - 5, 12, _fmt(data["total_del_dia"]), ln=0, align="R")
+    pdf.ln(20)
 
-    # ── Observaciones ─────────────────────────────────────────────
+    # ── Observaciones ────────────────────────────────────────────
     if data.get("observaciones"):
-        pdf.set_draw_color(220, 220, 220)
-        pdf.set_line_width(0.3)
-        obs_y = pdf.get_y()
+        pdf.set_x(x0)
         pdf.set_font("Helvetica", "B", 7)
-        pdf.set_text_color(100, 100, 100)
+        pdf.set_text_color(110, 110, 110)
         pdf.cell(W, 5, "OBSERVACIONES", ln=1)
+        pdf.set_x(x0)
         pdf.set_font("Helvetica", "", 8.5)
         pdf.set_text_color(50, 50, 50)
-        obs_text = _safe(data.get("observaciones") or "")
-        pdf.multi_cell(W, 5, obs_text)
+        pdf.multi_cell(W, 5, _safe(data.get("observaciones") or ""))
         pdf.ln(2)
 
-    # ── Footer ────────────────────────────────────────────────────
-    pdf.set_y(-18)
-    pdf.set_draw_color(220, 220, 220)
+    # ── Footer ───────────────────────────────────────────────────
+    pdf.set_y(pdf.h - 13)
+    pdf.set_draw_color(210, 210, 210)
     pdf.set_line_width(0.3)
-    pdf.line(15, pdf.get_y(), 15 + W, pdf.get_y())
+    pdf.line(x0, pdf.get_y(), x0 + W, pdf.get_y())
     pdf.ln(2)
+    pdf.set_x(x0)
     pdf.set_font("Helvetica", "", 7)
     pdf.set_text_color(160, 160, 160)
-    pdf.cell(W, 5, "Sur Maderas  |  Mar del Plata  |  Sistema ERP v1.0  |  Documento interno",
+    pdf.cell(W, 5,
+             "Sur Maderas  |  Mar del Plata  |  Sistema ERP v1.0  |  Documento interno",
              align="C")
 
     return bytes(pdf.output())
