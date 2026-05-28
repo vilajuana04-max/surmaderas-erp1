@@ -6,19 +6,21 @@ Uso:
 import os
 import sys
 import psycopg2
-from passlib.context import CryptContext
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     print("ERROR: definí la variable DATABASE_URL antes de correr este script.")
     sys.exit(1)
 
-pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Hashes bcrypt pre-generados (contraseñas: Gust1401 y 1111)
+USERS = [
+    ("Gustavo", "$2b$12$DM6fkHH4HVcp8sJ5X200MOt3bXu0UWZ8XqGBhc.kernSC8h/1mdM.", "admin"),
+    ("Caja",    "$2b$12$hBgYB8esHs7zq0JT1mW7LuIWejLEOpEEZ1CPGs/eY4PppvKIvwPfG", "caja"),
+]
 
 conn = psycopg2.connect(DATABASE_URL)
 cur  = conn.cursor()
 
-# ── Crear tabla ──────────────────────────────────────────────────
 cur.execute("""
 CREATE TABLE IF NOT EXISTS users (
     id            SERIAL PRIMARY KEY,
@@ -30,20 +32,13 @@ CREATE TABLE IF NOT EXISTS users (
 );
 """)
 
-# ── Seed ─────────────────────────────────────────────────────────
-users = [
-    ("Gustavo", "Gust1401", "admin"),
-    ("Caja",    "1111",     "caja"),
-]
-
-for username, password, role in users:
-    hashed = pwd.hash(password)
+for username, hashed, role in USERS:
     cur.execute("""
         INSERT INTO users (username, password_hash, role)
         VALUES (%s, %s, %s)
         ON CONFLICT (username) DO NOTHING;
     """, (username, hashed, role))
-    print(f"  ✓ Usuario '{username}' ({role}) insertado (o ya existía).")
+    print(f"  ✓ Usuario '{username}' ({role}) listo.")
 
 conn.commit()
 cur.close()
