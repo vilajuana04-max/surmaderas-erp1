@@ -170,7 +170,7 @@ def _generate_caja_pdf(data: dict) -> bytes:
         else:
             for m in items:
                 pdf.set_xy(x_off, y0)
-                desc = (m["descripcion"] or "—")[:32]
+                desc = (m["descripcion"] or "-")[:32]
                 pdf.cell(col_w * 0.6, 6, f"  {desc}", ln=0, border="L")
                 pdf.set_xy(x_off + col_w * 0.6, y0)
                 pdf.cell(col_w * 0.4, 6, _fmt(m["monto"]), ln=0,
@@ -204,7 +204,7 @@ def _generate_caja_pdf(data: dict) -> bytes:
     y0t = pdf.get_y()
     # Si la col izquierda terminó más abajo, ajustar
     y0t = max(yL2, pdf.get_y()) - (max(yL2, pdf.get_y()) - pdf.get_y())
-    # Recalcular — usar misma y que col izquierda empezó
+    # Recalcular: usar misma y que col izquierda empezo
     y0t_start = max(yL, yR) + 4
     pdf.set_xy(x_r, y0t_start)
 
@@ -218,7 +218,7 @@ def _generate_caja_pdf(data: dict) -> bytes:
     pdf.set_text_color(40, 40, 40)
     pdf.set_font("Helvetica", "", 8)
     for label, key in [("PROVINCIA", "tarjeta_provincia"), ("NAVE", "tarjeta_nave"),
-                        ("FRANCÉS",  "tarjeta_frances"),   ("COMAFI", "tarjeta_comafi")]:
+                        ("FRANCES",  "tarjeta_frances"),   ("COMAFI", "tarjeta_comafi")]:
         pdf.set_xy(x_r, y0t)
         pdf.cell(col_w * 0.55, 6, f"  {label}", ln=0, border="L")
         pdf.set_xy(x_r + col_w * 0.55, y0t)
@@ -305,7 +305,7 @@ def _generate_caja_pdf(data: dict) -> bytes:
     pdf.ln(2)
     pdf.set_font("Helvetica", "", 7)
     pdf.set_text_color(160, 160, 160)
-    pdf.cell(W, 5, "Sur Maderas  ·  Mar del Plata  ·  Sistema ERP v1.0  —  Documento interno",
+    pdf.cell(W, 5, "Sur Maderas  |  Mar del Plata  |  Sistema ERP v1.0  |  Documento interno",
              align="C")
 
     return bytes(pdf.output())
