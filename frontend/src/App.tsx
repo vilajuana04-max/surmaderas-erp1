@@ -13,6 +13,7 @@ import FlujoCaja        from './pages/FlujoCaja'
 import Vencimientos     from './pages/Vencimientos'
 import GastosPersonales from './pages/GastosPersonales'
 import CajaDiaria       from './pages/CajaDiaria'
+import Comisiones       from './pages/Comisiones'
 
 export default function App() {
   return (
@@ -112,6 +113,17 @@ export default function App() {
             <ProtectedRoute requiredRole="admin">
               <Layout>
                 <GastosPersonales />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/comisiones"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <Layout>
+                <Comisiones />
               </Layout>
             </ProtectedRoute>
           }

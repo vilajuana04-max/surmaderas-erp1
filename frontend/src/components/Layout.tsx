@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingCart, Package,
-  Users, Receipt, Menu, X, ChevronDown, TrendingUp, Bell, Wallet, LogOut, BookOpen,
+  Users, Receipt, Menu, X, ChevronDown, TrendingUp, Bell, Wallet, LogOut, BookOpen, Percent,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
@@ -227,6 +227,17 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
               <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>08</span>
               <Bell size={16} strokeWidth={2} />
               <span className="tracking-[1px] uppercase text-[12px]">Vencimientos</span>
+            </NavLink>
+
+            {/* Comisiones */}
+            <NavLink
+              to="/comisiones"
+              onClick={onClose}
+              className={({ isActive }) => navLinkClass(isActive)}
+              style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
+              <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>10</span>
+              <Percent size={16} strokeWidth={2} />
+              <span className="tracking-[1px] uppercase text-[12px]">Comisiones</span>
             </NavLink>
 
             {/* Gastos Personales */}
