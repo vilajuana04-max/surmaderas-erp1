@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 
 // ── WhatsApp — número de Gustavo (sin + ni espacios) ─────────────
-const GUSTAVO_WA = '5492235000000'  // ← reemplazar con el número real
+const GUSTAVO_WA = '5492235203420'
 
 const CORAL = '#C8603A'
 const NAVY  = '#070614'
