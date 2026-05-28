@@ -223,6 +223,88 @@ const EMPTY_FORM: FormState = {
   color: '#3b82f6', active: true, notes: '', sort_order: 0,
 }
 
+// IMPORTANTE: definido FUERA de SettingsModal para que React no lo desmonte en cada keystroke
+function InlineForm({
+  form, setF,
+}: {
+  form: FormState
+  setF: (patch: Partial<FormState>) => void
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-3 mt-3 bg-gray-50 rounded-xl p-4 border border-gray-100">
+      {/* Nombre */}
+      <div className="col-span-2">
+        <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Nombre</label>
+        <input
+          value={form.name}
+          onChange={e => setF({ name: e.target.value })}
+          className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+          placeholder="Ej: Alquiler local"
+        />
+      </div>
+      {/* Día */}
+      <div>
+        <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Día del mes</label>
+        <input
+          type="number" min={1} max={31}
+          value={form.day_of_month}
+          onChange={e => setF({ day_of_month: e.target.value })}
+          className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-mono text-center focus:outline-none focus:ring-2 focus:ring-blue-300"
+        />
+      </div>
+      {/* Monto */}
+      <div>
+        <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Monto habitual</label>
+        <div className="relative">
+          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">$</span>
+          <input
+            value={form.amount}
+            onChange={e => setF({ amount: e.target.value })}
+            className="w-full border border-gray-200 rounded-lg pl-6 pr-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+            placeholder="0"
+          />
+        </div>
+      </div>
+      {/* Categoría */}
+      <div>
+        <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Categoría</label>
+        <select
+          value={form.category}
+          onChange={e => setF({ category: e.target.value })}
+          className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+        >
+          {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+        </select>
+      </div>
+      {/* Color */}
+      <div>
+        <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Color</label>
+        <div className="flex flex-wrap gap-1.5 pt-0.5">
+          {COLOR_PALETTE.map(c => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setF({ color: c })}
+              className="w-5 h-5 rounded-full border-2 transition-transform hover:scale-110"
+              style={{ background: c, borderColor: form.color === c ? '#0f172a' : 'transparent' }}
+            />
+          ))}
+        </div>
+      </div>
+      {/* Notas */}
+      <div className="col-span-2">
+        <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Notas (opcional)</label>
+        <input
+          value={form.notes}
+          onChange={e => setF({ notes: e.target.value })}
+          className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+          placeholder="Ej: Pagar antes del mediodía"
+        />
+      </div>
+    </div>
+  )
+}
+
 function SettingsModal({ onClose, onRefresh }: { onClose: () => void; onRefresh: () => void }) {
   const [templates, setTemplates] = useState<RecurringDue[]>([])
   const [loading,   setLoading]   = useState(true)
@@ -230,13 +312,13 @@ function SettingsModal({ onClose, onRefresh }: { onClose: () => void; onRefresh:
   const [addMode,   setAddMode]   = useState(false)
   const [deleteId,  setDeleteId]  = useState<number | null>(null)
   const [form,      setForm]      = useState<FormState>(EMPTY_FORM)
-  const setF = (patch: Partial<FormState>) => setForm(f => ({ ...f, ...patch }))
+  const setF = useCallback((patch: Partial<FormState>) => setForm(f => ({ ...f, ...patch })), [])
 
   useEffect(() => {
-    api.get<RecurringDue[]>('/vencimientos/recurring').then(data => {
-      setTemplates(data)
-      setLoading(false)
-    })
+    api.get<RecurringDue[]>('/vencimientos/recurring')
+      .then(data => setTemplates(data))
+      .catch(() => {/* silencio — tabla vacía hasta que el backend responda */})
+      .finally(() => setLoading(false))
   }, [])
 
   async function toggleActive(t: RecurringDue) {
@@ -300,83 +382,6 @@ function SettingsModal({ onClose, onRefresh }: { onClose: () => void; onRefresh:
     onRefresh()
   }
 
-  // Form compartido (edit + add)
-  function InlineForm() {
-    return (
-      <div className="grid grid-cols-2 gap-3 mt-3 bg-gray-50 rounded-xl p-4 border border-gray-100">
-        {/* Nombre */}
-        <div className="col-span-2">
-          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Nombre</label>
-          <input
-            value={form.name}
-            onChange={e => setF({ name: e.target.value })}
-            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-            placeholder="Ej: Alquiler local"
-          />
-        </div>
-        {/* Día */}
-        <div>
-          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Día del mes</label>
-          <input
-            type="number" min={1} max={31}
-            value={form.day_of_month}
-            onChange={e => setF({ day_of_month: e.target.value })}
-            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-mono text-center focus:outline-none focus:ring-2 focus:ring-blue-300"
-          />
-        </div>
-        {/* Monto */}
-        <div>
-          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Monto habitual</label>
-          <div className="relative">
-            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">$</span>
-            <input
-              value={form.amount}
-              onChange={e => setF({ amount: e.target.value })}
-              className="w-full border border-gray-200 rounded-lg pl-6 pr-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-              placeholder="0"
-            />
-          </div>
-        </div>
-        {/* Categoría */}
-        <div>
-          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Categoría</label>
-          <select
-            value={form.category}
-            onChange={e => setF({ category: e.target.value })}
-            className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-          >
-            {CATEGORIES.map(c => <option key={c}>{c}</option>)}
-          </select>
-        </div>
-        {/* Color */}
-        <div>
-          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Color</label>
-          <div className="flex flex-wrap gap-1.5 pt-0.5">
-            {COLOR_PALETTE.map(c => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setF({ color: c })}
-                className="w-5 h-5 rounded-full border-2 transition-transform hover:scale-110"
-                style={{ background: c, borderColor: form.color === c ? '#0f172a' : 'transparent' }}
-              />
-            ))}
-          </div>
-        </div>
-        {/* Notas */}
-        <div className="col-span-2">
-          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Notas (opcional)</label>
-          <input
-            value={form.notes}
-            onChange={e => setF({ notes: e.target.value })}
-            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-            placeholder="Ej: Pagar antes del mediodía"
-          />
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
@@ -406,7 +411,7 @@ function SettingsModal({ onClose, onRefresh }: { onClose: () => void; onRefresh:
                       <X size={13} />
                     </button>
                   </div>
-                  <InlineForm />
+                  <InlineForm form={form} setF={setF} />
                   <div className="flex gap-2 mt-3">
                     <button
                       onClick={() => setEditId(null)}
@@ -504,7 +509,7 @@ function SettingsModal({ onClose, onRefresh }: { onClose: () => void; onRefresh:
           {addMode ? (
             <div className="border border-green-200 rounded-xl p-3 bg-green-50/30">
               <p className="text-[11px] font-bold text-green-700 mb-1">Nuevo vencimiento recurrente</p>
-              <InlineForm />
+              <InlineForm form={form} setF={setF} />
               <div className="flex gap-2 mt-3">
                 <button
                   onClick={() => { setAddMode(false); setForm(EMPTY_FORM) }}
