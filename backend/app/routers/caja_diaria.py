@@ -372,6 +372,65 @@ def _generate_caja_pdf(data: dict) -> bytes:
     return HTML(string=html_str).write_pdf()
 
 
+# ═══════════════════════════════════════════════════════════════
+# IMPORTANTE: las rutas con segmentos literales ("historial",
+# "pdf", "movimientos") DEBEN ir ANTES de las rutas genéricas
+# con parámetros ({fecha}/{sucursal}, {caja_id}), porque FastAPI
+# las evalúa en orden y /{fecha}/{sucursal} capturaría todo.
+# ═══════════════════════════════════════════════════════════════
+
+# ── GET /caja-diaria/historial/{sucursal} ────────────────────────
+@router.get("/historial/{sucursal}")
+def historial(sucursal: str, db: Session = Depends(get_db)):
+    cajas = (
+        db.query(CajaDiaria)
+        .filter(CajaDiaria.sucursal == sucursal)
+        .order_by(CajaDiaria.fecha.desc())
+        .limit(60)
+        .all()
+    )
+    return [_serialize_caja(c) for c in cajas]
+
+
+# ── GET /caja-diaria/pdf/{caja_id} ───────────────────────────────
+@router.get("/pdf/{caja_id}")
+def download_pdf(caja_id: int, db: Session = Depends(get_db)):
+    caja = db.query(CajaDiaria).filter(CajaDiaria.id == caja_id).first()
+    if not caja:
+        raise HTTPException(404, "Caja no encontrada")
+    data      = _serialize_caja(caja)
+    pdf_bytes = _generate_caja_pdf(data)
+    fname     = f"caja_{caja.sucursal}_{caja.fecha}.pdf"
+    return Response(
+        content    = pdf_bytes,
+        media_type = "application/pdf",
+        headers    = {"Content-Disposition": f"attachment; filename={fname}"},
+    )
+
+
+# ── PUT /caja-diaria/movimientos/{mov_id} ────────────────────────
+@router.put("/movimientos/{mov_id}")
+def update_movimiento(mov_id: int, body: MovimientoUpdate, db: Session = Depends(get_db)):
+    mov = db.query(CajaMovimiento).filter(CajaMovimiento.id == mov_id).first()
+    if not mov:
+        raise HTTPException(404, "Movimiento no encontrado")
+    if body.descripcion is not None: mov.descripcion = body.descripcion
+    if body.monto       is not None: mov.monto       = body.monto
+    db.commit()
+    return {"ok": True}
+
+
+# ── DELETE /caja-diaria/movimientos/{mov_id} ─────────────────────
+@router.delete("/movimientos/{mov_id}")
+def delete_movimiento(mov_id: int, db: Session = Depends(get_db)):
+    mov = db.query(CajaMovimiento).filter(CajaMovimiento.id == mov_id).first()
+    if not mov:
+        raise HTTPException(404, "Movimiento no encontrado")
+    db.delete(mov)
+    db.commit()
+    return {"ok": True}
+
+
 # ── GET /caja-diaria/{fecha}/{sucursal} ──────────────────────────
 @router.get("/{fecha}/{sucursal}")
 def get_or_create_caja(fecha: DateType, sucursal: str, db: Session = Depends(get_db)):
@@ -385,22 +444,6 @@ def get_or_create_caja(fecha: DateType, sucursal: str, db: Session = Depends(get
         db.commit()
         db.refresh(caja)
     return _serialize_caja(caja)
-
-
-# ── GET /caja-diaria/{caja_id}/pdf ───────────────────────────────
-@router.get("/{caja_id}/pdf")
-def download_pdf(caja_id: int, db: Session = Depends(get_db)):
-    caja = db.query(CajaDiaria).filter(CajaDiaria.id == caja_id).first()
-    if not caja:
-        raise HTTPException(404, "Caja no encontrada")
-    data      = _serialize_caja(caja)
-    pdf_bytes = _generate_caja_pdf(data)
-    fname     = f"caja_{caja.sucursal}_{caja.fecha}.pdf"
-    return Response(
-        content    = pdf_bytes,
-        media_type = "application/pdf",
-        headers    = {"Content-Disposition": f"attachment; filename={fname}"},
-    )
 
 
 # ── PUT /caja-diaria/{caja_id} ────────────────────────────────────
@@ -437,39 +480,3 @@ def add_movimiento(caja_id: int, body: MovimientoIn, db: Session = Depends(get_d
     db.commit()
     db.refresh(mov)
     return {"id": mov.id, "tipo": mov.tipo, "descripcion": mov.descripcion, "monto": float(mov.monto)}
-
-
-# ── PUT /caja-diaria/movimientos/{mov_id} ────────────────────────
-@router.put("/movimientos/{mov_id}")
-def update_movimiento(mov_id: int, body: MovimientoUpdate, db: Session = Depends(get_db)):
-    mov = db.query(CajaMovimiento).filter(CajaMovimiento.id == mov_id).first()
-    if not mov:
-        raise HTTPException(404, "Movimiento no encontrado")
-    if body.descripcion is not None: mov.descripcion = body.descripcion
-    if body.monto       is not None: mov.monto       = body.monto
-    db.commit()
-    return {"ok": True}
-
-
-# ── DELETE /caja-diaria/movimientos/{mov_id} ─────────────────────
-@router.delete("/movimientos/{mov_id}")
-def delete_movimiento(mov_id: int, db: Session = Depends(get_db)):
-    mov = db.query(CajaMovimiento).filter(CajaMovimiento.id == mov_id).first()
-    if not mov:
-        raise HTTPException(404, "Movimiento no encontrado")
-    db.delete(mov)
-    db.commit()
-    return {"ok": True}
-
-
-# ── GET /caja-diaria/historial/{sucursal} ────────────────────────
-@router.get("/historial/{sucursal}")
-def historial(sucursal: str, db: Session = Depends(get_db)):
-    cajas = (
-        db.query(CajaDiaria)
-        .filter(CajaDiaria.sucursal == sucursal)
-        .order_by(CajaDiaria.fecha.desc())
-        .limit(60)
-        .all()
-    )
-    return [_serialize_caja(c) for c in cajas]

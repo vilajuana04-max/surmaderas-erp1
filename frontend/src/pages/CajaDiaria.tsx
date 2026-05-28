@@ -215,8 +215,11 @@ export default function CajaDiaria() {
   async function toggleCerrar() {
     if (!caja) return
     setClosing(true)
-    try { await patchCaja({ cerrada: !caja.cerrada }) }
-    finally { setClosing(false) }
+    try {
+      await patchCaja({ cerrada: !caja.cerrada })
+      // Forzar recarga del historial la próxima vez que se abra ese tab
+      setHistorial([])
+    } finally { setClosing(false) }
   }
 
   // ── Movimientos ──────────────────────────────────────────────
@@ -239,7 +242,7 @@ export default function CajaDiaria() {
 
   // ── PDF download ─────────────────────────────────────────────
   async function downloadPdf(cajaId: number, fecha: string, suc: string) {
-    await api.pdf(`/caja-diaria/${cajaId}/pdf`, `caja_${suc}_${fecha}.pdf`)
+    await api.pdf(`/caja-diaria/pdf/${cajaId}`, `caja_${suc}_${fecha}.pdf`)
   }
 
   // ── Ver día desde historial ──────────────────────────────────
