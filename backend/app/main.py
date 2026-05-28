@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base
 from app import models  # noqa: registers all ORM models
 from app.routers import (
+    auth_router,
     sales_router, purchases_router, payroll_router,
     vacations_router, expenses_router, dashboard_router, employees_router,
     receipts_router, cashflow_router, vencimientos_router, gastos_personales_router,
@@ -47,6 +48,7 @@ app.add_middleware(
     allow_headers       = ["*"],
 )
 
+app.include_router(auth_router)
 app.include_router(sales_router)
 app.include_router(purchases_router)
 app.include_router(payroll_router)

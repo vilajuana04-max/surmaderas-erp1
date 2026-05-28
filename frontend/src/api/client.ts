@@ -2,10 +2,15 @@
 // En desarrollo, usa el proxy de Vite (/api → localhost:8000)
 const BASE = import.meta.env.VITE_API_URL ?? ''
 
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem('erp_token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 async function req<T>(path: string, opts?: RequestInit): Promise<T> {
   const url = `${BASE}${path}`
   const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json', ...opts?.headers },
+    headers: { 'Content-Type': 'application/json', ...authHeaders(), ...opts?.headers },
     ...opts,
   })
   if (!res.ok) {

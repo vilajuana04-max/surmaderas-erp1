@@ -1,3 +1,4 @@
+from .users import User
 from .core import Branch, AppConfig
 from .employees import Employee
 from .sales import DailySales
@@ -11,6 +12,7 @@ from .vencimientos import Vencimiento, VencimientoEstado, VencimientoOneOff
 from .gastos_personales import GastoPersonal
 
 __all__ = [
+    "User",
     "Branch", "AppConfig",
     "Employee",
     "DailySales",

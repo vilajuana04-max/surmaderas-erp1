@@ -1,3 +1,4 @@
+from .auth import router as auth_router
 from .sales import router as sales_router
 from .purchases import router as purchases_router
 from .payroll import router as payroll_router

@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingCart, Package,
-  Users, Receipt, Menu, X, ChevronDown, TrendingUp, Bell, Wallet,
+  Users, Receipt, Menu, X, ChevronDown, TrendingUp, Bell, Wallet, LogOut,
 } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 
 const NAVY  = '#070614'
 const CORAL = '#C8603A'
@@ -29,12 +30,15 @@ const GASTOS_SUB = [
 /* ── Sidebar content (shared desktop/mobile) ─────────────────── */
 function SidebarContent({ onClose }: { onClose?: () => void }) {
   const location   = useLocation()
-  const isRRHH     = location.pathname === '/rrhh' || location.pathname.startsWith('/rrhh')
-  const isGastos   = location.pathname === '/gastos' || location.pathname.startsWith('/gastos')
+  const navigate   = useNavigate()
+  const { user, logout } = useAuth()
+  const isAdmin    = user?.role === 'admin'
+
+  const isRRHH   = location.pathname === '/rrhh'   || location.pathname.startsWith('/rrhh')
+  const isGastos = location.pathname === '/gastos' || location.pathname.startsWith('/gastos')
   const [rrhhOpen,   setRrhhOpen]   = useState(isRRHH)
   const [gastosOpen, setGastosOpen] = useState(isGastos)
 
-  // Tab activo desde query params
   const activeTab = new URLSearchParams(location.search).get('tab') ?? 'vacaciones'
 
   const navLinkClass = (isActive: boolean) => [
@@ -45,10 +49,15 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
       : 'text-white/40 border-l-transparent hover:text-white/80 hover:bg-white/5',
   ].join(' ')
 
+  function handleLogout() {
+    logout()
+    navigate('/login', { replace: true })
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Brand */}
-      <div className="px-7 py-8 border-b" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
+      <div className="px-7 py-6 border-b" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
         <p style={{ color: CORAL }}
           className="text-[11px] font-bold tracking-[3px] uppercase font-body mb-1">
           Sur Maderas
@@ -59,11 +68,31 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
         <p className="text-white/30 text-[11px] tracking-[1.5px] uppercase mt-1.5 font-body">
           Mar del Plata · 2026
         </p>
+
+        {/* User chip */}
+        {user && (
+          <div className="mt-4 flex items-center gap-2">
+            <div
+              className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
+              style={{ background: CORAL }}
+            >
+              {user.username.charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <p className="text-white text-[11px] font-semibold leading-none truncate">
+                {user.username}
+              </p>
+              <p className="text-white/30 text-[10px] tracking-wide uppercase mt-0.5">
+                {user.role === 'admin' ? 'Administrador' : 'Acceso Caja'}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 py-6">
-        {/* Items antes de RRHH */}
+      <nav className="flex-1 py-6 overflow-y-auto">
+        {/* Comunes a todos los roles */}
         {NAV_MAIN.map(({ to, icon: Icon, label, num }) => (
           <NavLink key={to} to={to} end={to === '/'}
             onClick={onClose}
@@ -75,137 +104,143 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
           </NavLink>
         ))}
 
-        {/* ── RRHH con submenú desplegable ── */}
-        <button
-          onClick={() => setRrhhOpen(o => !o)}
-          className={[
-            'w-full flex items-center gap-3 px-7 py-3 text-sm font-semibold font-body',
-            'border-l-[3px] transition-all duration-200 tracking-wide',
-            isRRHH
-              ? 'text-white bg-white/5'
-              : 'text-white/40 border-l-transparent hover:text-white/80 hover:bg-white/5',
-          ].join(' ')}
-          style={{ borderLeftColor: isRRHH ? CORAL : 'transparent' }}>
-          <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>04</span>
-          <Users size={16} strokeWidth={2} />
-          <span className="tracking-[1px] uppercase text-[12px] flex-1 text-left">Rec. Humanos</span>
-          <ChevronDown
-            size={14}
-            className="transition-transform duration-200 shrink-0"
-            style={{ transform: rrhhOpen ? 'rotate(180deg)' : 'rotate(0deg)', opacity: 0.6 }}
-          />
-        </button>
+        {/* ── Solo admin ── */}
+        {isAdmin && (
+          <>
+            {/* RRHH con submenú */}
+            <button
+              onClick={() => setRrhhOpen(o => !o)}
+              className={[
+                'w-full flex items-center gap-3 px-7 py-3 text-sm font-semibold font-body',
+                'border-l-[3px] transition-all duration-200 tracking-wide',
+                isRRHH
+                  ? 'text-white bg-white/5'
+                  : 'text-white/40 border-l-transparent hover:text-white/80 hover:bg-white/5',
+              ].join(' ')}
+              style={{ borderLeftColor: isRRHH ? CORAL : 'transparent' }}>
+              <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>04</span>
+              <Users size={16} strokeWidth={2} />
+              <span className="tracking-[1px] uppercase text-[12px] flex-1 text-left">Rec. Humanos</span>
+              <ChevronDown
+                size={14}
+                className="transition-transform duration-200 shrink-0"
+                style={{ transform: rrhhOpen ? 'rotate(180deg)' : 'rotate(0deg)', opacity: 0.6 }}
+              />
+            </button>
+            {rrhhOpen && (
+              <div className="pb-1" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                {RRHH_SUB.map(({ tab, label }) => {
+                  const isActive = isRRHH && activeTab === tab
+                  return (
+                    <NavLink
+                      key={tab}
+                      to={`/rrhh?tab=${tab}`}
+                      onClick={onClose}
+                      className={[
+                        'flex items-center gap-2 pl-14 pr-7 py-2 text-[11px] font-semibold font-body',
+                        'border-l-[3px] transition-all duration-150',
+                        isActive
+                          ? 'text-white bg-white/5'
+                          : 'text-white/35 border-l-transparent hover:text-white/70 hover:bg-white/5',
+                      ].join(' ')}
+                      style={{ borderLeftColor: isActive ? CORAL : 'transparent' }}>
+                      <span className="tracking-wide">{label}</span>
+                    </NavLink>
+                  )
+                })}
+              </div>
+            )}
 
-        {/* Sub-items */}
-        {rrhhOpen && (
-          <div className="pb-1" style={{ background: 'rgba(255,255,255,0.03)' }}>
-            {RRHH_SUB.map(({ tab, label }) => {
-              const isActive = isRRHH && activeTab === tab
-              return (
-                <NavLink
-                  key={tab}
-                  to={`/rrhh?tab=${tab}`}
-                  onClick={onClose}
-                  className={[
-                    'flex items-center gap-2 pl-14 pr-7 py-2 text-[11px] font-semibold font-body',
-                    'border-l-[3px] transition-all duration-150',
-                    isActive
-                      ? 'text-white bg-white/5'
-                      : 'text-white/35 border-l-transparent hover:text-white/70 hover:bg-white/5',
-                  ].join(' ')}
-                  style={{ borderLeftColor: isActive ? CORAL : 'transparent' }}>
-                  <span className="tracking-wide">{label}</span>
-                </NavLink>
-              )
-            })}
-          </div>
+            {/* Gastos con submenú */}
+            <button
+              onClick={() => setGastosOpen(o => !o)}
+              className={[
+                'w-full flex items-center gap-3 px-7 py-3 text-sm font-semibold font-body',
+                'border-l-[3px] transition-all duration-200 tracking-wide',
+                isGastos
+                  ? 'text-white bg-white/5'
+                  : 'text-white/40 border-l-transparent hover:text-white/80 hover:bg-white/5',
+              ].join(' ')}
+              style={{ borderLeftColor: isGastos ? CORAL : 'transparent' }}>
+              <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>05</span>
+              <Receipt size={16} strokeWidth={2} />
+              <span className="tracking-[1px] uppercase text-[12px] flex-1 text-left">Gastos</span>
+              <ChevronDown
+                size={14}
+                className="transition-transform duration-200 shrink-0"
+                style={{ transform: gastosOpen ? 'rotate(180deg)' : 'rotate(0deg)', opacity: 0.6 }}
+              />
+            </button>
+            {gastosOpen && (
+              <div className="pb-1" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                {GASTOS_SUB.map(({ tab, label }) => {
+                  const activeGastosTab = new URLSearchParams(location.search).get('tab') ?? 'compartidos'
+                  const isActive = isGastos && activeGastosTab === tab
+                  return (
+                    <NavLink
+                      key={tab}
+                      to={`/gastos?tab=${tab}`}
+                      onClick={onClose}
+                      className={[
+                        'flex items-center gap-2 pl-14 pr-7 py-2 text-[11px] font-semibold font-body',
+                        'border-l-[3px] transition-all duration-150',
+                        isActive
+                          ? 'text-white bg-white/5'
+                          : 'text-white/35 border-l-transparent hover:text-white/70 hover:bg-white/5',
+                      ].join(' ')}
+                      style={{ borderLeftColor: isActive ? CORAL : 'transparent' }}>
+                      <span className="tracking-wide">{label}</span>
+                    </NavLink>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Flujo de Caja */}
+            <NavLink
+              to="/flujocaja"
+              onClick={onClose}
+              className={({ isActive }) => navLinkClass(isActive)}
+              style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
+              <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>06</span>
+              <TrendingUp size={16} strokeWidth={2} />
+              <span className="tracking-[1px] uppercase text-[12px]">Flujo de Caja</span>
+            </NavLink>
+
+            {/* Vencimientos */}
+            <NavLink
+              to="/vencimientos"
+              onClick={onClose}
+              className={({ isActive }) => navLinkClass(isActive)}
+              style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
+              <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>07</span>
+              <Bell size={16} strokeWidth={2} />
+              <span className="tracking-[1px] uppercase text-[12px]">Vencimientos</span>
+            </NavLink>
+
+            {/* Gastos Personales */}
+            <NavLink
+              to="/gastos-personales"
+              onClick={onClose}
+              className={({ isActive }) => navLinkClass(isActive)}
+              style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
+              <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>08</span>
+              <Wallet size={16} strokeWidth={2} />
+              <span className="tracking-[1px] uppercase text-[12px]">Gastos Pers.</span>
+            </NavLink>
+          </>
         )}
-
-        {/* ── Gastos con submenú desplegable ── */}
-        <button
-          onClick={() => setGastosOpen(o => !o)}
-          className={[
-            'w-full flex items-center gap-3 px-7 py-3 text-sm font-semibold font-body',
-            'border-l-[3px] transition-all duration-200 tracking-wide',
-            isGastos
-              ? 'text-white bg-white/5'
-              : 'text-white/40 border-l-transparent hover:text-white/80 hover:bg-white/5',
-          ].join(' ')}
-          style={{ borderLeftColor: isGastos ? CORAL : 'transparent' }}>
-          <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>05</span>
-          <Receipt size={16} strokeWidth={2} />
-          <span className="tracking-[1px] uppercase text-[12px] flex-1 text-left">Gastos</span>
-          <ChevronDown
-            size={14}
-            className="transition-transform duration-200 shrink-0"
-            style={{ transform: gastosOpen ? 'rotate(180deg)' : 'rotate(0deg)', opacity: 0.6 }}
-          />
-        </button>
-
-        {gastosOpen && (
-          <div className="pb-1" style={{ background: 'rgba(255,255,255,0.03)' }}>
-            {GASTOS_SUB.map(({ tab, label }) => {
-              const activeGastosTab = new URLSearchParams(location.search).get('tab') ?? 'compartidos'
-              const isActive = isGastos && activeGastosTab === tab
-              return (
-                <NavLink
-                  key={tab}
-                  to={`/gastos?tab=${tab}`}
-                  onClick={onClose}
-                  className={[
-                    'flex items-center gap-2 pl-14 pr-7 py-2 text-[11px] font-semibold font-body',
-                    'border-l-[3px] transition-all duration-150',
-                    isActive
-                      ? 'text-white bg-white/5'
-                      : 'text-white/35 border-l-transparent hover:text-white/70 hover:bg-white/5',
-                  ].join(' ')}
-                  style={{ borderLeftColor: isActive ? CORAL : 'transparent' }}>
-                  <span className="tracking-wide">{label}</span>
-                </NavLink>
-              )
-            })}
-          </div>
-        )}
-
-        {/* ── Flujo de Caja ── */}
-        <NavLink
-          to="/flujocaja"
-          onClick={onClose}
-          className={({ isActive }) => navLinkClass(isActive)}
-          style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
-          <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>06</span>
-          <TrendingUp size={16} strokeWidth={2} />
-          <span className="tracking-[1px] uppercase text-[12px]">Flujo de Caja</span>
-        </NavLink>
-
-        {/* ── Vencimientos ── */}
-        <NavLink
-          to="/vencimientos"
-          onClick={onClose}
-          className={({ isActive }) => navLinkClass(isActive)}
-          style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
-          <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>07</span>
-          <Bell size={16} strokeWidth={2} />
-          <span className="tracking-[1px] uppercase text-[12px]">Vencimientos</span>
-        </NavLink>
-
-        {/* ── Gastos Personales ── */}
-        <NavLink
-          to="/gastos-personales"
-          onClick={onClose}
-          className={({ isActive }) => navLinkClass(isActive)}
-          style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
-          <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>08</span>
-          <Wallet size={16} strokeWidth={2} />
-          <span className="tracking-[1px] uppercase text-[12px]">Gastos Pers.</span>
-        </NavLink>
       </nav>
 
-      {/* Footer */}
+      {/* Footer — logout */}
       <div className="px-7 py-5 border-t" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
-        <p className="text-white/20 text-[10px] font-body tracking-wide uppercase">
-          v1.0 · Sistema interno
-        </p>
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-2 text-white/30 hover:text-white/70 transition-colors text-[11px] font-body tracking-wide uppercase w-full"
+        >
+          <LogOut size={13} />
+          Cerrar sesión
+        </button>
       </div>
     </div>
   )
@@ -236,11 +271,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* ── MOBILE DRAWER ── */}
       {mobileOpen && (
         <>
-          {/* Backdrop */}
           <div
             className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
             onClick={() => setMobileOpen(false)} />
-          {/* Drawer */}
           <aside
             className="md:hidden fixed top-0 left-0 h-full w-64 z-50 overflow-y-auto flex flex-col"
             style={{ background: NAVY }}>
@@ -256,9 +289,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* ── MAIN CONTENT ── */}
       <main className="flex-1 min-w-0 overflow-x-hidden">
-        {/* Top bar mobile — spacer so content doesn't hide under hamburger */}
         <div className="md:hidden h-16" />
-
         <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 md:py-8">
           {children}
         </div>
