@@ -40,3 +40,20 @@ class VencimientoEstado(Base):
     status          = Column(String(20), default='pendiente')  # pendiente|pagado|omitido
     paid_at         = Column(DateTime(timezone=True))
     notes           = Column(String(300))
+
+
+class VencimientoOneOff(Base):
+    """Recordatorio único: no es recurrente, aplica solo a un mes puntual."""
+    __tablename__ = "vencimientos_oneoff"
+
+    id       = Column(Integer, primary_key=True)
+    year     = Column(Integer,      nullable=False)
+    month    = Column(String(20),   nullable=False)  # 'ENERO', 'FEBRERO', …
+    name     = Column(String(100),  nullable=False)
+    amount   = Column(Numeric(15, 2), default=0)
+    day      = Column(Integer,      nullable=False)
+    category = Column(String(50),   default='Otros')
+    color    = Column(String(20),   default='#64748b')
+    status   = Column(String(20),   default='pendiente')
+    paid_at  = Column(DateTime(timezone=True))
+    notes    = Column(String(300))

@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.vencimientos import Vencimiento, VencimientoEstado
+from app.models.vencimientos import Vencimiento, VencimientoEstado, VencimientoOneOff
 
 router = APIRouter(prefix="/vencimientos", tags=["Vencimientos"])
 
@@ -110,13 +110,85 @@ def delete_recurring(vid: int, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
+# ── Schemas: one-off ─────────────────────────────────────────────────────────
+class OneOffIn(BaseModel):
+    name:     str
+    amount:   float        = 0
+    day:      int
+    category: str          = "Otros"
+    color:    str          = "#64748b"
+    notes:    Optional[str] = None
+
+
+class OneOffStatusIn(BaseModel):
+    status: str  # pendiente | pagado | omitido
+
+
+# ── Endpoints: one-offs ───────────────────────────────────────────────────────
+
+@router.post("/{year}/{month}/oneoff", status_code=201)
+def create_oneoff(year: int, month: str, data: OneOffIn, db: Session = Depends(get_db)):
+    month = month.upper()
+    entry = VencimientoOneOff(
+        year=year, month=month,
+        name=data.name, amount=data.amount, day=data.day,
+        category=data.category, color=data.color, notes=data.notes,
+    )
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return {
+        "id": entry.id, "is_oneoff": True,
+        "name": entry.name, "amount": float(entry.amount or 0),
+        "day": entry.day, "category": entry.category, "color": entry.color,
+        "status": entry.status, "paid_at": None, "notes": entry.notes,
+        "day_original": entry.day, "amount_original": float(entry.amount or 0),
+    }
+
+
+@router.put("/oneoff/{oid}")
+def update_oneoff_status(oid: int, data: OneOffStatusIn, db: Session = Depends(get_db)):
+    entry = db.query(VencimientoOneOff).filter(VencimientoOneOff.id == oid).first()
+    if not entry:
+        raise HTTPException(404, "Recordatorio no encontrado")
+    entry.status  = data.status
+    entry.paid_at = datetime.now(timezone.utc) if data.status == "pagado" else None
+    db.commit()
+    return {"ok": True}
+
+
+@router.put("/oneoff/{oid}/full")
+def update_oneoff_full(oid: int, data: OneOffIn, db: Session = Depends(get_db)):
+    entry = db.query(VencimientoOneOff).filter(VencimientoOneOff.id == oid).first()
+    if not entry:
+        raise HTTPException(404, "Recordatorio no encontrado")
+    entry.name     = data.name
+    entry.amount   = data.amount
+    entry.day      = data.day
+    entry.category = data.category
+    entry.color    = data.color
+    entry.notes    = data.notes
+    db.commit()
+    return {"ok": True}
+
+
+@router.delete("/oneoff/{oid}")
+def delete_oneoff(oid: int, db: Session = Depends(get_db)):
+    entry = db.query(VencimientoOneOff).filter(VencimientoOneOff.id == oid).first()
+    if not entry:
+        raise HTTPException(404, "Recordatorio no encontrado")
+    db.delete(entry)
+    db.commit()
+    return {"ok": True}
+
+
 # ── Endpoints: vista mensual ──────────────────────────────────────────────────
 
 @router.get("/{year}/{month}")
 def get_month(year: int, month: str, db: Session = Depends(get_db)):
     """
-    Devuelve todos los vencimientos activos para el mes indicado,
-    fusionando el template con el estado mensual si existe.
+    Devuelve todos los vencimientos activos + one-offs para el mes,
+    fusionando templates con estados mensuales.
     """
     _seed_if_empty(db)
     month = month.upper()
@@ -141,6 +213,7 @@ def get_month(year: int, month: str, db: Session = Depends(get_db)):
         e = estados.get(t.id)
         result.append({
             "id":              t.id,
+            "is_oneoff":       False,
             "name":            t.name,
             "category":        t.category,
             "color":           t.color,
@@ -156,6 +229,28 @@ def get_month(year: int, month: str, db: Session = Depends(get_db)):
             "estado_id":       e.id   if e else None,
             "day_original":    t.day_of_month,
             "amount_original": float(t.amount or 0),
+        })
+
+    # One-offs del mes
+    oneoffs = db.query(VencimientoOneOff).filter(
+        VencimientoOneOff.year  == year,
+        VencimientoOneOff.month == month,
+    ).all()
+    for o in oneoffs:
+        result.append({
+            "id":              o.id,
+            "is_oneoff":       True,
+            "name":            o.name,
+            "category":        o.category,
+            "color":           o.color,
+            "day":             o.day,
+            "amount":          float(o.amount or 0),
+            "status":          o.status,
+            "paid_at":         o.paid_at.isoformat() if o.paid_at else None,
+            "notes":           o.notes,
+            "estado_id":       None,
+            "day_original":    o.day,
+            "amount_original": float(o.amount or 0),
         })
 
     return sorted(result, key=lambda x: x["day"])

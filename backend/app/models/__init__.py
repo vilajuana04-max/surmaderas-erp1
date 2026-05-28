@@ -7,7 +7,7 @@ from .vacations import VacationRecord, VacationLog
 from .expenses import SharedExpenseItem, SharedExpense, ExpenseCategory, LuroExpense, GastoCompartido, MonthClosure
 from .cashflow import CashFlowEntry
 from .receipts import PayslipUpload
-from .vencimientos import Vencimiento, VencimientoEstado
+from .vencimientos import Vencimiento, VencimientoEstado, VencimientoOneOff
 
 __all__ = [
     "Branch", "AppConfig",
@@ -19,5 +19,5 @@ __all__ = [
     "SharedExpenseItem", "SharedExpense", "ExpenseCategory", "LuroExpense", "GastoCompartido", "MonthClosure",
     "CashFlowEntry",
     "PayslipUpload",
-    "Vencimiento", "VencimientoEstado",
+    "Vencimiento", "VencimientoEstado", "VencimientoOneOff",
 ]
