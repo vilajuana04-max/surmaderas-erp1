@@ -8,6 +8,7 @@ from .expenses import SharedExpenseItem, SharedExpense, ExpenseCategory, LuroExp
 from .cashflow import CashFlowEntry
 from .receipts import PayslipUpload
 from .vencimientos import Vencimiento, VencimientoEstado, VencimientoOneOff
+from .gastos_personales import GastoPersonal
 
 __all__ = [
     "Branch", "AppConfig",
@@ -20,4 +21,5 @@ __all__ = [
     "CashFlowEntry",
     "PayslipUpload",
     "Vencimiento", "VencimientoEstado", "VencimientoOneOff",
+    "GastoPersonal",
 ]

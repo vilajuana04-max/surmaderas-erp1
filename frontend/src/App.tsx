@@ -6,7 +6,8 @@ import Compras   from './pages/Compras'
 import RRHH      from './pages/RRHH'
 import Gastos    from './pages/Gastos'
 import FlujoCaja    from './pages/FlujoCaja'
-import Vencimientos from './pages/Vencimientos'
+import Vencimientos      from './pages/Vencimientos'
+import GastosPersonales  from './pages/GastosPersonales'
 import { Navigate } from 'react-router-dom'
 
 export default function App() {
@@ -19,7 +20,8 @@ export default function App() {
         <Route path="/rrhh"       element={<RRHH />}       />
         <Route path="/gastos"     element={<Gastos />}     />
         <Route path="/flujocaja"     element={<FlujoCaja />}     />
-        <Route path="/vencimientos"  element={<Vencimientos />}  />
+        <Route path="/vencimientos"      element={<Vencimientos />}     />
+        <Route path="/gastos-personales" element={<GastosPersonales />}  />
         {/* Redirigir rutas antiguas al nuevo RRHH */}
         <Route path="/sueldos"    element={<Navigate to="/rrhh" replace />} />
         <Route path="/vacaciones" element={<Navigate to="/rrhh" replace />} />

@@ -162,43 +162,37 @@ function CalendarView({
 
 // ── OneOffModal — recordatorio único ─────────────────────────────────────────
 function OneOffModal({
-  year, month, monthIdx, onSave, onClose,
+  defaultYear, defaultMonthIdx, onSave, onClose,
 }: {
-  year: number
-  month: string
-  monthIdx: number
+  defaultYear: number
+  defaultMonthIdx: number
   onSave: () => void
   onClose: () => void
 }) {
-  const [name,     setName]    = useState('')
-  const [day,      setDay]     = useState('')
-  const [amount,   setAmount]  = useState('')
-  const [category, setCat]     = useState('Otros')
-  const [color,    setColor]   = useState('#64748b')
-  const [notes,    setNotes]   = useState('')
-  const [saving,   setSaving]  = useState(false)
-  const [error,    setError]   = useState('')
+  const [name,       setName]      = useState('')
+  const [day,        setDay]       = useState('')
+  const [selMonthIdx,setSelMonth]  = useState(defaultMonthIdx)
+  const [selYear,    setSelYear]   = useState(defaultYear)
+  const [amount,     setAmount]    = useState('')
+  const [category,   setCat]       = useState('Otros')
+  const [color,      setColor]     = useState('#64748b')
+  const [notes,      setNotes]     = useState('')
+  const [saving,     setSaving]    = useState(false)
+  const [error,      setError]     = useState('')
 
   async function handleSave() {
     if (!name.trim() || !day) { setError('Completá nombre y día'); return }
-    setSaving(true)
-    setError('')
+    setSaving(true); setError('')
     try {
-      await api.post(`/vencimientos/${year}/${month}/oneoff`, {
-        name: name.trim(),
-        day: parseInt(day),
+      await api.post(`/vencimientos/${selYear}/${MONTHS[selMonthIdx]}/oneoff`, {
+        name: name.trim(), day: parseInt(day),
         amount: parseFloat(amount || '0'),
-        category,
-        color,
-        notes: notes.trim() || null,
+        category, color, notes: notes.trim() || null,
       })
-      onSave()
-      onClose()
+      onSave(); onClose()
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error al guardar')
-    } finally {
-      setSaving(false)
-    }
+    } finally { setSaving(false) }
   }
 
   return (
@@ -210,7 +204,7 @@ function OneOffModal({
               <Bell size={16} className="text-amber-500" /> Recordatorio único
             </h3>
             <p className="text-[11px] text-gray-400 mt-0.5">
-              Solo aparece en {MESES_ES[monthIdx]} {year}
+              Aparece solo en el mes elegido
             </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 ml-4"><X size={18} /></button>
@@ -226,6 +220,23 @@ function OneOffModal({
               placeholder="Ej: Pago cuota club"
               autoFocus
             />
+          </div>
+
+          {/* Mes y año destino */}
+          <div>
+            <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">¿Para qué mes?</label>
+            <div className="grid grid-cols-2 gap-2">
+              <select
+                value={selMonthIdx} onChange={e => setSelMonth(parseInt(e.target.value))}
+                className="border border-gray-200 rounded-xl px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300"
+              >
+                {MESES_ES.map((m, i) => <option key={i} value={i}>{m}</option>)}
+              </select>
+              <input
+                type="number" value={selYear} onChange={e => setSelYear(parseInt(e.target.value))}
+                className="border border-gray-200 rounded-xl px-3 py-2 text-sm font-mono text-center focus:outline-none focus:ring-2 focus:ring-amber-300"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -970,7 +981,7 @@ export default function Vencimientos() {
       {/* Modals */}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} onRefresh={load} />}
       {showOneOff && (
-        <OneOffModal year={year} month={month} monthIdx={monthIdx}
+        <OneOffModal defaultYear={year} defaultMonthIdx={monthIdx}
           onSave={load} onClose={() => setShowOneOff(false)} />
       )}
       {editItem && (
