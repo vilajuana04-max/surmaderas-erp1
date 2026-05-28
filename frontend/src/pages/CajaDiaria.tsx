@@ -245,7 +245,11 @@ export default function CajaDiaria() {
 
   // ── PDF download ─────────────────────────────────────────────
   async function downloadPdf(cajaId: number, fecha: string, suc: string) {
-    await api.pdf(`/caja-diaria/pdf/${cajaId}`, `caja_${suc}_${fecha}.pdf`)
+    try {
+      await api.pdf(`/caja-diaria/pdf/${cajaId}`, `caja_${suc}_${fecha}.pdf`)
+    } catch (err) {
+      alert(`No se pudo generar el PDF:\n${err instanceof Error ? err.message : String(err)}`)
+    }
   }
 
   // ── WhatsApp summary ─────────────────────────────────────────

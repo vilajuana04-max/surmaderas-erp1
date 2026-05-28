@@ -41,7 +41,7 @@ export const api = {
     const url = `${BASE}${path}`
     let res: Response
     try {
-      res = await fetch(url)
+      res = await fetch(url, { headers: { ...authHeaders() } })
     } catch {
       throw new Error('No se pudo conectar con el servidor. Verificá tu conexión.')
     }
