@@ -1,8 +1,8 @@
 import os
 from datetime import datetime, timedelta
 
+import bcrypt as _bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
@@ -14,17 +14,19 @@ SECRET_KEY = os.getenv("JWT_SECRET", "surmaderas-erp-secret-2026-change-in-prod"
 ALGORITHM  = "HS256"
 TOKEN_EXPIRE_HOURS = 24
 
-pwd_context   = CryptContext(schemes=["bcrypt"], deprecated="auto")
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
-# ── Password helpers ────────────────────────────────────────────
+# ── Password helpers (bcrypt directo, sin passlib) ──────────────
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    return _bcrypt.hashpw(password.encode(), _bcrypt.gensalt()).decode()
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    try:
+        return _bcrypt.checkpw(plain.encode(), hashed.encode())
+    except Exception:
+        return False
 
 
 # ── JWT helpers ─────────────────────────────────────────────────
