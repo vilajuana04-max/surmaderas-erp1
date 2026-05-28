@@ -12,6 +12,7 @@ import Gastos           from './pages/Gastos'
 import FlujoCaja        from './pages/FlujoCaja'
 import Vencimientos     from './pages/Vencimientos'
 import GastosPersonales from './pages/GastosPersonales'
+import CajaDiaria       from './pages/CajaDiaria'
 
 export default function App() {
   return (
@@ -47,6 +48,18 @@ export default function App() {
             <ProtectedRoute>
               <Layout>
                 <Compras />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ── Caja Diaria — todos los roles ── */}
+        <Route
+          path="/caja-diaria"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <CajaDiaria />
               </Layout>
             </ProtectedRoute>
           }

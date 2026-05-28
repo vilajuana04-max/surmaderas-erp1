@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingCart, Package,
-  Users, Receipt, Menu, X, ChevronDown, TrendingUp, Bell, Wallet, LogOut,
+  Users, Receipt, Menu, X, ChevronDown, TrendingUp, Bell, Wallet, LogOut, BookOpen,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
@@ -104,6 +104,17 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
           </NavLink>
         ))}
 
+        {/* ── Caja Diaria — visible para todos ── */}
+        <NavLink
+          to="/caja-diaria"
+          onClick={onClose}
+          className={({ isActive }) => navLinkClass(isActive)}
+          style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
+          <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>04</span>
+          <BookOpen size={16} strokeWidth={2} />
+          <span className="tracking-[1px] uppercase text-[12px]">Caja Diaria</span>
+        </NavLink>
+
         {/* ── Solo admin ── */}
         {isAdmin && (
           <>
@@ -118,7 +129,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
                   : 'text-white/40 border-l-transparent hover:text-white/80 hover:bg-white/5',
               ].join(' ')}
               style={{ borderLeftColor: isRRHH ? CORAL : 'transparent' }}>
-              <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>04</span>
+              <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>05</span>
               <Users size={16} strokeWidth={2} />
               <span className="tracking-[1px] uppercase text-[12px] flex-1 text-left">Rec. Humanos</span>
               <ChevronDown
@@ -162,7 +173,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
                   : 'text-white/40 border-l-transparent hover:text-white/80 hover:bg-white/5',
               ].join(' ')}
               style={{ borderLeftColor: isGastos ? CORAL : 'transparent' }}>
-              <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>05</span>
+              <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>06</span>
               <Receipt size={16} strokeWidth={2} />
               <span className="tracking-[1px] uppercase text-[12px] flex-1 text-left">Gastos</span>
               <ChevronDown
@@ -202,7 +213,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
               onClick={onClose}
               className={({ isActive }) => navLinkClass(isActive)}
               style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
-              <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>06</span>
+              <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>07</span>
               <TrendingUp size={16} strokeWidth={2} />
               <span className="tracking-[1px] uppercase text-[12px]">Flujo de Caja</span>
             </NavLink>
@@ -213,7 +224,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
               onClick={onClose}
               className={({ isActive }) => navLinkClass(isActive)}
               style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
-              <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>07</span>
+              <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>08</span>
               <Bell size={16} strokeWidth={2} />
               <span className="tracking-[1px] uppercase text-[12px]">Vencimientos</span>
             </NavLink>
@@ -224,7 +235,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
               onClick={onClose}
               className={({ isActive }) => navLinkClass(isActive)}
               style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
-              <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>08</span>
+              <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>09</span>
               <Wallet size={16} strokeWidth={2} />
               <span className="tracking-[1px] uppercase text-[12px]">Gastos Pers.</span>
             </NavLink>

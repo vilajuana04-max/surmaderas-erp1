@@ -1,4 +1,5 @@
 from .users import User
+from .caja import CajaDiaria, CajaMovimiento
 from .core import Branch, AppConfig
 from .employees import Employee
 from .sales import DailySales
@@ -13,6 +14,7 @@ from .gastos_personales import GastoPersonal
 
 __all__ = [
     "User",
+    "CajaDiaria", "CajaMovimiento",
     "Branch", "AppConfig",
     "Employee",
     "DailySales",
