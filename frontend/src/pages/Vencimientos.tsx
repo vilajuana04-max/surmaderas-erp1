@@ -312,6 +312,8 @@ function SettingsModal({ onClose, onRefresh }: { onClose: () => void; onRefresh:
   const [addMode,   setAddMode]   = useState(false)
   const [deleteId,  setDeleteId]  = useState<number | null>(null)
   const [form,      setForm]      = useState<FormState>(EMPTY_FORM)
+  const [saving,    setSaving]    = useState(false)
+  const [formError, setFormError] = useState('')
   const setF = useCallback((patch: Partial<FormState>) => setForm(f => ({ ...f, ...patch })), [])
 
   useEffect(() => {
@@ -357,22 +359,38 @@ function SettingsModal({ onClose, onRefresh }: { onClose: () => void; onRefresh:
 
   async function handleSaveEdit() {
     if (!editId) return
-    const payload = buildPayload()
-    await api.put(`/vencimientos/recurring/${editId}`, payload)
-    setTemplates(ts => ts.map(x => x.id === editId ? { ...x, ...payload, id: editId } : x))
-    setEditId(null)
-    onRefresh()
+    setSaving(true)
+    setFormError('')
+    try {
+      const payload = buildPayload()
+      await api.put(`/vencimientos/recurring/${editId}`, payload)
+      setTemplates(ts => ts.map(x => x.id === editId ? { ...x, ...payload, id: editId } : x))
+      setEditId(null)
+      onRefresh()
+    } catch (e: unknown) {
+      setFormError(e instanceof Error ? e.message : 'Error al guardar')
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function handleAdd() {
-    const payload = buildPayload(true)
-    const result = await api.post<RecurringDue>('/vencimientos/recurring', {
-      ...payload, sort_order: templates.length + 1,
-    })
-    setTemplates(ts => [...ts, result])
-    setAddMode(false)
-    setForm(EMPTY_FORM)
-    onRefresh()
+    setSaving(true)
+    setFormError('')
+    try {
+      const payload = buildPayload(true)
+      const result = await api.post<RecurringDue>('/vencimientos/recurring', {
+        ...payload, sort_order: templates.length + 1,
+      })
+      setTemplates(ts => [...ts, result])
+      setAddMode(false)
+      setForm(EMPTY_FORM)
+      onRefresh()
+    } catch (e: unknown) {
+      setFormError(e instanceof Error ? e.message : 'Error al agregar. Verificá que el backend esté activo.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function handleDelete(id: number) {
@@ -412,19 +430,23 @@ function SettingsModal({ onClose, onRefresh }: { onClose: () => void; onRefresh:
                     </button>
                   </div>
                   <InlineForm form={form} setF={setF} />
+                  {formError && (
+                    <p className="text-red-500 text-[11px] mt-2 px-1">{formError}</p>
+                  )}
                   <div className="flex gap-2 mt-3">
                     <button
-                      onClick={() => setEditId(null)}
+                      onClick={() => { setEditId(null); setFormError('') }}
                       className="flex-1 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-600 hover:bg-gray-50"
                     >
                       Cancelar
                     </button>
                     <button
                       onClick={handleSaveEdit}
-                      className="flex-1 py-1.5 rounded-lg text-xs text-white font-bold"
+                      disabled={saving}
+                      className="flex-1 py-1.5 rounded-lg text-xs text-white font-bold disabled:opacity-50"
                       style={{ background: NAVY }}
                     >
-                      Guardar
+                      {saving ? 'Guardando…' : 'Guardar'}
                     </button>
                   </div>
                 </div>
@@ -510,20 +532,23 @@ function SettingsModal({ onClose, onRefresh }: { onClose: () => void; onRefresh:
             <div className="border border-green-200 rounded-xl p-3 bg-green-50/30">
               <p className="text-[11px] font-bold text-green-700 mb-1">Nuevo vencimiento recurrente</p>
               <InlineForm form={form} setF={setF} />
+              {formError && (
+                <p className="text-red-500 text-[11px] mt-2 px-1">{formError}</p>
+              )}
               <div className="flex gap-2 mt-3">
                 <button
-                  onClick={() => { setAddMode(false); setForm(EMPTY_FORM) }}
+                  onClick={() => { setAddMode(false); setForm(EMPTY_FORM); setFormError('') }}
                   className="flex-1 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-600 hover:bg-gray-50"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleAdd}
-                  disabled={!form.name.trim() || !form.day_of_month}
+                  disabled={saving || !form.name.trim() || !form.day_of_month}
                   className="flex-1 py-1.5 rounded-lg text-xs text-white font-bold disabled:opacity-50"
                   style={{ background: '#16a34a' }}
                 >
-                  Agregar
+                  {saving ? 'Agregando…' : 'Agregar'}
                 </button>
               </div>
             </div>
