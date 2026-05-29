@@ -2,6 +2,7 @@ import { useState } from 'react'
 import {
   Calculator, Users, ClipboardList, Settings2,
   TableProperties, ChevronDown, ChevronUp, Plus, Check, X, Trash2,
+  Briefcase, History, Save,
 } from 'lucide-react'
 
 const NAVY  = '#070614'
@@ -37,6 +38,24 @@ type Reunion = {
   notas: string
   realizada: boolean
 }
+
+// Planilla de descripcion de puesto
+type Puesto = {
+  id:                string
+  nombre:            string
+  responsabilidades: string
+  criterios:         string
+  evaluacion:        string
+}
+
+const PUESTOS_DEFAULT: Puesto[] = [
+  { id: 'vend1',  nombre: 'Vendedor 1', responsabilidades: '', criterios: '', evaluacion: '' },
+  { id: 'vend2',  nombre: 'Vendedor 2', responsabilidades: '', criterios: '', evaluacion: '' },
+  { id: 'vend3',  nombre: 'Vendedor 3', responsabilidades: '', criterios: '', evaluacion: '' },
+  { id: 'vend4',  nombre: 'Vendedor 4', responsabilidades: '', criterios: '', evaluacion: '' },
+  { id: 'caja',   nombre: 'Caja',       responsabilidades: '', criterios: '', evaluacion: '' },
+  { id: 'taller', nombre: 'Taller',     responsabilidades: '', criterios: '', evaluacion: '' },
+]
 
 type Config = {
   // 6hs
@@ -118,13 +137,14 @@ function useLocalState<T>(key: string, def: T) {
 }
 
 // ── Tab nav ───────────────────────────────────────────────────────
-type Tab = 'calculadora' | 'registro' | 'vendedores' | 'reuniones' | 'config'
+type Tab = 'calculadora' | 'registro' | 'vendedores' | 'reuniones' | 'puestos' | 'config'
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'calculadora', label: 'Calculadora', icon: <Calculator size={13}/> },
   { id: 'registro',    label: 'Registro',    icon: <TableProperties size={13}/> },
   { id: 'vendedores',  label: 'Vendedores',  icon: <Users size={13}/> },
   { id: 'reuniones',   label: 'Reuniones',   icon: <ClipboardList size={13}/> },
+  { id: 'puestos',     label: 'Puestos',     icon: <Briefcase size={13}/> },
   { id: 'config',      label: 'Config',      icon: <Settings2 size={13}/> },
 ]
 
@@ -612,7 +632,7 @@ function TabVendedores({
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// REUNIONES
+// REUNIONES (quincena actual + historial)
 // ═══════════════════════════════════════════════════════════════════
 function TabReuniones({
   vendedores, reuniones, setReuniones, registros, cfg,
@@ -624,6 +644,9 @@ function TabReuniones({
   cfg: Config
 }) {
   const qActual = quincenaLabel()
+  const [vista, setVista] = useState<'actual' | 'historial'>('actual')
+  const [filtroVend, setFiltroVend] = useState<number | 'todos'>('todos')
+  const [expandedId, setExpandedId] = useState<number | null>(null)
 
   function getOrCreate(vendId: number): Reunion {
     const ex = reuniones.find(r => r.vendedorId === vendId && r.quincena === qActual)
@@ -642,86 +665,356 @@ function TabReuniones({
     ))
   }
 
+  // Historial: todas las reuniones pasadas (no la actual)
+  const historial = reuniones
+    .filter(r => r.quincena !== qActual)
+    .filter(r => filtroVend === 'todos' || r.vendedorId === filtroVend)
+    .sort((a, b) => b.id - a.id)
+
+  // Quincenas unicas en historial
+  const quincenasUnicas = [...new Set(historial.map(r => r.quincena))]
+
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-2xl border border-gray-100 px-5 py-3">
-        <p className="text-[10px] font-bold tracking-[1.5px] uppercase text-gray-400">Quincena actual</p>
-        <p className="font-bold text-gray-700 mt-0.5">{qActual}</p>
+
+      {/* Selector vista */}
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
+        <button onClick={() => setVista('actual')}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all"
+          style={vista === 'actual' ? { background: NAVY, color: 'white' } : { color: '#6b7280' }}>
+          <ClipboardList size={12}/> Quincena Actual
+        </button>
+        <button onClick={() => setVista('historial')}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all"
+          style={vista === 'historial' ? { background: NAVY, color: 'white' } : { color: '#6b7280' }}>
+          <History size={12}/> Registro Historial
+        </button>
       </div>
 
-      {vendedores.filter(v => v.activo).map(v => {
-        const r = reuniones.find(r => r.vendedorId === v.id && r.quincena === qActual)
-        const reg = registros.find(r => r.vendedorId === v.id && r.quincena === qActual)
-        const done = r?.checks.filter(Boolean).length ?? 0
+      {/* ── VISTA: QUINCENA ACTUAL ── */}
+      {vista === 'actual' && (
+        <>
+          <div className="bg-white rounded-2xl border border-gray-100 px-5 py-3">
+            <p className="text-[10px] font-bold tracking-[1.5px] uppercase text-gray-400">Quincena actual</p>
+            <p className="font-bold text-gray-700 mt-0.5">{qActual}</p>
+          </div>
 
-        return (
-          <div key={v.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-            <div className="px-5 py-4 flex items-center justify-between gap-3 border-b border-gray-100"
-              style={{ background: r?.realizada ? '#f0fdf4' : 'white' }}>
-              <div>
-                <p className="font-bold text-gray-800">{v.nombre}</p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {reg
-                    ? <>Comision: <span className="font-bold" style={{ color: CORAL }}>{fmt(reg.comision)}</span> &middot; {reg.pct}% &middot; {fmt(reg.ventas)} en ventas</>
-                    : 'Sin ventas registradas esta quincena'}
-                </p>
-              </div>
-              <span className="text-xs font-bold px-3 py-1 rounded-full shrink-0"
-                style={r?.realizada
-                  ? { background: '#dcfce7', color: '#16a34a' }
-                  : { background: '#fef9c3', color: '#854d0e' }}>
-                {r?.realizada ? 'Realizada' : 'Pendiente'}
-              </span>
-            </div>
+          {vendedores.filter(v => v.activo).map(v => {
+            const r   = reuniones.find(r => r.vendedorId === v.id && r.quincena === qActual)
+            const reg = registros.find(r => r.vendedorId === v.id && r.quincena === qActual)
+            const done = r?.checks.filter(Boolean).length ?? 0
 
-            <div className="px-5 pb-4 pt-3 space-y-3">
-              <div className="space-y-1.5">
-                {CHECKLIST_ITEMS.map((item, i) => {
-                  const checked = r?.checks[i] ?? false
-                  return (
-                    <button key={i}
-                      onClick={() => {
-                        const reunion = r ?? getOrCreate(v.id)
-                        const nc = [...reunion.checks]; nc[i] = !nc[i]
-                        update({ ...reunion, checks: nc })
-                      }}
-                      className="w-full flex items-center gap-3 text-left py-1.5 border-b border-gray-50 last:border-0">
-                      <div className="w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all"
-                        style={checked ? { background: CORAL, borderColor: CORAL } : { borderColor: '#e5e7eb' }}>
-                        {checked && <Check size={11} color="white" strokeWidth={3}/>}
-                      </div>
-                      <span className={`text-sm ${checked ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{item}</span>
-                    </button>
-                  )
-                })}
-              </div>
-
-              <div className="flex items-center gap-2">
-                <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: `${done / CHECKLIST_ITEMS.length * 100}%`, background: CORAL }}/>
+            return (
+              <div key={v.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                <div className="px-5 py-4 flex items-center justify-between gap-3 border-b border-gray-100"
+                  style={{ background: r?.realizada ? '#f0fdf4' : 'white' }}>
+                  <div>
+                    <p className="font-bold text-gray-800">{v.nombre}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {reg
+                        ? <>Comision: <span className="font-bold" style={{ color: CORAL }}>{fmt(reg.comision)}</span> &middot; {reg.pct}% &middot; {fmt(reg.ventas)} en ventas</>
+                        : 'Sin ventas registradas esta quincena'}
+                    </p>
+                  </div>
+                  <span className="text-xs font-bold px-3 py-1 rounded-full shrink-0"
+                    style={r?.realizada
+                      ? { background: '#dcfce7', color: '#16a34a' }
+                      : { background: '#fef9c3', color: '#854d0e' }}>
+                    {r?.realizada ? 'Realizada' : 'Pendiente'}
+                  </span>
                 </div>
-                <span className="text-xs text-gray-400">{done}/{CHECKLIST_ITEMS.length}</span>
+
+                <div className="px-5 pb-4 pt-3 space-y-3">
+                  <div className="space-y-1.5">
+                    {CHECKLIST_ITEMS.map((item, i) => {
+                      const checked = r?.checks[i] ?? false
+                      return (
+                        <button key={i}
+                          onClick={() => {
+                            const reunion = r ?? getOrCreate(v.id)
+                            const nc = [...reunion.checks]; nc[i] = !nc[i]
+                            update({ ...reunion, checks: nc })
+                          }}
+                          className="w-full flex items-center gap-3 text-left py-1.5 border-b border-gray-50 last:border-0">
+                          <div className="w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all"
+                            style={checked ? { background: CORAL, borderColor: CORAL } : { borderColor: '#e5e7eb' }}>
+                            {checked && <Check size={11} color="white" strokeWidth={3}/>}
+                          </div>
+                          <span className={`text-sm ${checked ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{item}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${done / CHECKLIST_ITEMS.length * 100}%`, background: CORAL }}/>
+                    </div>
+                    <span className="text-xs text-gray-400">{done}/{CHECKLIST_ITEMS.length}</span>
+                  </div>
+
+                  <textarea
+                    value={r?.notas ?? ''}
+                    onChange={e => { const reunion = r ?? getOrCreate(v.id); update({ ...reunion, notas: e.target.value }) }}
+                    placeholder="Notas de la reunion..."
+                    rows={2}
+                    className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 outline-none resize-none focus:border-gray-400 placeholder:text-gray-300" />
+
+                  <button
+                    onClick={() => { const reunion = r ?? getOrCreate(v.id); update({ ...reunion, realizada: !reunion.realizada }) }}
+                    className="w-full py-2.5 rounded-xl text-sm font-bold transition-all"
+                    style={r?.realizada
+                      ? { background: '#f3f4f6', color: '#374151', border: '2px solid #e5e7eb' }
+                      : { background: NAVY, color: 'white' }}>
+                    {r?.realizada ? 'Reabrir reunion' : 'Marcar como realizada'}
+                  </button>
+                </div>
               </div>
+            )
+          })}
+        </>
+      )}
 
-              <textarea
-                value={r?.notas ?? ''}
-                onChange={e => { const reunion = r ?? getOrCreate(v.id); update({ ...reunion, notas: e.target.value }) }}
-                placeholder="Notas de la reunion..."
-                rows={2}
-                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 outline-none resize-none focus:border-gray-400 placeholder:text-gray-300" />
-
-              <button
-                onClick={() => { const reunion = r ?? getOrCreate(v.id); update({ ...reunion, realizada: !reunion.realizada }) }}
-                className="w-full py-2.5 rounded-xl text-sm font-bold transition-all"
-                style={r?.realizada
-                  ? { background: '#f3f4f6', color: '#374151', border: '2px solid #e5e7eb' }
-                  : { background: NAVY, color: 'white' }}>
-                {r?.realizada ? 'Reabrir reunion' : 'Marcar como realizada'}
+      {/* ── VISTA: HISTORIAL ── */}
+      {vista === 'historial' && (
+        <div className="space-y-4">
+          {/* Filtro vendedor */}
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => setFiltroVend('todos')}
+              className="px-3 py-1.5 rounded-full text-xs font-bold border-2 transition-all"
+              style={filtroVend === 'todos'
+                ? { background: NAVY, color: 'white', borderColor: NAVY }
+                : { borderColor: '#e5e7eb', color: '#6b7280' }}>
+              Todos
+            </button>
+            {vendedores.filter(v => v.activo).map(v => (
+              <button key={v.id} onClick={() => setFiltroVend(v.id)}
+                className="px-3 py-1.5 rounded-full text-xs font-bold border-2 transition-all"
+                style={filtroVend === v.id
+                  ? { background: NAVY, color: 'white', borderColor: NAVY }
+                  : { borderColor: '#e5e7eb', color: '#6b7280' }}>
+                {v.nombre}
               </button>
+            ))}
+          </div>
+
+          {historial.length === 0 ? (
+            <div className="text-center py-12 text-gray-300">
+              <History size={32} className="mx-auto mb-2 opacity-40"/>
+              <p className="text-sm">Sin historial de reuniones todavia</p>
+            </div>
+          ) : (
+            quincenasUnicas.map(q => {
+              const reusDQ = historial.filter(r => r.quincena === q)
+              return (
+                <div key={q}>
+                  {/* Separador quincena */}
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="h-px flex-1 bg-gray-200"/>
+                    <span className="text-[10px] font-bold tracking-widest uppercase text-gray-400 px-2">{q}</span>
+                    <div className="h-px flex-1 bg-gray-200"/>
+                  </div>
+
+                  <div className="space-y-2">
+                    {reusDQ.map(r => {
+                      const v    = vendedores.find(v => v.id === r.vendedorId)
+                      const done = r.checks.filter(Boolean).length
+                      const isOpen = expandedId === r.id
+
+                      return (
+                        <div key={r.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                          {/* Fila clickeable */}
+                          <button
+                            onClick={() => setExpandedId(isOpen ? null : r.id)}
+                            className="w-full flex items-center gap-3 px-5 py-3 text-left hover:bg-gray-50 transition-colors">
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+                              style={{ background: r.realizada ? '#16a34a' : '#f59e0b' }}>
+                              {v?.nombre.charAt(0) ?? '?'}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-bold text-sm text-gray-800">{v?.nombre ?? '-'}</p>
+                              <p className="text-[10px] text-gray-400">
+                                {done}/{CHECKLIST_ITEMS.length} items &middot;{' '}
+                                {r.notas ? `"${r.notas.slice(0, 40)}${r.notas.length > 40 ? '...' : ''}"` : 'Sin notas'}
+                              </p>
+                            </div>
+                            <span className="text-xs font-bold px-2 py-0.5 rounded-full shrink-0"
+                              style={r.realizada
+                                ? { background: '#dcfce7', color: '#16a34a' }
+                                : { background: '#fef9c3', color: '#854d0e' }}>
+                              {r.realizada ? 'Realizada' : 'Pendiente'}
+                            </span>
+                            {isOpen ? <ChevronUp size={14} className="text-gray-400 shrink-0"/> : <ChevronDown size={14} className="text-gray-400 shrink-0"/>}
+                          </button>
+
+                          {/* Detalle expandido */}
+                          {isOpen && (
+                            <div className="px-5 pb-4 pt-1 space-y-3 border-t border-gray-50">
+                              <div className="space-y-1">
+                                {CHECKLIST_ITEMS.map((item, i) => (
+                                  <div key={i} className="flex items-center gap-2 py-1">
+                                    <div className="w-4 h-4 rounded flex items-center justify-center shrink-0"
+                                      style={r.checks[i]
+                                        ? { background: CORAL }
+                                        : { background: '#f3f4f6' }}>
+                                      {r.checks[i] && <Check size={9} color="white" strokeWidth={3}/>}
+                                    </div>
+                                    <span className={`text-xs ${r.checks[i] ? 'text-gray-400 line-through' : 'text-gray-600'}`}>{item}</span>
+                                  </div>
+                                ))}
+                              </div>
+                              {r.notas && (
+                                <div className="bg-gray-50 rounded-xl px-4 py-3">
+                                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Notas</p>
+                                  <p className="text-sm text-gray-700 leading-relaxed">{r.notas}</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PLANILLA DE DESCRIPCIÓN DE PUESTO
+// ═══════════════════════════════════════════════════════════════════
+const PUESTO_COLORS: Record<string, { bg: string; text: string }> = {
+  vend1:  { bg: NAVY,      text: '#fff'     },
+  vend2:  { bg: CORAL,     text: '#fff'     },
+  vend3:  { bg: '#7c3aed', text: '#fff'     },
+  vend4:  { bg: '#0891b2', text: '#fff'     },
+  caja:   { bg: '#16a34a', text: '#fff'     },
+  taller: { bg: '#d97706', text: '#fff'     },
+}
+
+function TabPuestos({
+  puestos, setPuestos,
+}: {
+  puestos: Puesto[]
+  setPuestos: (p: Puesto[]) => void
+}) {
+  const [activoId, setActivoId] = useState<string>(puestos[0]?.id ?? 'vend1')
+  const [saved,    setSaved]    = useState(false)
+
+  const puesto = puestos.find(p => p.id === activoId) ?? puestos[0]
+
+  function update(field: keyof Puesto, value: string) {
+    setPuestos(puestos.map(p => p.id === activoId ? { ...p, [field]: value } : p))
+  }
+
+  function handleSave() {
+    // ya persiste via useLocalState, solo feedback visual
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
+
+  const sections: { key: keyof Puesto; label: string; placeholder: string; rows: number }[] = [
+    {
+      key:         'responsabilidades',
+      label:       'Responsabilidades',
+      placeholder: 'Describí las tareas y responsabilidades principales del puesto...\n\n• Atender clientes\n• Gestionar ventas\n• ...',
+      rows:        6,
+    },
+    {
+      key:         'criterios',
+      label:       'Criterios de Desempeño',
+      placeholder: 'Describí con qué criterios se mide el rendimiento...\n\n• Cumplimiento de metas de venta\n• Puntualidad y presencia\n• ...',
+      rows:        5,
+    },
+    {
+      key:         'evaluacion',
+      label:       'Evaluación de Desempeño',
+      placeholder: 'Historial de evaluaciones, observaciones o calificaciones...\n\nEj: Mayo 2026 — Buen desempeño, superó meta en 15%.',
+      rows:        5,
+    },
+  ]
+
+  const colores = PUESTO_COLORS[activoId] ?? { bg: NAVY, text: '#fff' }
+
+  return (
+    <div className="space-y-4">
+
+      {/* Selector de puesto — chips */}
+      <div className="flex flex-wrap gap-2">
+        {puestos.map(p => {
+          const c = PUESTO_COLORS[p.id] ?? { bg: NAVY, text: '#fff' }
+          const isActive = activoId === p.id
+          return (
+            <button key={p.id} onClick={() => setActivoId(p.id)}
+              className="px-4 py-2 rounded-full text-sm font-bold transition-all border-2"
+              style={isActive
+                ? { background: c.bg, color: c.text, borderColor: c.bg }
+                : { background: 'white', color: '#6b7280', borderColor: '#e5e7eb' }}>
+              {p.nombre}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Encabezado del puesto */}
+      <div className="rounded-2xl px-6 py-5 flex items-center justify-between"
+        style={{ background: colores.bg }}>
+        <div>
+          <p className="text-xs font-bold tracking-[2px] uppercase opacity-70" style={{ color: colores.text }}>
+            Planilla de Puesto
+          </p>
+          <p className="text-2xl font-bold mt-0.5" style={{ color: colores.text }}>
+            {puesto?.nombre}
+          </p>
+          <p className="text-xs mt-1 opacity-60" style={{ color: colores.text }}>
+            Sur Maderas · Mar del Plata · {new Date().getFullYear()}
+          </p>
+        </div>
+        <Briefcase size={36} style={{ color: colores.text, opacity: 0.3 }} />
+      </div>
+
+      {/* Campos editables */}
+      <div className="space-y-4">
+        {sections.map(({ key, label, placeholder, rows }) => (
+          <div key={key} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            {/* Header sección */}
+            <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2"
+              style={{ background: colores.bg + '12' }}>
+              <div className="w-2 h-2 rounded-full" style={{ background: colores.bg }} />
+              <p className="text-xs font-bold uppercase tracking-[1.5px]" style={{ color: colores.bg }}>
+                {label}
+              </p>
+            </div>
+            <div className="p-4">
+              <textarea
+                value={puesto?.[key] as string ?? ''}
+                onChange={e => update(key, e.target.value)}
+                placeholder={placeholder}
+                rows={rows}
+                className="w-full text-sm text-gray-700 outline-none resize-none leading-relaxed placeholder:text-gray-300 bg-transparent"
+              />
             </div>
           </div>
-        )
-      })}
+        ))}
+      </div>
+
+      {/* Botón guardar */}
+      <button onClick={handleSave}
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-bold text-white transition-all"
+        style={{ background: saved ? '#16a34a' : colores.bg }}>
+        <Save size={14}/>
+        {saved ? 'Guardado ✓' : 'Guardar planilla'}
+      </button>
+
+      {/* Info */}
+      <p className="text-[10px] text-gray-400 text-center">
+        Los datos se guardan automáticamente en este dispositivo.
+      </p>
     </div>
   )
 }
@@ -781,12 +1074,12 @@ function TabConfig({ cfg, setCfg }: { cfg: Config; setCfg: (c: Config) => void }
 // MAIN PAGE
 // ═══════════════════════════════════════════════════════════════════
 export default function Comisiones() {
-  const [tab]                           = useState<Tab>('calculadora')
   const [activeTab, setActiveTab]       = useState<Tab>('calculadora')
   const [cfg,         setCfg]           = useLocalState<Config>('com_cfg', DEFAULT_CONFIG)
   const [vendedores,  setVendedores]    = useLocalState<Vendedor[]>('com_vendedores', DEFAULT_VENDEDORES)
   const [registros,   setRegistros]     = useLocalState<RegistroQ[]>('com_registros', [])
   const [reuniones,   setReuniones]     = useLocalState<Reunion[]>('com_reuniones', [])
+  const [puestos,     setPuestos]       = useLocalState<Puesto[]>('com_puestos', PUESTOS_DEFAULT)
 
   const activos       = vendedores.filter(v => v.activo)
   const totalPendiente = registros.filter(r => !r.pagada).reduce((s, r) => s + r.comision, 0)
@@ -838,6 +1131,7 @@ export default function Comisiones() {
       {activeTab === 'registro'    && <TabRegistro    vendedores={vendedores} registros={registros} setRegistros={setRegistros} cfg={cfg} />}
       {activeTab === 'vendedores'  && <TabVendedores  vendedores={vendedores} setVendedores={setVendedores} />}
       {activeTab === 'reuniones'   && <TabReuniones   vendedores={vendedores} reuniones={reuniones} setReuniones={setReuniones} registros={registros} cfg={cfg} />}
+      {activeTab === 'puestos'     && <TabPuestos     puestos={puestos} setPuestos={setPuestos} />}
       {activeTab === 'config'      && <TabConfig      cfg={cfg} setCfg={setCfg} />}
     </div>
   )
