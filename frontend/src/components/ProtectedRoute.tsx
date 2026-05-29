@@ -6,12 +6,23 @@ interface Props {
   requiredRole?: UserRole   // if omitted, any logged-in user can access
 }
 
+function SessionLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#0f172a]">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+        <p className="text-white/40 text-xs tracking-widest uppercase">Sur Maderas</p>
+      </div>
+    </div>
+  )
+}
+
 export default function ProtectedRoute({ children, requiredRole }: Props) {
   const { user, loading } = useAuth()
   const location = useLocation()
 
-  // Still restoring session from localStorage
-  if (loading) return null
+  // Restoring session from localStorage → show spinner instead of blank screen
+  if (loading) return <SessionLoader />
 
   // Not logged in → send to /login
   if (!user) {
@@ -24,7 +35,7 @@ export default function ProtectedRoute({ children, requiredRole }: Props) {
   }
 
   // Logged in but not enough permissions → send to /
-  if (requiredRole && user.role !== requiredRole && user.role !== 'caja_diaria') {
+  if (requiredRole && user.role !== requiredRole) {
     return <Navigate to="/" replace />
   }
 
