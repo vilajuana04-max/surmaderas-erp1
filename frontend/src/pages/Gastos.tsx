@@ -1103,7 +1103,7 @@ function LuroRegistro({ month, year, cats, colors, isClosed }: { month: string; 
   const [adding, setAdding]     = useState(false)
   const [saving, setSaving]     = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const EMPTY_FORM = { expense_date: '', categoria: '', subcategoria: '', detail: '', amount: '', payment_method: '', pagado: 'NO' }
+  const EMPTY_FORM = { expense_date: '', categoria: '', subcategoria: '', detail: '', amount: '', payment_method: '', pagado: 'NO', tipo_costo: 'fijo' }
   const [form, setForm]         = useState(EMPTY_FORM)
 
   const subCats = form.categoria ? (cats[form.categoria] ?? []) : []
@@ -1127,6 +1127,7 @@ function LuroRegistro({ month, year, cats, colors, isClosed }: { month: string; 
         amount:         parseFloat(form.amount),
         payment_method: form.payment_method || null,
         pagado:         form.pagado,
+        tipo_costo:     form.tipo_costo,
         month, year,
       })
       setAdding(false)
@@ -1221,6 +1222,21 @@ function LuroRegistro({ month, year, cats, colors, isClosed }: { month: string; 
                 <option value="SI">SI</option>
               </select>
             </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-brand-muted uppercase tracking-wide font-semibold">Tipo costo (PE)</label>
+              <div className="flex gap-2 mt-1">
+                {['fijo','variable'].map(t => (
+                  <button key={t} type="button"
+                    onClick={() => setForm(f => ({ ...f, tipo_costo: t }))}
+                    className="flex-1 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide border-2 transition-all"
+                    style={form.tipo_costo === t
+                      ? { background: t === 'fijo' ? '#7c3aed' : '#0891b2', color: '#fff', borderColor: t === 'fijo' ? '#7c3aed' : '#0891b2' }
+                      : { background: 'white', color: '#9ca3af', borderColor: '#e5e7eb' }}>
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="col-span-2 md:col-span-3 flex flex-col gap-2 pt-1">
               {saveError && (
                 <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-xs">
@@ -1249,6 +1265,7 @@ function LuroRegistro({ month, year, cats, colors, isClosed }: { month: string; 
                   <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-widest">Detalle</th>
                   <th className="px-3 py-3 text-right text-[11px] font-bold uppercase tracking-widest">Importe $</th>
                   <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-widest">Medio</th>
+                  <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-widest">Tipo</th>
                   <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-widest">Pagado</th>
                   <th className="px-3 py-3 w-8" />
                 </tr>
@@ -1266,6 +1283,21 @@ function LuroRegistro({ month, year, cats, colors, isClosed }: { month: string; 
                     <td className="table-td text-xs">{e.detail ?? '—'}</td>
                     <td className="table-td text-xs text-right font-semibold">{fmt$(parseFloat(e.amount))}</td>
                     <td className="table-td text-xs text-center text-brand-muted">{e.payment_method ?? '—'}</td>
+                    <td className="table-td text-center">
+                      <button
+                        onClick={async () => {
+                          const next = (e.tipo_costo ?? 'fijo') === 'fijo' ? 'variable' : 'fijo'
+                          await api.put(`/expenses/luro/${e.id}`, { tipo_costo: next })
+                          load()
+                        }}
+                        title="Clic para cambiar tipo"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide cursor-pointer transition-all"
+                        style={(e.tipo_costo ?? 'fijo') === 'fijo'
+                          ? { background: '#ede9fe', color: '#7c3aed' }
+                          : { background: '#cffafe', color: '#0e7490' }}>
+                        {(e.tipo_costo ?? 'fijo') === 'fijo' ? 'FIJO' : 'VARIABLE'}
+                      </button>
+                    </td>
                     <td className="table-td text-center">
                       <button onClick={() => togglePagado(e.id, e.pagado ?? 'NO')}
                         className={['badge cursor-pointer', e.pagado === 'SI' ? 'badge-green' : 'badge-red'].join(' ')}>
@@ -1290,7 +1322,7 @@ function LuroRegistro({ month, year, cats, colors, isClosed }: { month: string; 
                 <tr className="bg-brand-off-white border-t-2 border-brand-border font-bold text-xs">
                   <td colSpan={4} className="table-td">TOTAL MES</td>
                   <td className="table-td text-right">{fmt$(totalMes)}</td>
-                  <td colSpan={3} />
+                  <td colSpan={4} />
                 </tr>
               </tbody>
             </table>

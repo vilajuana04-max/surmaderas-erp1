@@ -60,6 +60,7 @@ class LuroExpense(Base):
     amount          = Column(Numeric(15, 2))
     payment_method  = Column(String(50))
     paid_status     = Column(Boolean, default=False)
+    tipo_costo      = Column(String(10), default='fijo')   # 'fijo' | 'variable'
 
     category    = relationship("ExpenseCategory", foreign_keys=[category_id])
     subcategory = relationship("ExpenseCategory", foreign_keys=[subcategory_id])

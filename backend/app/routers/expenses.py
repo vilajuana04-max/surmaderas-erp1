@@ -211,6 +211,7 @@ def create_luro_expense(data: LuroExpenseCreate, db: Session = Depends(get_db)):
         amount         = data.amount,
         payment_method = data.payment_method,
         pagado         = data.pagado,
+        tipo_costo     = data.tipo_costo,
     )
     db.add(expense)
     db.commit()
@@ -218,12 +219,30 @@ def create_luro_expense(data: LuroExpenseCreate, db: Session = Depends(get_db)):
     return expense
 
 
+@router.get("/luro/totales-pe")
+def luro_totales_pe(
+    month: Optional[str] = None,
+    year:  Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    """Devuelve totales de gastos Luro agrupados por tipo_costo para el PE."""
+    q = db.query(LuroExpense)
+    if year:
+        q = q.filter(LuroExpense.year == year)
+    if month:
+        q = q.filter(LuroExpense.month == month.upper())
+    expenses = q.all()
+    total_fijo     = sum(float(e.amount or 0) for e in expenses if (e.tipo_costo or 'fijo') == 'fijo')
+    total_variable = sum(float(e.amount or 0) for e in expenses if (e.tipo_costo or 'fijo') == 'variable')
+    return {"total_fijo": total_fijo, "total_variable": total_variable}
+
+
 @router.put("/luro/{expense_id}", response_model=LuroExpenseOut)
 def update_luro_expense(expense_id: int, data: dict, db: Session = Depends(get_db)):
     e = db.query(LuroExpense).filter(LuroExpense.id == expense_id).first()
     if not e:
         raise HTTPException(404, "Gasto no encontrado")
-    for field in ("categoria","subcategoria","detail","amount","payment_method","pagado","expense_date","month","year"):
+    for field in ("categoria","subcategoria","detail","amount","payment_method","pagado","expense_date","month","year","tipo_costo"):
         if field in data:
             setattr(e, field, data[field] if data[field] != "" else None)
     db.commit()

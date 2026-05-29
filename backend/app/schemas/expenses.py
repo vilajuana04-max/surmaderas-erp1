@@ -66,6 +66,7 @@ class LuroExpenseCreate(BaseModel):
     amount:         Decimal
     payment_method: Optional[str]  = None
     pagado:         str = 'NO'
+    tipo_costo:     str = 'fijo'   # 'fijo' | 'variable'
 
 
 class LuroExpenseOut(BaseModel):
@@ -79,5 +80,6 @@ class LuroExpenseOut(BaseModel):
     amount:         Decimal
     payment_method: Optional[str]
     pagado:         Optional[str]
+    tipo_costo:     Optional[str]
 
     model_config = {"from_attributes": True}
