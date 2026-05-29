@@ -14,6 +14,34 @@ from app.routers import (
 
 Base.metadata.create_all(bind=engine)
 
+# ── Seed usuarios por defecto ────────────────────────────────────
+def _seed_users():
+    """Crea usuarios iniciales si no existen. Se ejecuta al arrancar."""
+    from app.database import SessionLocal
+    from app.models.users import User
+
+    # Hash bcrypt de "Gust1401" (rounds=12)
+    HASH_GUST1401 = "$2b$12$DM6fkHH4HVcp8sJ5X200MOt3bXu0UWZ8XqGBhc.kernSC8h/1mdM."
+
+    DEFAULT_USERS = [
+        ("Gustavo",  HASH_GUST1401, "admin"),
+        ("Personal", HASH_GUST1401, "caja"),
+    ]
+
+    db = SessionLocal()
+    try:
+        for username, pw_hash, role in DEFAULT_USERS:
+            if not db.query(User).filter(User.username == username).first():
+                db.add(User(username=username, password_hash=pw_hash, role=role))
+                print(f"[seed] Usuario '{username}' creado.")
+        db.commit()
+    except Exception as e:
+        print(f"[seed] Error: {e}")
+    finally:
+        db.close()
+
+_seed_users()
+
 # ── CORS ────────────────────────────────────────────────────────
 # En producción, solo el frontend de Vercel/Render puede conectarse.
 # En desarrollo, se permiten localhost.
