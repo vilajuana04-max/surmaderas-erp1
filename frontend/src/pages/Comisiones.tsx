@@ -49,12 +49,12 @@ type Puesto = {
 }
 
 const PUESTOS_DEFAULT: Puesto[] = [
-  { id: 'vend1',  nombre: 'Vendedor 1', responsabilidades: '', criterios: '', evaluacion: '' },
-  { id: 'vend2',  nombre: 'Vendedor 2', responsabilidades: '', criterios: '', evaluacion: '' },
-  { id: 'vend3',  nombre: 'Vendedor 3', responsabilidades: '', criterios: '', evaluacion: '' },
-  { id: 'vend4',  nombre: 'Vendedor 4', responsabilidades: '', criterios: '', evaluacion: '' },
-  { id: 'caja',   nombre: 'Caja',       responsabilidades: '', criterios: '', evaluacion: '' },
-  { id: 'taller', nombre: 'Taller',     responsabilidades: '', criterios: '', evaluacion: '' },
+  { id: 'vend1',    nombre: 'Ariel Viejo',   responsabilidades: '', criterios: '', evaluacion: '' },
+  { id: 'vend2',    nombre: 'Pato Scatizzi', responsabilidades: '', criterios: '', evaluacion: '' },
+  { id: 'vend3',    nombre: 'Valentina',      responsabilidades: '', criterios: '', evaluacion: '' },
+  { id: 'caja',     nombre: 'Cecilia Vila',   responsabilidades: '', criterios: '', evaluacion: '' },
+  { id: 'taller1',  nombre: 'Facundo Lalli',  responsabilidades: '', criterios: '', evaluacion: '' },
+  { id: 'taller2',  nombre: 'Marcelo Viejo',  responsabilidades: '', criterios: '', evaluacion: '' },
 ]
 
 type Config = {
@@ -86,9 +86,12 @@ const DEFAULT_CONFIG: Config = {
 }
 
 const DEFAULT_VENDEDORES: Vendedor[] = [
-  { id: 1, nombre: 'Maria G.',  sucursal: 'luro',          turno: '6hs', activo: true },
-  { id: 2, nombre: 'Lucas T.',  sucursal: 'independencia', turno: '6hs', activo: true },
-  { id: 3, nombre: 'Ana P.',    sucursal: 'luro',          turno: '8hs', activo: true },
+  { id: 1, nombre: 'Cecilia Vila',    sucursal: 'luro', turno: '6hs', activo: true },
+  { id: 2, nombre: 'Ariel Viejo',     sucursal: 'luro', turno: '8hs', activo: true },
+  { id: 3, nombre: 'Pato Scatizzi',   sucursal: 'luro', turno: '6hs', activo: true },
+  { id: 4, nombre: 'Valentina',       sucursal: 'luro', turno: '6hs', activo: true },
+  { id: 5, nombre: 'Facundo Lalli',   sucursal: 'luro', turno: '8hs', activo: true },
+  { id: 6, nombre: 'Marcelo Viejo',   sucursal: 'luro', turno: '8hs', activo: true },
 ]
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -889,12 +892,12 @@ function TabReuniones({
 // PLANILLA DE DESCRIPCIÓN DE PUESTO
 // ═══════════════════════════════════════════════════════════════════
 const PUESTO_COLORS: Record<string, { bg: string; text: string }> = {
-  vend1:  { bg: NAVY,      text: '#fff'     },
-  vend2:  { bg: CORAL,     text: '#fff'     },
-  vend3:  { bg: '#7c3aed', text: '#fff'     },
-  vend4:  { bg: '#0891b2', text: '#fff'     },
-  caja:   { bg: '#16a34a', text: '#fff'     },
-  taller: { bg: '#d97706', text: '#fff'     },
+  vend1:   { bg: NAVY,      text: '#fff' },
+  vend2:   { bg: CORAL,     text: '#fff' },
+  vend3:   { bg: '#7c3aed', text: '#fff' },
+  caja:    { bg: '#16a34a', text: '#fff' },
+  taller1: { bg: '#d97706', text: '#fff' },
+  taller2: { bg: '#0891b2', text: '#fff' },
 }
 
 function TabPuestos({
@@ -1076,10 +1079,10 @@ function TabConfig({ cfg, setCfg }: { cfg: Config; setCfg: (c: Config) => void }
 export default function Comisiones() {
   const [activeTab, setActiveTab]       = useState<Tab>('calculadora')
   const [cfg,         setCfg]           = useLocalState<Config>('com_cfg', DEFAULT_CONFIG)
-  const [vendedores,  setVendedores]    = useLocalState<Vendedor[]>('com_vendedores', DEFAULT_VENDEDORES)
+  const [vendedores,  setVendedores]    = useLocalState<Vendedor[]>('com_vendedores_v2', DEFAULT_VENDEDORES)
   const [registros,   setRegistros]     = useLocalState<RegistroQ[]>('com_registros', [])
   const [reuniones,   setReuniones]     = useLocalState<Reunion[]>('com_reuniones', [])
-  const [puestos,     setPuestos]       = useLocalState<Puesto[]>('com_puestos', PUESTOS_DEFAULT)
+  const [puestos,     setPuestos]       = useLocalState<Puesto[]>('com_puestos_v2', PUESTOS_DEFAULT)
 
   const activos       = vendedores.filter(v => v.activo)
   const totalPendiente = registros.filter(r => !r.pagada).reduce((s, r) => s + r.comision, 0)
