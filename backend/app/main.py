@@ -22,10 +22,13 @@ def _seed_users():
 
     # Hash bcrypt de "Gust1401" (rounds=12)
     HASH_GUST1401 = "$2b$12$DM6fkHH4HVcp8sJ5X200MOt3bXu0UWZ8XqGBhc.kernSC8h/1mdM."
+    # Hash bcrypt de "1111" (rounds=12)
+    HASH_1111     = "$2b$12$EY1XI8rJnuVxfEbE1kqcx.l4/j5eDMObYjcoAO.wCZ.Y0QMpFmvVG"
 
     DEFAULT_USERS = [
         ("Gustavo",  HASH_GUST1401, "admin"),
         ("Personal", HASH_GUST1401, "caja"),
+        ("Caja",     HASH_1111,     "caja_diaria"),
     ]
 
     db = SessionLocal()

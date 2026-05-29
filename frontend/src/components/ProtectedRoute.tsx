@@ -18,8 +18,13 @@ export default function ProtectedRoute({ children, requiredRole }: Props) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
+  // caja_diaria: solo puede estar en /caja-diaria
+  if (user.role === 'caja_diaria' && location.pathname !== '/caja-diaria') {
+    return <Navigate to="/caja-diaria" replace />
+  }
+
   // Logged in but not enough permissions → send to /
-  if (requiredRole && user.role !== requiredRole) {
+  if (requiredRole && user.role !== requiredRole && user.role !== 'caja_diaria') {
     return <Navigate to="/" replace />
   }
 

@@ -32,7 +32,8 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
   const location   = useLocation()
   const navigate   = useNavigate()
   const { user, logout } = useAuth()
-  const isAdmin    = user?.role === 'admin'
+  const isAdmin      = user?.role === 'admin'
+  const isCajaDiaria = user?.role === 'caja_diaria'
 
   const isRRHH   = location.pathname === '/rrhh'   || location.pathname.startsWith('/rrhh')
   const isGastos = location.pathname === '/gastos' || location.pathname.startsWith('/gastos')
@@ -83,7 +84,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
                 {user.username}
               </p>
               <p className="text-white/30 text-[10px] tracking-wide uppercase mt-0.5">
-                {user.role === 'admin' ? 'Administrador' : 'Acceso Caja'}
+                {user.role === 'admin' ? 'Administrador' : user.role === 'caja_diaria' ? 'Caja Diaria' : 'Acceso Caja'}
               </p>
             </div>
           </div>
@@ -92,8 +93,8 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
 
       {/* Nav */}
       <nav className="flex-1 py-6 overflow-y-auto">
-        {/* Comunes a todos los roles */}
-        {NAV_MAIN.map(({ to, icon: Icon, label, num }) => (
+        {/* Dashboard, Ventas, Compras — oculto para caja_diaria */}
+        {!isCajaDiaria && NAV_MAIN.map(({ to, icon: Icon, label, num }) => (
           <NavLink key={to} to={to} end={to === '/'}
             onClick={onClose}
             className={({ isActive }) => navLinkClass(isActive)}
