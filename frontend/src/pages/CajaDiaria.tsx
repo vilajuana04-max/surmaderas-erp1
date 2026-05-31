@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { api, fmt$ } from '../api'
 import {
   Plus, Trash2, Lock, Unlock,
-  ArrowDownCircle, ArrowUpCircle, CreditCard, Banknote,
+  ArrowDownCircle, ArrowUpCircle, CreditCard, Banknote, Smartphone,
   FileDown, History, CalendarDays, CheckCircle2, MessageCircle,
 } from 'lucide-react'
 
@@ -17,13 +17,13 @@ type Mov = { id: number; tipo: string; descripcion: string; monto: number }
 
 type Caja = {
   id: number; fecha: string; sucursal: string
-  efectivo_del_dia: number
+  efectivo_del_dia: number   // = total_link (compat)
   tarjeta_provincia: number; tarjeta_nave: number
   tarjeta_frances: number;  tarjeta_comafi: number
   observaciones: string; cerrada: boolean
   movimientos: Mov[]
   total_gastos: number; total_transf: number
-  total_retiros: number; total_tarjetas: number
+  total_retiros: number; total_link: number; total_tarjetas: number
   total_del_dia: number; total_salidas: number
 }
 
@@ -261,8 +261,8 @@ export default function CajaDiaria() {
       `📋 *Resumen del día — Sur Maderas*`,
       `📅 ${d}/${m}/${y} | Sucursal ${sucLabel}`,
       ``,
-      `💵 Efectivo: ${fmt$(caja.efectivo_del_dia)}`,
       `🔄 Transferencias: ${fmt$(caja.total_transf)}`,
+      `🔗 Link de pago: ${fmt$(caja.total_link ?? 0)}`,
       `💳 Tarjetas: ${fmt$(caja.total_tarjetas)}`,
       `   · PROVINCIA: ${fmt$(caja.tarjeta_provincia)}`,
       `   · NAVE: ${fmt$(caja.tarjeta_nave)}`,
@@ -291,6 +291,7 @@ export default function CajaDiaria() {
   const gastos  = caja?.movimientos.filter(m => m.tipo === 'gasto')         ?? []
   const transf  = caja?.movimientos.filter(m => m.tipo === 'transferencia') ?? []
   const retiros = caja?.movimientos.filter(m => m.tipo === 'retiro')        ?? []
+  const links   = caja?.movimientos.filter(m => m.tipo === 'link')          ?? []
 
   return (
     <div className="space-y-5">
@@ -356,57 +357,50 @@ export default function CajaDiaria() {
 
           {caja && !loading && (
             <>
-              {/* ── 4 sections ── */}
+              {/* ── Secciones ── */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Fila 1 */}
                 <Section title="Gastos" icon={<ArrowUpCircle size={16}/>} color="#ef4444"
                   total={caja.total_gastos} items={gastos} tipo="gasto" disabled={disabled}
                   onAdd={addMov} onChange={updateMov} onDelete={deleteMov} />
                 <Section title="Transferencias" icon={<ArrowDownCircle size={16}/>} color="#2563eb"
                   total={caja.total_transf} items={transf} tipo="transferencia" disabled={disabled}
                   onAdd={addMov} onChange={updateMov} onDelete={deleteMov} />
+
+                {/* Fila 2 */}
+                <Section title="Link de Pago" icon={<Smartphone size={16}/>} color="#22c55e"
+                  total={caja.total_link ?? 0} items={links} tipo="link" disabled={disabled}
+                  onAdd={addMov} onChange={updateMov} onDelete={deleteMov} />
                 <Section title="Retiro de Caja" icon={<Banknote size={16}/>} color="#f59e0b"
                   total={caja.total_retiros} items={retiros} tipo="retiro" disabled={disabled}
                   onAdd={addMov} onChange={updateMov} onDelete={deleteMov} />
-
-                {/* Tarjetas */}
-                <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden flex flex-col">
-                  <div className="px-4 py-3 flex items-center gap-2 border-b border-gray-100"
-                       style={{ borderLeftWidth: 3, borderLeftColor: '#8b5cf6' }}>
-                    <CreditCard size={16} style={{ color: '#8b5cf6' }} />
-                    <span className="font-bold text-sm text-gray-800 flex-1">Tarjetas</span>
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                          style={{ background: '#8b5cf618', color: '#8b5cf6' }}>
-                      {fmt$(caja.total_tarjetas)}
-                    </span>
-                  </div>
-                  <div className="px-4 py-2 flex-1 space-y-1">
-                    {TERMINALES.map(t => {
-                      const key = `tarjeta_${t.key}` as keyof Caja
-                      const val = caja[key] as number
-                      return (
-                        <div key={t.key} className="flex items-center gap-3 py-1.5">
-                          <span className="text-xs font-bold text-gray-400 w-24 shrink-0">{t.label}</span>
-                          <input defaultValue={val || ''} disabled={disabled} inputMode="decimal" placeholder="0"
-                            onBlur={e => { const n = parseFloat(e.target.value)||0; if (n !== val) patchCaja({ [key]: n }) }}
-                            className="flex-1 text-sm text-right border-b border-gray-200 focus:border-purple-400 outline-none px-1 py-0.5 bg-transparent disabled:opacity-50" />
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
               </div>
 
-              {/* ── Efectivo del día ── */}
-              <div className="bg-white rounded-2xl border border-gray-100 px-5 py-4 flex items-center gap-4">
-                <div className="flex-1">
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Efectivo del día</p>
-                  <p className="text-xs text-gray-400">Cantidad contada en caja al cierre</p>
+              {/* ── Tarjetas (fila completa) ── */}
+              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                <div className="px-4 py-3 flex items-center gap-2 border-b border-gray-100"
+                     style={{ borderLeftWidth: 3, borderLeftColor: '#8b5cf6' }}>
+                  <CreditCard size={16} style={{ color: '#8b5cf6' }} />
+                  <span className="font-bold text-sm text-gray-800 flex-1">Tarjetas</span>
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                        style={{ background: '#8b5cf618', color: '#8b5cf6' }}>
+                    {fmt$(caja.total_tarjetas)}
+                  </span>
                 </div>
-                <input key={caja.id+'-ef'} defaultValue={caja.efectivo_del_dia||''} disabled={disabled}
-                  inputMode="decimal" placeholder="0,00"
-                  onBlur={e => { const n = parseFloat(e.target.value)||0; if (n !== caja.efectivo_del_dia) patchCaja({ efectivo_del_dia: n }) }}
-                  className="w-36 text-right text-xl font-bold text-gray-800 border-b-2 focus:outline-none px-2 py-1 bg-transparent disabled:opacity-50"
-                  style={{ borderBottomColor: CORAL }} />
+                <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-gray-100 px-0">
+                  {TERMINALES.map(t => {
+                    const key = `tarjeta_${t.key}` as keyof Caja
+                    const val = caja[key] as number
+                    return (
+                      <div key={t.key} className="px-4 py-3">
+                        <p className="text-[10px] font-bold text-gray-400 mb-1">{t.label}</p>
+                        <input defaultValue={val || ''} disabled={disabled} inputMode="decimal" placeholder="0"
+                          onBlur={e => { const n = parseFloat(e.target.value)||0; if (n !== val) patchCaja({ [key]: n }) }}
+                          className="w-full text-sm font-bold text-right border-b border-gray-200 focus:border-purple-400 outline-none py-0.5 bg-transparent disabled:opacity-50" />
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
 
               {/* ── Resumen ── */}
@@ -416,10 +410,10 @@ export default function CajaDiaria() {
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0 divide-gray-100">
                   {[
-                    { label: 'Transferencias', value: caja.total_transf,    color: '#2563eb' },
-                    { label: 'Efectivo',        value: caja.efectivo_del_dia, color: '#16a34a' },
-                    { label: 'Tarjetas',        value: caja.total_tarjetas,   color: '#8b5cf6' },
-                    { label: 'Gastos + Retiros', value: -caja.total_salidas,  color: '#ef4444' },
+                    { label: 'Transferencias',  value: caja.total_transf,         color: '#2563eb' },
+                    { label: 'Link de Pago',     value: caja.total_link ?? 0,      color: '#22c55e' },
+                    { label: 'Tarjetas',         value: caja.total_tarjetas,       color: '#8b5cf6' },
+                    { label: 'Gastos + Retiros', value: -caja.total_salidas,       color: '#ef4444' },
                   ].map(({ label, value, color }) => (
                     <div key={label} className="px-5 py-4">
                       <p className="text-xs text-gray-400 font-semibold mb-1">{label}</p>

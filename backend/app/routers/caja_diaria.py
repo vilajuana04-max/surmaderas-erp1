@@ -73,19 +73,20 @@ def _serialize_caja(c: CajaDiaria) -> dict:
     total_gastos   = sum(m["monto"] for m in movs if m["tipo"] == "gasto")
     total_transf   = sum(m["monto"] for m in movs if m["tipo"] == "transferencia")
     total_retiros  = sum(m["monto"] for m in movs if m["tipo"] == "retiro")
+    total_link     = sum(m["monto"] for m in movs if m["tipo"] == "link")
     total_tarjetas = (
         float(c.tarjeta_provincia) + float(c.tarjeta_nave) +
         float(c.tarjeta_frances)   + float(c.tarjeta_comafi)
     )
-    efectivo      = float(c.efectivo_del_dia)
-    total_del_dia = total_transf + efectivo + total_tarjetas
+    # efectivo_del_dia ya no se ingresa manualmente; se deriva del total de links
+    total_del_dia = total_transf + total_link + total_tarjetas
     total_salidas = total_gastos + total_retiros
 
     return {
         "id":                 c.id,
         "fecha":              c.fecha.isoformat(),
         "sucursal":           c.sucursal,
-        "efectivo_del_dia":   efectivo,
+        "efectivo_del_dia":   total_link,   # compat: expuesto como efectivo = link
         "tarjeta_provincia":  float(c.tarjeta_provincia),
         "tarjeta_nave":       float(c.tarjeta_nave),
         "tarjeta_frances":    float(c.tarjeta_frances),
@@ -96,6 +97,7 @@ def _serialize_caja(c: CajaDiaria) -> dict:
         "total_gastos":       total_gastos,
         "total_transf":       total_transf,
         "total_retiros":      total_retiros,
+        "total_link":         total_link,
         "total_tarjetas":     total_tarjetas,
         "total_del_dia":      total_del_dia,
         "total_salidas":      total_salidas,
@@ -112,6 +114,7 @@ def _generate_caja_pdf(data: dict) -> bytes:
     gastos  = [m for m in data["movimientos"] if m["tipo"] == "gasto"]
     transf  = [m for m in data["movimientos"] if m["tipo"] == "transferencia"]
     retiros = [m for m in data["movimientos"] if m["tipo"] == "retiro"]
+    links   = [m for m in data["movimientos"] if m["tipo"] == "link"]
 
     # Landscape A4: 297 x 210 mm
     pdf = FPDF(orientation="L", format="A4")
@@ -214,43 +217,50 @@ def _generate_caja_pdf(data: dict) -> bytes:
     yR = draw_section("TRANSFERENCIAS", transf, data["total_transf"],
                       50, 100, 210,  x_r, row1_y, col_w)
 
-    # Fila 2: Retiro de Caja | Tarjetas — misma y de arranque
+    # Fila 2: Link de Pago | Retiro de Caja
     row2_y = max(yL, yR) + 5
-    yL2 = draw_section("RETIRO DE CAJA", retiros, data["total_retiros"],
-                       200, 150, 40, x_l, row2_y, col_w)
+    yL2 = draw_section("LINK DE PAGO", links, data["total_link"],
+                       34, 197, 94,  x_l, row2_y, col_w)
+    yR2 = draw_section("RETIRO DE CAJA", retiros, data["total_retiros"],
+                       200, 150, 40, x_r, row2_y, col_w)
 
-    # Tarjetas (filas fijas de terminales)
+    # Fila 3: Tarjetas (izquierda)
+    row3_y = max(yL2, yR2) + 5
+    # dummy yL3 for alignment
+    yL3 = row3_y
+
+    # Tarjetas (filas fijas de terminales) — fila 3 lado izquierdo
     pdf.set_fill_color(110, 70, 200)
-    pdf.set_xy(x_r, row2_y)
+    pdf.set_xy(x_l, row3_y)
     pdf.set_font("Helvetica", "B", 8.5)
     pdf.set_text_color(255, 255, 255)
     pdf.cell(col_w, 8, "  TARJETAS", ln=0, fill=True)
-    pdf.set_xy(x_r, row2_y)
+    pdf.set_xy(x_l, row3_y)
     pdf.cell(col_w - 2, 8, _fmt(data["total_tarjetas"]), ln=0, align="R", fill=True)
-    yT = row2_y + 8
+    yT = row3_y + 8
     for idx, (label, key) in enumerate([
             ("PROVINCIA", "tarjeta_provincia"), ("NAVE",   "tarjeta_nave"),
             ("FRANCES",   "tarjeta_frances"),   ("COMAFI", "tarjeta_comafi")]):
         bg = (250, 250, 252) if idx % 2 == 1 else (255, 255, 255)
         pdf.set_fill_color(*bg)
-        pdf.set_xy(x_r, yT)
+        pdf.set_xy(x_l, yT)
         pdf.set_font("Helvetica", "", 8)
         pdf.set_text_color(40, 40, 40)
         pdf.cell(col_w * 0.55, 6, f"  {label}", border="LB", fill=True, ln=0)
-        pdf.set_xy(x_r + col_w * 0.55, yT)
+        pdf.set_xy(x_l + col_w * 0.55, yT)
         pdf.set_font("Helvetica", "B", 8)
         pdf.cell(col_w * 0.45, 6, _fmt(data[key]),
                  border="RB", align="R", fill=True, ln=0)
         yT += 6
 
-    pdf.set_y(max(yL2, yT) + 6)
+    pdf.set_y(max(yL3, yT) + 6)
 
     # ── KPI: 4 boxes con borde superior de color ─────────────────
     kpi_y  = pdf.get_y()
     cw_kpi = W / 4
     kpi_items = [
-        ("EFECTIVO DEL DIA",  data["efectivo_del_dia"],   22, 163,  74),
         ("TRANSFERENCIAS",    data["total_transf"],        37,  99, 235),
+        ("LINK DE PAGO",      data["total_link"],          34, 197,  94),
         ("TARJETAS",          data["total_tarjetas"],     124,  58, 237),
         ("GASTOS + RETIROS",  data["total_salidas"],      200,  50,  50),
     ]
