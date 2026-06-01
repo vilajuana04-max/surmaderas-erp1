@@ -13,7 +13,10 @@ const CORAL = '#C8603A'
 const NAVY  = '#070614'
 
 // ── Types ─────────────────────────────────────────────────────────
-type Mov = { id: number; tipo: string; descripcion: string; monto: number }
+type Mov = { id: number; tipo: string; descripcion: string; monto: number; categoria?: string }
+
+const GASTO_CATS = ['Proveedores', 'Limpieza', 'Insumos', 'Transporte', 'Servicios'] as const
+type GastoCat = typeof GASTO_CATS[number]
 
 type Caja = {
   id: number; fecha: string; sucursal: string
@@ -50,16 +53,25 @@ function fmtDate(iso: string) {
 }
 
 // ── InlineRow ─────────────────────────────────────────────────────
-function InlineRow({ mov, disabled, onChange, onDelete }: {
-  mov: Mov; disabled: boolean
+function InlineRow({ mov, tipo, disabled, onChange, onDelete }: {
+  mov: Mov; tipo: string; disabled: boolean
   onChange: (id: number, patch: Partial<Mov>) => void
   onDelete: (id: number) => void
 }) {
   const [desc,  setDesc]  = useState(mov.descripcion)
   const [monto, setMonto] = useState(String(mov.monto || ''))
+  const [cat,   setCat]   = useState(mov.categoria || GASTO_CATS[0])
 
   return (
     <div className="flex items-center gap-2 py-1.5 group">
+      {tipo === 'gasto' && (
+        <select value={cat}
+          onChange={e => { setCat(e.target.value as GastoCat); onChange(mov.id, { categoria: e.target.value }) }}
+          disabled={disabled}
+          className="text-xs bg-gray-50 border border-gray-200 rounded-md px-1.5 py-0.5 text-gray-600 outline-none focus:border-red-300 disabled:opacity-50 shrink-0">
+          {GASTO_CATS.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+      )}
       <input value={desc} onChange={e => setDesc(e.target.value)}
         onBlur={() => { if (desc !== mov.descripcion) onChange(mov.id, { descripcion: desc }) }}
         disabled={disabled} placeholder="Descripción…"
@@ -67,7 +79,7 @@ function InlineRow({ mov, disabled, onChange, onDelete }: {
       <input value={monto} onChange={e => setMonto(e.target.value)}
         onBlur={() => { const n = parseFloat(monto)||0; if (n !== mov.monto) onChange(mov.id, { monto: n }) }}
         disabled={disabled} inputMode="decimal" placeholder="0"
-        className="w-28 text-sm text-right bg-transparent border-b border-gray-200 focus:border-gray-400 outline-none px-1 py-0.5 disabled:opacity-50" />
+        className="w-24 text-sm text-right bg-transparent border-b border-gray-200 focus:border-gray-400 outline-none px-1 py-0.5 disabled:opacity-50" />
       {!disabled && (
         <button onClick={() => onDelete(mov.id)}
           className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity shrink-0">
@@ -82,22 +94,23 @@ function InlineRow({ mov, disabled, onChange, onDelete }: {
 function Section({ title, icon, color, total, items, tipo, disabled, onAdd, onChange, onDelete }: {
   title: string; icon: React.ReactNode; color: string; total: number
   items: Mov[]; tipo: string; disabled: boolean
-  onAdd: (tipo: string, desc: string, monto: number) => void
+  onAdd: (tipo: string, desc: string, monto: number, categoria?: string) => void
   onChange: (id: number, patch: Partial<Mov>) => void
   onDelete: (id: number) => void
 }) {
   const [adding, setAdding] = useState(false)
   const [desc,   setDesc]   = useState('')
   const [monto,  setMonto]  = useState('')
+  const [cat,    setCat]    = useState<string>(GASTO_CATS[0])
   const descRef = useRef<HTMLInputElement>(null)
 
   function startAdd() { setAdding(true); setTimeout(() => descRef.current?.focus(), 50) }
   function confirmAdd() {
     const n = parseFloat(monto) || 0
-    if (desc.trim() || n) onAdd(tipo, desc.trim(), n)
-    setDesc(''); setMonto(''); setAdding(false)
+    if (desc.trim() || n) onAdd(tipo, desc.trim(), n, tipo === 'gasto' ? cat : undefined)
+    setDesc(''); setMonto(''); setCat(GASTO_CATS[0]); setAdding(false)
   }
-  function cancelAdd() { setDesc(''); setMonto(''); setAdding(false) }
+  function cancelAdd() { setDesc(''); setMonto(''); setCat(GASTO_CATS[0]); setAdding(false) }
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden flex flex-col">
@@ -113,17 +126,23 @@ function Section({ title, icon, color, total, items, tipo, disabled, onAdd, onCh
           <p className="text-gray-300 text-xs py-3 text-center">Sin registros</p>
         )}
         {items.map(m => (
-          <InlineRow key={m.id} mov={m} disabled={disabled} onChange={onChange} onDelete={onDelete} />
+          <InlineRow key={m.id} mov={m} tipo={tipo} disabled={disabled} onChange={onChange} onDelete={onDelete} />
         ))}
         {adding && (
-          <div className="flex items-center gap-2 py-2 border-t border-dashed border-gray-200 mt-1">
+          <div className="flex flex-wrap items-center gap-2 py-2 border-t border-dashed border-gray-200 mt-1">
+            {tipo === 'gasto' && (
+              <select value={cat} onChange={e => setCat(e.target.value)}
+                className="text-xs bg-gray-50 border border-gray-200 rounded-md px-1.5 py-1 text-gray-600 outline-none focus:border-red-300 shrink-0">
+                {GASTO_CATS.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            )}
             <input ref={descRef} value={desc} onChange={e => setDesc(e.target.value)}
               placeholder="Descripción…"
               onKeyDown={e => { if (e.key==='Enter') confirmAdd(); if (e.key==='Escape') cancelAdd() }}
-              className="flex-1 text-sm border-b outline-none px-1 py-0.5" style={{ borderBottomColor: color }} />
+              className="flex-1 min-w-0 text-sm border-b outline-none px-1 py-0.5" style={{ borderBottomColor: color }} />
             <input value={monto} onChange={e => setMonto(e.target.value)} inputMode="decimal" placeholder="0"
               onKeyDown={e => { if (e.key==='Enter') confirmAdd(); if (e.key==='Escape') cancelAdd() }}
-              className="w-28 text-sm text-right border-b outline-none px-1 py-0.5" style={{ borderBottomColor: color }} />
+              className="w-24 text-sm text-right border-b outline-none px-1 py-0.5" style={{ borderBottomColor: color }} />
             <button onClick={confirmAdd} className="text-green-500 hover:text-green-700 text-xs font-bold">✓</button>
             <button onClick={cancelAdd}  className="text-gray-400 hover:text-gray-600 text-xs">✕</button>
           </div>
@@ -226,9 +245,9 @@ export default function CajaDiaria() {
   }
 
   // ── Movimientos ──────────────────────────────────────────────
-  async function addMov(tipo: string, descripcion: string, monto: number) {
+  async function addMov(tipo: string, descripcion: string, monto: number, categoria?: string) {
     if (!caja) return
-    await api.post(`/caja-diaria/${caja.id}/movimientos`, { tipo, descripcion, monto })
+    await api.post(`/caja-diaria/${caja.id}/movimientos`, { tipo, descripcion, monto, categoria })
     const updated = await api.get<Caja>(`/caja-diaria/${fecha}/${sucursal}`)
     setCaja(updated)
   }

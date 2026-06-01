@@ -61,6 +61,7 @@ class LuroExpense(Base):
     payment_method  = Column(String(50))
     paid_status     = Column(Boolean, default=False)
     tipo_costo      = Column(String(10), default='fijo')   # 'fijo' | 'variable'
+    caja_id         = Column(Integer, nullable=True)        # referencia a caja_diaria.id si fue importado de caja
 
     category    = relationship("ExpenseCategory", foreign_keys=[category_id])
     subcategory = relationship("ExpenseCategory", foreign_keys=[subcategory_id])

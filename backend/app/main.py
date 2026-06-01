@@ -14,6 +14,27 @@ from app.routers import (
 
 Base.metadata.create_all(bind=engine)
 
+# ── Migraciones de columnas nuevas (idempotentes) ────────────────
+def _run_migrations():
+    """Agrega columnas nuevas si aún no existen. Seguro de correr múltiples veces."""
+    from sqlalchemy import text
+    from app.database import SessionLocal
+    db = SessionLocal()
+    try:
+        db.execute(text(
+            "ALTER TABLE caja_movimientos ADD COLUMN IF NOT EXISTS categoria VARCHAR(50);"
+        ))
+        db.execute(text(
+            "ALTER TABLE luro_expenses ADD COLUMN IF NOT EXISTS caja_id INTEGER;"
+        ))
+        db.commit()
+    except Exception as e:
+        print(f"[migration] Error: {e}")
+    finally:
+        db.close()
+
+_run_migrations()
+
 # ── Seed usuarios por defecto ────────────────────────────────────
 def _seed_users():
     """Crea usuarios iniciales si no existen. Se ejecuta al arrancar."""

@@ -37,8 +37,9 @@ class CajaMovimiento(Base):
 
     id          = Column(Integer, primary_key=True, index=True)
     caja_id     = Column(Integer, ForeignKey("caja_diaria.id", ondelete="CASCADE"), nullable=False)
-    tipo        = Column(String(20), nullable=False)   # gasto | transferencia | retiro
+    tipo        = Column(String(20), nullable=False)   # gasto | transferencia | retiro | link
     descripcion = Column(String(200), default='')
     monto       = Column(Numeric(15, 2), nullable=False, default=0)
+    categoria   = Column(String(50), nullable=True)    # para tipo='gasto': Proveedores | Limpieza | Insumos | Transporte | Servicios
 
     caja = relationship("CajaDiaria", back_populates="movimientos")

@@ -20,10 +20,12 @@ class MovimientoIn(BaseModel):
     tipo:        str
     descripcion: str = ''
     monto:       float = 0
+    categoria:   Optional[str] = None
 
 class MovimientoUpdate(BaseModel):
     descripcion: Optional[str]   = None
     monto:       Optional[float] = None
+    categoria:   Optional[str]   = None
 
 class CajaUpdate(BaseModel):
     efectivo_del_dia:  Optional[float] = None
@@ -60,6 +62,9 @@ def _safe(text: str) -> str:
         text = text.replace(src, dst)
     return text.encode('latin-1', errors='replace').decode('latin-1')
 
+MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+            'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+
 def _serialize_caja(c: CajaDiaria) -> dict:
     movs = [
         {
@@ -67,6 +72,7 @@ def _serialize_caja(c: CajaDiaria) -> dict:
             "tipo":        m.tipo,
             "descripcion": m.descripcion or '',
             "monto":       float(m.monto),
+            "categoria":   m.categoria or '',
         }
         for m in c.movimientos
     ]
@@ -373,6 +379,7 @@ def update_movimiento(mov_id: int, body: MovimientoUpdate, db: Session = Depends
         raise HTTPException(404, "Movimiento no encontrado")
     if body.descripcion is not None: mov.descripcion = body.descripcion
     if body.monto       is not None: mov.monto       = body.monto
+    if body.categoria   is not None: mov.categoria   = body.categoria
     db.commit()
     return {"ok": True}
 
@@ -406,6 +413,8 @@ def get_or_create_caja(fecha: DateType, sucursal: str, db: Session = Depends(get
 # ── PUT /caja-diaria/{caja_id} ────────────────────────────────────
 @router.put("/{caja_id}")
 def update_caja(caja_id: int, body: CajaUpdate, db: Session = Depends(get_db)):
+    from app.models.expenses import LuroExpense
+
     caja = db.query(CajaDiaria).filter(CajaDiaria.id == caja_id).first()
     if not caja:
         raise HTTPException(404, "Caja no encontrada")
@@ -416,6 +425,33 @@ def update_caja(caja_id: int, body: CajaUpdate, db: Session = Depends(get_db)):
     if body.tarjeta_comafi    is not None: caja.tarjeta_comafi    = body.tarjeta_comafi
     if body.observaciones     is not None: caja.observaciones     = body.observaciones
     if body.cerrada           is not None: caja.cerrada           = body.cerrada
+
+    # ── Sync gastos → Gastos Luro cuando se cierra la caja ─────
+    if body.cerrada is True:
+        # Borrar entradas previas de esta caja (idempotente)
+        db.query(LuroExpense).filter(LuroExpense.caja_id == caja_id).delete()
+
+        # Crear una LuroExpense por cada movimiento tipo 'gasto'
+        fecha = caja.fecha
+        month_name = MESES_ES[fecha.month - 1]
+        gastos_movs = [m for m in caja.movimientos if m.tipo == 'gasto']
+        for mov in gastos_movs:
+            luro = LuroExpense(
+                caja_id        = caja_id,
+                month          = month_name,
+                year           = fecha.year,
+                expense_date   = fecha,
+                categoria      = mov.categoria or 'Gastos Caja',
+                subcategoria   = mov.descripcion or '',
+                detail         = mov.descripcion or '',
+                amount         = mov.monto,
+                payment_method = 'efectivo',
+                tipo_costo     = 'variable',
+                pagado         = 'SI',
+                paid_status    = True,
+            )
+            db.add(luro)
+
     db.commit()
     db.refresh(caja)
     return _serialize_caja(caja)
@@ -432,8 +468,15 @@ def add_movimiento(caja_id: int, body: MovimientoIn, db: Session = Depends(get_d
         tipo        = body.tipo,
         descripcion = body.descripcion,
         monto       = body.monto,
+        categoria   = body.categoria,
     )
     db.add(mov)
     db.commit()
     db.refresh(mov)
-    return {"id": mov.id, "tipo": mov.tipo, "descripcion": mov.descripcion, "monto": float(mov.monto)}
+    return {
+        "id":          mov.id,
+        "tipo":        mov.tipo,
+        "descripcion": mov.descripcion,
+        "monto":       float(mov.monto),
+        "categoria":   mov.categoria or '',
+    }
