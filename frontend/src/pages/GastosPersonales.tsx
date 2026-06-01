@@ -19,7 +19,7 @@ type Gasto = {
   notes:          string | null
 }
 
-type PayMethod = 'efectivo' | 'transferencia' | 'tarjeta_debito' | 'tarjeta_credito'
+type PayMethod = 'efectivo' | 'debito_automatico' | 'tarjeta_credito' | 'tarjeta_debito' | 'transferencia'
 
 // ── Datos ─────────────────────────────────────────────────────────────────────
 const MESES_ES = [
@@ -45,15 +45,15 @@ const CATEGORIES: { label: string; emoji: string; color: string }[] = [
 // Subcategorías por categoría
 const SUBCATEGORIES: Record<string, string[]> = {
   'Impuestos':            ['ARBA', 'Municipal'],
-  'Servicios':            ['Luz', 'Camuzzi', 'Obras Sanitarias', 'Flow'],
+  'Servicios':            ['Luz', 'Camuzzi', 'Obras Sanitarias', 'Flow', 'Fanti Alarmas'],
   'Entretenimiento':      ['Spotify', 'Netflix', 'Disney+', 'Apple'],
   'Salud':                ['Obra social', 'Médicos'],
-  'Seguros':              ['Seguro vehicular', 'Seguro de la casa'],
+  'Seguros':              ['Seguro Vehicular Tucson', 'Seguro Vehicular Peugeot', 'Seguro de la casa'],
   'Transporte':           ['Combustible'],
   'Deportes':             ['Deporte Mariana', 'Deporte Juana', 'Deporte Juan Pedro', 'Deporte Gustavo'],
   'Educación':            ['Colegio Juanpi', 'Inglés TEC Juanpi', 'Facultad Juani'],
   'Compras para la casa': ['Supermercado', 'Verdulería', 'Farmacia', 'Limpieza'],
-  'Tarjetas bancarias':   ['Mantenimiento', 'Cuotas por pagar'],
+  'Tarjetas bancarias':   ['Mantenimiento', 'Cuotas por pagar', 'Caja de seguridad'],
 }
 
 // Categorías con gastos predeterminados (se pre-cargan cada mes)
@@ -63,11 +63,23 @@ const PREDEFINED_CATS = new Set([
 ])
 
 const PAY_METHODS: { key: PayMethod; label: string; color: string; bg: string }[] = [
-  { key: 'efectivo',        label: 'Efectivo',      color: '#16a34a', bg: '#dcfce7' },
-  { key: 'transferencia',   label: 'Transferencia', color: '#2563eb', bg: '#dbeafe' },
-  { key: 'tarjeta_debito',  label: 'Débito',        color: '#7c3aed', bg: '#ede9fe' },
-  { key: 'tarjeta_credito', label: 'Crédito',       color: '#dc2626', bg: '#fee2e2' },
+  { key: 'efectivo',          label: 'Efectivo',       color: '#16a34a', bg: '#dcfce7' },
+  { key: 'debito_automatico', label: 'Débito Aut.',    color: '#0891b2', bg: '#e0f2fe' },
+  { key: 'tarjeta_credito',   label: 'T. Crédito',    color: '#dc2626', bg: '#fee2e2' },
+  { key: 'tarjeta_debito',    label: 'Débito',        color: '#7c3aed', bg: '#ede9fe' },
+  { key: 'transferencia',     label: 'Transferencia', color: '#2563eb', bg: '#dbeafe' },
 ]
+
+// Métodos disponibles en el panel de predeterminados
+const PREDEF_PAY_METHODS: { key: PayMethod; label: string; color: string; bg: string }[] = [
+  { key: 'efectivo',          label: 'Efectivo',    color: '#16a34a', bg: '#dcfce7' },
+  { key: 'debito_automatico', label: 'Débito Aut.', color: '#0891b2', bg: '#e0f2fe' },
+  { key: 'tarjeta_credito',   label: 'T. Crédito', color: '#dc2626', bg: '#fee2e2' },
+  { key: 'tarjeta_debito',    label: 'Débito',     color: '#7c3aed', bg: '#ede9fe' },
+]
+
+// Métodos que requieren selección de banco
+const NEEDS_BANK = new Set<PayMethod>(['debito_automatico', 'tarjeta_credito', 'tarjeta_debito', 'transferencia'])
 
 const CORAL = '#C8603A'
 const NAVY  = '#070614'
@@ -95,8 +107,9 @@ function PayBadge({ method, bank }: { method: string; bank: string | null }) {
   return (
     <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
       style={{ color: m.color, background: m.bg }}>
-      {method === 'efectivo'       && <Wallet size={9} />}
-      {method === 'transferencia'  && <ArrowLeftRight size={9} />}
+      {method === 'efectivo'           && <Wallet size={9} />}
+      {method === 'transferencia'      && <ArrowLeftRight size={9} />}
+      {method === 'debito_automatico'  && <ArrowLeftRight size={9} />}
       {(method === 'tarjeta_debito' || method === 'tarjeta_credito') && <CreditCard size={9} />}
       {payLabel(method, bank)}
     </span>
@@ -125,13 +138,15 @@ function GastosFijosPanel({
 }) {
   const month = MONTHS[monthIdx]
 
-  // amounts[`${cat}::${sub}`] = valor ingresado
+  // amounts[key] = valor ingresado; methods[key] = método de pago; banks[key] = banco
   const [amounts,  setAmounts]  = useState<Record<string, string>>({})
+  const [methods,  setMethods]  = useState<Record<string, PayMethod>>({})
+  const [banks,    setBanks]    = useState<Record<string, string>>({})
   const [saving,   setSaving]   = useState<Record<string, boolean>>({})
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
   // Cuando cambia el mes, limpiar inputs
-  useEffect(() => { setAmounts({}) }, [year, monthIdx])
+  useEffect(() => { setAmounts({}); setMethods({}); setBanks({}) }, [year, monthIdx])
 
   // Para cada categoría predeterminada, calculá estado de cada subcategoría
   const groups = useMemo(() => {
@@ -154,20 +169,23 @@ function GastosFijosPanel({
   const totalPendiente = groups.reduce((s, g) => s + g.pending, 0)
 
   async function saveItem(category: string, subcategory: string) {
-    const key = `${category}::${subcategory}`
-    const raw = amounts[key]?.replace(/\./g, '').replace(',', '.') ?? ''
+    const key    = `${category}::${subcategory}`
+    const raw    = amounts[key]?.replace(/\./g, '').replace(',', '.') ?? ''
     const amount = parseFloat(raw)
     if (!amount || isNaN(amount)) return
+
+    const method = methods[key] ?? 'debito_automatico'
+    const bank   = NEEDS_BANK.has(method) ? (banks[key] || null) : null
 
     setSaving(s => ({ ...s, [key]: true }))
     try {
       await api.post('/gastos-personales/', {
         year, month, day: 1,
-        description: subcategory,
+        description:    subcategory,
         amount,
         category,
-        payment_method: 'transferencia',
-        bank: null,
+        payment_method: method,
+        bank,
         notes: null,
       })
       setAmounts(a => { const n = { ...a }; delete n[key]; return n })
@@ -271,12 +289,15 @@ function GastosFijosPanel({
                       )
                     }
 
-                    // Pendiente — input para cargar monto
+                    // Pendiente — input para cargar monto + método de pago
+                    const currentMethod = methods[key] ?? 'debito_automatico'
+                    const needsBank     = NEEDS_BANK.has(currentMethod)
                     return (
-                      <div key={sub} className="flex items-center gap-2 px-5 py-1.5">
-                        <div className="w-4 h-4 rounded-full border-2 border-gray-200 shrink-0" />
-                        <span className="flex-1 text-xs text-gray-400">{sub}</span>
-                        <div className="flex items-center gap-1.5">
+                      <div key={sub} className="px-5 py-2 space-y-1.5" style={{ background: '#fafafa' }}>
+                        {/* Fila nombre + monto + guardar */}
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 rounded-full border-2 border-gray-200 shrink-0" />
+                          <span className="flex-1 text-xs text-gray-500 font-medium">{sub}</span>
                           <span className="text-xs text-gray-300 font-bold">$</span>
                           <input
                             type="text"
@@ -290,12 +311,37 @@ function GastosFijosPanel({
                           <button
                             onClick={() => saveItem(cat.label, sub)}
                             disabled={isSaving || !amounts[key]}
-                            className="w-7 h-7 rounded-lg flex items-center justify-center transition-all disabled:opacity-30"
+                            className="w-7 h-7 rounded-lg flex items-center justify-center transition-all disabled:opacity-30 shrink-0"
                             style={{ background: cat.color }}>
                             {isSaving
                               ? <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
                               : <Check size={11} color="white" strokeWidth={3} />}
                           </button>
+                        </div>
+
+                        {/* Fila método de pago */}
+                        <div className="flex items-center gap-1 pl-6 flex-wrap">
+                          {PREDEF_PAY_METHODS.map(pm => (
+                            <button key={pm.key} type="button"
+                              onClick={() => { setMethods(m => ({ ...m, [key]: pm.key })); setBanks(b => ({ ...b, [key]: '' })) }}
+                              className="px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all"
+                              style={currentMethod === pm.key
+                                ? { background: pm.bg, color: pm.color, borderColor: pm.color }
+                                : { borderColor: '#e5e7eb', color: '#9ca3af', background: 'white' }}>
+                              {pm.label}
+                            </button>
+                          ))}
+
+                          {/* Banco (si aplica) */}
+                          {needsBank && (
+                            <select
+                              value={banks[key] ?? ''}
+                              onChange={e => setBanks(b => ({ ...b, [key]: e.target.value }))}
+                              className="ml-1 text-[10px] border border-gray-200 rounded-full px-2 py-0.5 bg-white focus:outline-none focus:border-blue-300 text-gray-500">
+                              <option value="">Banco…</option>
+                              {BANKS.map(b => <option key={b} value={b}>{b}</option>)}
+                            </select>
+                          )}
                         </div>
                       </div>
                     )
