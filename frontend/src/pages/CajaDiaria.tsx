@@ -15,7 +15,7 @@ const NAVY  = '#070614'
 // ── Types ─────────────────────────────────────────────────────────
 type Mov = { id: number; tipo: string; descripcion: string; monto: number; categoria?: string }
 
-const GASTO_CATS = ['Proveedores', 'Limpieza', 'Insumos', 'Transporte', 'Servicios'] as const
+const GASTO_CATS = ['Proveedores', 'Limpieza', 'Insumos', 'Transporte', 'Servicios', 'Adelantos', 'Varios'] as const
 type GastoCat = typeof GASTO_CATS[number]
 
 type Caja = {
