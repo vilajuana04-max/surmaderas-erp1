@@ -423,30 +423,45 @@ export default function CajaDiaria() {
               </div>
 
               {/* ── Resumen ── */}
-              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                <div className="px-5 py-3 border-b border-gray-100" style={{ background: NAVY }}>
-                  <p className="text-white/60 text-[11px] font-bold tracking-[2px] uppercase">Resumen del día</p>
+              {(() => {
+                const parcial = (caja.total_transf) + (caja.total_salidas) + (caja.total_gastos)
+                const totalDia = parcial + (caja.total_tarjetas)
+                return (
+                <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                  <div className="px-5 py-3 border-b border-gray-100" style={{ background: NAVY }}>
+                    <p className="text-white/60 text-[11px] font-bold tracking-[2px] uppercase">Resumen del día</p>
+                  </div>
+                  {/* Fila 1: tres componentes del parcial */}
+                  <div className="grid grid-cols-3 divide-x divide-gray-100">
+                    {[
+                      { label: 'Total Transferencias', value: caja.total_transf,   color: '#2563eb' },
+                      { label: 'Total Salidas',         value: caja.total_salidas,  color: '#22c55e' },
+                      { label: 'Total Gastos',          value: caja.total_gastos,   color: '#ef4444' },
+                    ].map(({ label, value, color }) => (
+                      <div key={label} className="px-5 py-4">
+                        <p className="text-xs text-gray-400 font-semibold mb-1">{label}</p>
+                        <p className="text-lg font-bold" style={{ color }}>{fmt$(value)}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Parcial del día */}
+                  <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between" style={{ background: '#f0f4ff' }}>
+                    <p className="font-bold text-blue-700 text-sm uppercase tracking-wide">Parcial del día</p>
+                    <p className="text-2xl font-bold text-blue-700">{fmt$(parcial)}</p>
+                  </div>
+                  {/* Tarjetas */}
+                  <div className="px-5 py-4 border-t border-gray-100">
+                    <p className="text-xs text-gray-400 font-semibold mb-1">Total Tarjetas</p>
+                    <p className="text-lg font-bold" style={{ color: '#8b5cf6' }}>{fmt$(caja.total_tarjetas)}</p>
+                  </div>
+                  {/* Total del día */}
+                  <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-between" style={{ background: '#f8f7f5' }}>
+                    <p className="font-bold text-gray-600 text-sm uppercase tracking-wide">Total del día</p>
+                    <p className="text-3xl font-bold" style={{ color: CORAL }}>{fmt$(totalDia)}</p>
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0 divide-gray-100">
-                  {[
-                    { label: 'Transferencias',  value: caja.total_transf,         color: '#2563eb' },
-                    { label: 'Link de Pago',     value: caja.total_link ?? 0,      color: '#22c55e' },
-                    { label: 'Tarjetas',         value: caja.total_tarjetas,       color: '#8b5cf6' },
-                    { label: 'Gastos + Retiros', value: -caja.total_salidas,       color: '#ef4444' },
-                  ].map(({ label, value, color }) => (
-                    <div key={label} className="px-5 py-4">
-                      <p className="text-xs text-gray-400 font-semibold mb-1">{label}</p>
-                      <p className="text-lg font-bold" style={{ color }}>
-                        {value < 0 ? `- ${fmt$(-value)}` : fmt$(value)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-                <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-between" style={{ background: '#f8f7f5' }}>
-                  <p className="font-bold text-gray-600 text-sm uppercase tracking-wide">Total del día</p>
-                  <p className="text-3xl font-bold" style={{ color: CORAL }}>{fmt$(caja.total_del_dia)}</p>
-                </div>
-              </div>
+                )
+              })()}
 
               {/* ── Observaciones ── */}
               <div className="bg-white rounded-2xl border border-gray-100 px-5 py-4">
