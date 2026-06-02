@@ -27,6 +27,10 @@ def _run_migrations():
         db.execute(text(
             "ALTER TABLE luro_expenses ADD COLUMN IF NOT EXISTS caja_id INTEGER;"
         ))
+        # Renombrar usuario 'Caja' → 'CAJA' y asegurar role caja_diaria
+        db.execute(text(
+            "UPDATE users SET username = 'CAJA', role = 'caja_diaria' WHERE username IN ('Caja', 'caja') AND role != 'admin';"
+        ))
         db.commit()
     except Exception as e:
         print(f"[migration] Error: {e}")
@@ -49,7 +53,7 @@ def _seed_users():
     DEFAULT_USERS = [
         ("Gustavo",  HASH_GUST1401, "admin"),
         ("Personal", HASH_GUST1401, "caja"),
-        ("Caja",     HASH_1111,     "caja_diaria"),
+        ("CAJA",     HASH_1111,     "caja_diaria"),
     ]
 
     db = SessionLocal()
