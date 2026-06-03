@@ -4,6 +4,7 @@ import {
   Plus, Trash2, Lock, Unlock,
   ArrowDownCircle, ArrowUpCircle, CreditCard, Banknote, Smartphone,
   FileDown, History, CalendarDays, CheckCircle2, MessageCircle,
+  Ticket, Search, CheckCircle, XCircle, Clock,
 } from 'lucide-react'
 
 // ── WhatsApp — número de Gustavo (sin + ni espacios) ─────────────
@@ -188,6 +189,169 @@ function HistorialRow({ c, onVer, onPdf }: { c: Caja; onVer: () => void; onPdf: 
           className="text-xs px-2 py-1.5 rounded-lg font-semibold border border-gray-200 text-gray-500 hover:bg-gray-100 transition-colors flex items-center gap-1">
           <FileDown size={12} /> PDF
         </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Cupones ───────────────────────────────────────────────────────
+interface CuponData {
+  couponCode:    string
+  couponUsed:    boolean
+  couponUsedAt?: string
+  couponUsedBy?: string
+  couponExpiresAt?: string
+  fullName?:     string
+  phone?:        string
+  email?:        string
+  branch?:       string
+}
+
+const BASE_URL = import.meta.env.VITE_API_URL ?? ''
+
+function cuponEstado(c: CuponData): { label: string; color: string; icon: React.ReactNode } {
+  if (c.couponUsed)
+    return { label: 'Ya usado', color: '#DC2626', icon: <XCircle size={14}/> }
+  if (c.couponExpiresAt && new Date(c.couponExpiresAt) < new Date())
+    return { label: 'Vencido',  color: '#9CA3AF', icon: <Clock size={14}/> }
+  return { label: 'Activo — 15% OFF', color: '#16a34a', icon: <CheckCircle size={14}/> }
+}
+
+function CuponPanel() {
+  const [code,      setCode]      = useState('')
+  const [cupon,     setCupon]     = useState<CuponData | null>(null)
+  const [msg,       setMsg]       = useState<{ text: string; ok: boolean } | null>(null)
+  const [searching, setSearching] = useState(false)
+  const [validating,setValidating]= useState(false)
+
+  const buscar = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const c = code.trim().toUpperCase()
+    if (!c) return
+    setSearching(true); setCupon(null); setMsg(null)
+    try {
+      const res = await fetch(`${BASE_URL}/cupones/consultar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'omit',
+        body: JSON.stringify({ couponCode: c }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail || 'No se encontró el cupón')
+      setCupon(data.coupon ?? data)
+      setMsg(null)
+    } catch (err: unknown) {
+      setMsg({ text: err instanceof Error ? err.message : 'Error al buscar', ok: false })
+    } finally { setSearching(false) }
+  }
+
+  const darDeBaja = async () => {
+    if (!cupon) return
+    if (!window.confirm(`¿Dar de baja el cupón ${cupon.couponCode}? Esta acción no se puede deshacer.`)) return
+    setValidating(true); setMsg(null)
+    try {
+      const res = await fetch(`${BASE_URL}/cupones/validar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'omit',
+        body: JSON.stringify({ couponCode: cupon.couponCode }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail || 'No se pudo dar de baja')
+      setCupon(data.coupon ?? { ...cupon, couponUsed: true })
+      setMsg({ text: '✓ Cupón dado de baja correctamente', ok: true })
+    } catch (err: unknown) {
+      setMsg({ text: err instanceof Error ? err.message : 'Error al validar', ok: false })
+    } finally { setValidating(false) }
+  }
+
+  const estado = cupon ? cuponEstado(cupon) : null
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      {/* Header */}
+      <div className="px-4 py-3 flex items-center gap-2 border-b border-gray-100"
+           style={{ borderLeftWidth: 3, borderLeftColor: CORAL }}>
+        <Ticket size={16} style={{ color: CORAL }} />
+        <span className="font-bold text-sm text-gray-800 flex-1">Validar cupón 15% OFF</span>
+      </div>
+
+      <div className="px-4 py-4 space-y-4">
+        {/* Búsqueda */}
+        <form onSubmit={buscar} className="flex gap-2">
+          <input
+            value={code}
+            onChange={e => setCode(e.target.value.toUpperCase())}
+            placeholder="Código del cupón (ej: AB1234)"
+            className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm font-mono uppercase tracking-wider focus:outline-none focus:border-gray-400"
+          />
+          <button
+            type="submit" disabled={searching || !code.trim()}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white disabled:opacity-50 transition-all"
+            style={{ background: NAVY }}>
+            <Search size={14} />
+            {searching ? 'Buscando…' : 'Buscar'}
+          </button>
+        </form>
+
+        {/* Mensaje de error/éxito */}
+        {msg && (
+          <p className={`text-sm px-3 py-2 rounded-lg font-semibold ${msg.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+            {msg.text}
+          </p>
+        )}
+
+        {/* Card del cupón */}
+        {cupon && estado && (
+          <div className="rounded-xl border overflow-hidden" style={{ borderColor: estado.color + '40' }}>
+            {/* Estado badge */}
+            <div className="flex items-center gap-2 px-3 py-2" style={{ background: estado.color + '12' }}>
+              <span style={{ color: estado.color }}>{estado.icon}</span>
+              <span className="text-xs font-bold uppercase tracking-wide" style={{ color: estado.color }}>{estado.label}</span>
+              <span className="ml-auto font-mono text-xs font-bold text-gray-500">{cupon.couponCode}</span>
+            </div>
+
+            {/* Datos del cliente */}
+            <div className="px-3 py-3 space-y-1.5">
+              {cupon.fullName && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Cliente</span>
+                  <span className="font-semibold text-gray-800">{cupon.fullName}</span>
+                </div>
+              )}
+              {cupon.phone && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Teléfono</span>
+                  <span className="text-gray-700">{cupon.phone}</span>
+                </div>
+              )}
+              {cupon.branch && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Sucursal</span>
+                  <span className="text-gray-700">{cupon.branch}</span>
+                </div>
+              )}
+              {cupon.couponUsed && cupon.couponUsedAt && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Usado el</span>
+                  <span className="text-gray-600 text-xs">{new Date(cupon.couponUsedAt).toLocaleDateString('es-AR')}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Botón dar de baja */}
+            {!cupon.couponUsed && (
+              <div className="px-3 pb-3">
+                <button
+                  onClick={darDeBaja} disabled={validating}
+                  className="w-full py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50 transition-all"
+                  style={{ background: CORAL }}>
+                  {validating ? 'Procesando…' : '✓ Dar de baja el cupón'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -471,6 +635,9 @@ export default function CajaDiaria() {
                   placeholder="Anotá cualquier novedad del día…"
                   className="w-full text-sm text-gray-700 resize-none outline-none bg-transparent placeholder:text-gray-300 disabled:opacity-50" />
               </div>
+
+              {/* ── Cupones ── */}
+              <CuponPanel />
 
               {/* ── Acciones: Cerrar + PDF ── */}
               <div className="flex gap-3">
