@@ -145,7 +145,7 @@ export default function App() {
         <Route
           path="/cupones"
           element={
-            <ProtectedRoute requiredRole="admin">
+            <ProtectedRoute>
               <Layout>
                 <Cupones />
               </Layout>

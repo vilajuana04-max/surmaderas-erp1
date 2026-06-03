@@ -34,6 +34,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
   const { user, logout } = useAuth()
   const isAdmin      = user?.role === 'admin'
   const isCajaDiaria = user?.role === 'caja_diaria'
+  const canSeeCupones = isAdmin || isCajaDiaria
 
   const isRRHH   = location.pathname === '/rrhh'   || location.pathname.startsWith('/rrhh')
   const isGastos = location.pathname === '/gastos' || location.pathname.startsWith('/gastos')
@@ -252,17 +253,6 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
               <span className="tracking-[1px] uppercase text-[12px]">Punto Equilibrio</span>
             </NavLink>
 
-            {/* Cupones */}
-            <NavLink
-              to="/cupones"
-              onClick={onClose}
-              className={({ isActive }) => navLinkClass(isActive)}
-              style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
-              <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>12</span>
-              <Ticket size={16} strokeWidth={2} />
-              <span className="tracking-[1px] uppercase text-[12px]">Cupones</span>
-            </NavLink>
-
             {/* Gastos Personales */}
             <NavLink
               to="/gastos-personales"
@@ -274,6 +264,19 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
               <span className="tracking-[1px] uppercase text-[12px]">Gastos Pers.</span>
             </NavLink>
           </>
+        )}
+
+        {/* ── Cupones — admin y caja_diaria ── */}
+        {canSeeCupones && (
+          <NavLink
+            to="/cupones"
+            onClick={onClose}
+            className={({ isActive }) => navLinkClass(isActive)}
+            style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
+            <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>12</span>
+            <Ticket size={16} strokeWidth={2} />
+            <span className="tracking-[1px] uppercase text-[12px]">Cupones</span>
+          </NavLink>
         )}
       </nav>
 
