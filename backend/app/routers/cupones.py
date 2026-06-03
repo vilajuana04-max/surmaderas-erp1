@@ -119,3 +119,65 @@ async def validar_cupon(body: CuponRequest):
         "/api/encuestas/cupones/validar",
         {"couponCode": body.couponCode.strip().upper()},
     )
+
+
+@router.get("/lista")
+async def lista_cupones():
+    """Devuelve todas las encuestas con su info de cupón y el resumen estadístico."""
+    token = await _get_token()
+    async with httpx.AsyncClient(timeout=15) as client:
+        res = await client.get(
+            f"{ENCUESTAS_BASE}/api/encuestas",
+            headers=_auth_headers(token),
+        )
+    if res.status_code == 401:
+        global _cached_token, _token_expires
+        _cached_token = None
+        _token_expires = 0
+        token = await _get_token()
+        async with httpx.AsyncClient(timeout=15) as client:
+            res = await client.get(
+                f"{ENCUESTAS_BASE}/api/encuestas",
+                headers=_auth_headers(token),
+            )
+    if not res.is_success:
+        raise HTTPException(status_code=res.status_code, detail=f"Error {res.status_code}")
+    return res.json()
+
+
+@router.get("/export/csv")
+async def export_csv():
+    """Descarga el CSV de encuestas desde el servidor de encuestas."""
+    from fastapi.responses import StreamingResponse
+    token = await _get_token()
+    async with httpx.AsyncClient(timeout=30) as client:
+        res = await client.get(
+            f"{ENCUESTAS_BASE}/api/encuestas/export",
+            headers=_auth_headers(token),
+        )
+    if not res.is_success:
+        raise HTTPException(status_code=res.status_code, detail="No se pudo descargar el CSV")
+    return StreamingResponse(
+        iter([res.content]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=encuestas-sur-maderas.csv"},
+    )
+
+
+@router.get("/export/excel")
+async def export_excel():
+    """Descarga el Excel de encuestas desde el servidor de encuestas."""
+    from fastapi.responses import StreamingResponse
+    token = await _get_token()
+    async with httpx.AsyncClient(timeout=30) as client:
+        res = await client.get(
+            f"{ENCUESTAS_BASE}/api/encuestas/export/excel",
+            headers=_auth_headers(token),
+        )
+    if not res.is_success:
+        raise HTTPException(status_code=res.status_code, detail="No se pudo descargar el Excel")
+    return StreamingResponse(
+        iter([res.content]),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=encuestas-sur-maderas.xlsx"},
+    )

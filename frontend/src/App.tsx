@@ -15,6 +15,7 @@ import GastosPersonales from './pages/GastosPersonales'
 import CajaDiaria       from './pages/CajaDiaria'
 import Comisiones        from './pages/Comisiones'
 import PuntoEquilibrio  from './pages/PuntoEquilibrio'
+import Cupones          from './pages/Cupones'
 
 export default function App() {
   return (
@@ -136,6 +137,17 @@ export default function App() {
             <ProtectedRoute requiredRole="admin">
               <Layout>
                 <PuntoEquilibrio />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/cupones"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <Layout>
+                <Cupones />
               </Layout>
             </ProtectedRoute>
           }
