@@ -61,8 +61,16 @@ function getDaysInMonth(monthName: string, year: number): string[] {
 
 function getWeeks(days: string[]) {
   const w: { label: string; days: string[] }[] = []
-  for (let i = 0; i < days.length; i += 7)
-    w.push({ label: `Semana ${w.length + 1}`, days: days.slice(i, i + 7) })
+  let current: string[] = []
+  for (const day of days) {
+    const dow = new Date(day + 'T12:00').getDay() // 0=Dom, 1=Lun … 6=Sáb
+    if (dow === 1 && current.length > 0) {
+      w.push({ label: `Semana ${w.length + 1}`, days: current })
+      current = []
+    }
+    if (dow !== 0) current.push(day) // excluir domingos
+  }
+  if (current.length > 0) w.push({ label: `Semana ${w.length + 1}`, days: current })
   return w
 }
 
@@ -157,8 +165,19 @@ export default function Ventas() {
     const kk = k(date, bid); const edit = edits[kk]
     if (!edit) return
     setSaving(kk)
+    // Incluir siempre todos los campos para que el backend no sobreescriba con null
+    const existing = find(date, bid)
+    const payload = {
+      sale_date:     date,
+      branch_id:     bid,
+      year,
+      total_amount:  existing?.total_amount  ?? null,
+      card_payments: existing?.card_payments ?? null,
+      ticket_count:  existing?.ticket_count  ?? null,
+      ...edit,
+    }
     try {
-      await api.post('/sales/', { sale_date: date, branch_id: bid, ...edit, year })
+      await api.post('/sales/', payload)
       load()
       setEdits(prev => { const n = { ...prev }; delete n[kk]; return n })
     } finally { setSaving(null) }
@@ -498,7 +517,14 @@ export default function Ventas() {
                 const ws = weekSummary(w.days)
                 return (
                   <tr key={w.label} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="px-4 py-2.5 font-semibold text-gray-700">{w.label}</td>
+                    <td className="px-4 py-2.5 font-semibold text-gray-700">
+                      {w.label}
+                      {w.days.length < 6 && (
+                        <span className="ml-1.5 text-[10px] font-normal text-amber-500">
+                          ({w.days.length} días)
+                        </span>
+                      )}
+                    </td>
                     <td className="px-3 py-2.5 text-center text-gray-400">{ws.withData || '—'}</td>
                     <td className="px-3 py-2.5 text-right font-medium text-gray-700">{ws.iT > 0 ? fmt$(ws.iT) : '—'}</td>
                     <td className="px-3 py-2.5 text-right text-gray-400">{ws.iT > 0 ? fmt$(ws.iProm) : '—'}</td>

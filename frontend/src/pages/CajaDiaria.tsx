@@ -53,15 +53,55 @@ function fmtDate(iso: string) {
   return `${dow} ${d}/${m}/${y}`
 }
 
+// ── PesosInput ────────────────────────────────────────────────────
+// Muestra el número formateado (100.000) cuando no está en foco,
+// y deja escribir dígitos libres cuando está activo.
+function PesosInput({ value, disabled, onSave, className }: {
+  value: number; disabled: boolean
+  onSave: (n: number) => void
+  className?: string
+}) {
+  const fmt = (n: number) => n ? n.toLocaleString('es-AR') : ''
+  const [display, setDisplay] = useState(fmt(value))
+  const [focused, setFocused] = useState(false)
+
+  useEffect(() => {
+    if (!focused) setDisplay(fmt(value))
+  }, [value, focused])
+
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      value={display}
+      disabled={disabled}
+      placeholder="0"
+      className={className}
+      onFocus={e => {
+        setFocused(true)
+        const raw = String(value || '')
+        setDisplay(raw)
+        setTimeout(() => e.target.select(), 0)
+      }}
+      onChange={e => setDisplay(e.target.value.replace(/[^\d]/g, ''))}
+      onBlur={() => {
+        setFocused(false)
+        const n = parseInt(display || '0', 10) || 0
+        setDisplay(fmt(n))
+        onSave(n)
+      }}
+    />
+  )
+}
+
 // ── InlineRow ─────────────────────────────────────────────────────
 function InlineRow({ mov, tipo, disabled, onChange, onDelete }: {
   mov: Mov; tipo: string; disabled: boolean
   onChange: (id: number, patch: Partial<Mov>) => void
   onDelete: (id: number) => void
 }) {
-  const [desc,  setDesc]  = useState(mov.descripcion)
-  const [monto, setMonto] = useState(String(mov.monto || ''))
-  const [cat,   setCat]   = useState(mov.categoria || GASTO_CATS[0])
+  const [desc, setDesc] = useState(mov.descripcion)
+  const [cat,  setCat]  = useState(mov.categoria || GASTO_CATS[0])
 
   return (
     <div className="flex items-center gap-2 py-1.5 group">
@@ -77,10 +117,12 @@ function InlineRow({ mov, tipo, disabled, onChange, onDelete }: {
         onBlur={() => { if (desc !== mov.descripcion) onChange(mov.id, { descripcion: desc }) }}
         disabled={disabled} placeholder="Descripción…"
         className="flex-1 text-sm bg-transparent border-b border-gray-200 focus:border-gray-400 outline-none px-1 py-0.5 disabled:opacity-50" />
-      <input value={monto} onChange={e => setMonto(e.target.value)}
-        onBlur={() => { const n = parseFloat(monto)||0; if (n !== mov.monto) onChange(mov.id, { monto: n }) }}
-        disabled={disabled} inputMode="decimal" placeholder="0"
-        className="w-24 text-sm text-right bg-transparent border-b border-gray-200 focus:border-gray-400 outline-none px-1 py-0.5 disabled:opacity-50" />
+      <PesosInput
+        value={mov.monto}
+        disabled={disabled}
+        onSave={n => { if (n !== mov.monto) onChange(mov.id, { monto: n }) }}
+        className="w-24 text-sm text-right bg-transparent border-b border-gray-200 focus:border-gray-400 outline-none px-1 py-0.5 disabled:opacity-50"
+      />
       {!disabled && (
         <button onClick={() => onDelete(mov.id)}
           className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity shrink-0">
@@ -107,7 +149,7 @@ function Section({ title, icon, color, total, items, tipo, disabled, onAdd, onCh
 
   function startAdd() { setAdding(true); setTimeout(() => descRef.current?.focus(), 50) }
   function confirmAdd() {
-    const n = parseFloat(monto) || 0
+    const n = parseInt(monto.replace(/\./g, ''), 10) || 0
     if (desc.trim() || n) onAdd(tipo, desc.trim(), n, tipo === 'gasto' ? cat : undefined)
     setDesc(''); setMonto(''); setCat(GASTO_CATS[0]); setAdding(false)
   }
@@ -141,7 +183,12 @@ function Section({ title, icon, color, total, items, tipo, disabled, onAdd, onCh
               placeholder="Descripción…"
               onKeyDown={e => { if (e.key==='Enter') confirmAdd(); if (e.key==='Escape') cancelAdd() }}
               className="flex-1 min-w-0 text-sm border-b outline-none px-1 py-0.5" style={{ borderBottomColor: color }} />
-            <input value={monto} onChange={e => setMonto(e.target.value)} inputMode="decimal" placeholder="0"
+            <input
+              value={monto}
+              onChange={e => setMonto(e.target.value.replace(/[^\d]/g, ''))}
+              onFocus={e => { setMonto(monto.replace(/\./g, '')); setTimeout(() => e.target.select(), 0) }}
+              onBlur={() => { const n = parseInt(monto.replace(/\./g, ''), 10)||0; setMonto(n ? n.toLocaleString('es-AR') : '') }}
+              inputMode="numeric" placeholder="0"
               onKeyDown={e => { if (e.key==='Enter') confirmAdd(); if (e.key==='Escape') cancelAdd() }}
               className="w-24 text-sm text-right border-b outline-none px-1 py-0.5" style={{ borderBottomColor: color }} />
             <button onClick={confirmAdd} className="text-green-500 hover:text-green-700 text-xs font-bold">✓</button>
@@ -577,9 +624,12 @@ export default function CajaDiaria() {
                     return (
                       <div key={t.key} className="px-4 py-3">
                         <p className="text-[10px] font-bold text-gray-400 mb-1">{t.label}</p>
-                        <input defaultValue={val || ''} disabled={disabled} inputMode="decimal" placeholder="0"
-                          onBlur={e => { const n = parseFloat(e.target.value)||0; if (n !== val) patchCaja({ [key]: n }) }}
-                          className="w-full text-sm font-bold text-right border-b border-gray-200 focus:border-purple-400 outline-none py-0.5 bg-transparent disabled:opacity-50" />
+                        <PesosInput
+                          value={val}
+                          disabled={disabled}
+                          onSave={n => { if (n !== val) patchCaja({ [key]: n }) }}
+                          className="w-full text-sm font-bold text-right border-b border-gray-200 focus:border-purple-400 outline-none py-0.5 bg-transparent disabled:opacity-50"
+                        />
                       </div>
                     )
                   })}

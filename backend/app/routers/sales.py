@@ -47,9 +47,10 @@ def create_or_update_sale(data: SaleCreate, db: Session = Depends(get_db)):
     ).first()
 
     if existing:
-        existing.total_amount  = data.total_amount
-        existing.card_payments = data.card_payments
-        existing.ticket_count  = data.ticket_count
+        # Solo sobreescribir campos que vienen explícitamente (no None)
+        if data.total_amount  is not None: existing.total_amount  = data.total_amount
+        if data.card_payments is not None: existing.card_payments = data.card_payments
+        if data.ticket_count  is not None: existing.ticket_count  = data.ticket_count
         db.commit()
         db.refresh(existing)
         return _enrich(existing)

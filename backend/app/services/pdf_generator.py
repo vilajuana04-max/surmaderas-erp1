@@ -471,10 +471,19 @@ def generate_luro_expenses_pdf(expenses, month: str, year: int) -> bytes:
 
 
 def generate_sales_pdf(sales: list, year: int, month: str, branch: str = "all") -> bytes:
+    """PDF de ventas usando fpdf2 (sin dependencias de sistema como libcairo)."""
     import calendar
-    from datetime import datetime
+    from datetime import datetime, date as DateType
+    from fpdf import FPDF
 
-    WEEKDAYS = ["lun","mar","mié","jue","vie","sáb","dom"]
+    # Paleta
+    NAVY_C    = (7,   6,  20)
+    CORAL_C   = (200, 96, 58)
+    WHITE_C   = (255, 255, 255)
+    LIGHT_C   = (250, 246, 242)
+    GRAY_C    = (238, 238, 238)
+    TEXT_C    = (30,  30,  30)
+    MUTED_C   = (120, 120, 120)
 
     show_indep = branch in ("all", "independencia")
     show_luro  = branch in ("all", "luro")
@@ -484,100 +493,197 @@ def generate_sales_pdf(sales: list, year: int, month: str, branch: str = "all") 
         "luro": "Luro",
     }.get(branch, "Ambas Sucursales")
 
-    # Construir dict por fecha y sucursal
+    MONTH_NAMES = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO",
+                   "JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"]
+    month_idx  = MONTH_NAMES.index(month)
+    days_count = calendar.monthrange(year, month_idx + 1)[1]
+    WDAYS      = ["Lun","Mar","Mie","Jue","Vie","Sab","Dom"]
+
+    def fmt(v: float) -> str:
+        if not v: return "-"
+        return "$ {:,.0f}".format(v).replace(",", ".")
+
+    # Índice por fecha
     by_date: dict = {}
     for s in sales:
         d = str(s.sale_date)
-        if d not in by_date:
-            by_date[d] = {}
-        by_date[d][s.branch_id] = s
+        by_date.setdefault(d, {})[s.branch_id] = s
 
-    # Mes completo
-    month_idx = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO",
-                 "JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"].index(month)
-    days_count = calendar.monthrange(year, month_idx + 1)[1]
+    # ── Configurar PDF (landscape A4) ──────────────────────────────
+    pdf = FPDF(orientation="L", unit="mm", format="A4")
+    pdf.set_margins(10, 10, 10)
+    pdf.set_auto_page_break(auto=True, margin=12)
+    pdf.add_page()
 
-    def fmt(v): return f"$ {int(v):,}".replace(",", ".") if v else "—"
+    # ── Cabecera ───────────────────────────────────────────────────
+    pdf.set_fill_color(*NAVY_C); pdf.set_text_color(*WHITE_C)
+    pdf.set_font("Helvetica", "B", 13)
+    pdf.cell(0, 8, "SUR MADERAS", ln=False, fill=True, align="L")
+    pdf.set_font("Helvetica", "", 8)
+    pdf.cell(0, 8,
+        f"Ventas {branch_label}  |  {month} {year}  |  Generado: {DateType.today().strftime('%d/%m/%Y')}",
+        ln=True, fill=True, align="R")
+    pdf.ln(2)
 
-    rows = []
+    # ── Definición de columnas ─────────────────────────────────────
+    cols: list[tuple[str, int, str]] = [("Fecha", 18, "L"), ("Dia", 12, "L")]
+    if show_indep:
+        cols += [("Indep Total", 30, "R"), ("Indep Tarj.", 27, "R"),
+                 ("Indep Tkt",   20, "R"), ("Indep Prom",  27, "R")]
+    if show_luro:
+        cols += [("Luro Total",  30, "R"), ("Luro Tarj.",  27, "R"),
+                 ("Luro Tkt",    20, "R"), ("Luro Prom",   27, "R")]
+    cols.append(("Total Dia", 27, "R"))
+
+    def draw_header_row() -> None:
+        pdf.set_fill_color(*NAVY_C); pdf.set_text_color(*WHITE_C)
+        pdf.set_font("Helvetica", "B", 7)
+        for label, w, align in cols:
+            pdf.cell(w, 6, _safe(label), border=0, align=align, fill=True)
+        pdf.ln()
+
+    draw_header_row()
+
+    # ── Filas de datos ─────────────────────────────────────────────
+    g_iT = g_iC = g_iTk = g_lT = g_lC = g_lTk = 0.0
+
     for d in range(1, days_count + 1):
-        date_str  = f"{year}-{month_idx+1:02d}-{d:02d}"
-        dt        = datetime(year, month_idx + 1, d)
-        weekday   = WEEKDAYS[dt.weekday()]
-        day_sales = by_date.get(date_str, {})
+        date_str = f"{year}-{month_idx+1:02d}-{d:02d}"
+        dt       = datetime(year, month_idx + 1, d)
+        is_sun   = dt.weekday() == 6
 
-        indep = day_sales.get(2)
-        luro  = day_sales.get(1)
+        ds    = by_date.get(date_str, {})
+        indep = ds.get(2); luro = ds.get(1)
 
-        iT  = float(indep.total_amount  or 0) if indep else 0
-        iC  = float(indep.card_payments or 0) if indep else 0
+        iT  = float(indep.total_amount  or 0) if indep else 0.0
+        iC  = float(indep.card_payments or 0) if indep else 0.0
         iTk = int(indep.ticket_count    or 0) if indep else 0
-        lT  = float(luro.total_amount   or 0) if luro  else 0
-        lC  = float(luro.card_payments  or 0) if luro  else 0
+        lT  = float(luro.total_amount   or 0) if luro  else 0.0
+        lC  = float(luro.card_payments  or 0) if luro  else 0.0
         lTk = int(luro.ticket_count     or 0) if luro  else 0
+
+        g_iT += iT; g_iC += iC; g_iTk += iTk
+        g_lT += lT; g_lC += lC; g_lTk += lTk
 
         row_total = (iT if show_indep else 0) + (lT if show_luro else 0)
 
-        rows.append({
-            "date": f"{d:02d}/{month_idx+1:02d}",
-            "weekday": weekday,
-            "indep_total":   fmt(iT),   "indep_cards": fmt(iC),
-            "indep_tickets": iTk or "—","indep_prom":  fmt(iT/iTk) if iTk else "—",
-            "luro_total":    fmt(lT),   "luro_cards":  fmt(lC),
-            "luro_tickets":  lTk or "—","luro_prom":   fmt(lT/lTk) if lTk else "—",
-            "day_total": fmt(row_total) if row_total else "—",
-        })
+        if is_sun:
+            pdf.set_fill_color(*GRAY_C); pdf.set_text_color(*MUTED_C)
+        elif d % 2 == 0:
+            pdf.set_fill_color(*LIGHT_C); pdf.set_text_color(*TEXT_C)
+        else:
+            pdf.set_fill_color(*WHITE_C); pdf.set_text_color(*TEXT_C)
 
-    # Totales
-    all_sales = list(by_date.values())
-    iTotal = sum(float(v[2].total_amount  or 0) for v in all_sales if 2 in v)
-    iCards = sum(float(v[2].card_payments or 0) for v in all_sales if 2 in v)
-    iTicks = sum(int(v[2].ticket_count    or 0) for v in all_sales if 2 in v)
-    lTotal = sum(float(v[1].total_amount  or 0) for v in all_sales if 1 in v)
-    lCards = sum(float(v[1].card_payments or 0) for v in all_sales if 1 in v)
-    lTicks = sum(int(v[1].ticket_count    or 0) for v in all_sales if 1 in v)
+        pdf.set_font("Helvetica", "", 7)
+        row: list[tuple[str, int, str]] = [
+            (f"{d:02d}/{month_idx+1:02d}", 18, "L"),
+            (WDAYS[dt.weekday()],          12, "L"),
+        ]
+        if show_indep:
+            row += [(fmt(iT),           30, "R"), (fmt(iC),           27, "R"),
+                    (str(iTk) or "-",   20, "R"), (fmt(iT/iTk) if iTk else "-", 27, "R")]
+        if show_luro:
+            row += [(fmt(lT),           30, "R"), (fmt(lC),           27, "R"),
+                    (str(lTk) or "-",   20, "R"), (fmt(lT/lTk) if lTk else "-", 27, "R")]
+        row.append((fmt(row_total) if row_total else "-", 27, "R"))
 
-    totals = {
-        "indep_total": fmt(iTotal), "indep_cards": fmt(iCards),
-        "indep_tickets": iTicks or "—",
-        "indep_prom": fmt(iTotal/iTicks) if iTicks else "—",
-        "luro_total": fmt(lTotal), "luro_cards": fmt(lCards),
-        "luro_tickets": lTicks or "—",
-        "luro_prom": fmt(lTotal/lTicks) if lTicks else "—",
-        "combined": fmt(iTotal + lTotal),
-    }
+        for text, w, align in row:
+            pdf.cell(w, 5, _safe(str(text)), border=0, align=align, fill=True)
+        pdf.ln()
 
-    # Semanas (grupos de 7 días)
-    week_rows = []
-    for wi in range(0, days_count, 7):
-        week_dates = [f"{year}-{month_idx+1:02d}-{d:02d}" for d in range(wi+1, min(wi+8, days_count+1))]
-        wSales = [s for s in sales if str(s.sale_date) in week_dates]
+    # ── Fila totales ───────────────────────────────────────────────
+    pdf.set_fill_color(*NAVY_C); pdf.set_text_color(*WHITE_C)
+    pdf.set_font("Helvetica", "B", 7)
+    pdf.cell(30, 6, "TOTAL MES", border=0, align="L", fill=True)
+    if show_indep:
+        pdf.cell(30, 6, fmt(g_iT),                              border=0, align="R", fill=True)
+        pdf.cell(27, 6, fmt(g_iC),                              border=0, align="R", fill=True)
+        pdf.cell(20, 6, str(int(g_iTk)) if g_iTk else "-",     border=0, align="R", fill=True)
+        pdf.cell(27, 6, fmt(g_iT/g_iTk) if g_iTk else "-",     border=0, align="R", fill=True)
+    if show_luro:
+        pdf.cell(30, 6, fmt(g_lT),                              border=0, align="R", fill=True)
+        pdf.cell(27, 6, fmt(g_lC),                              border=0, align="R", fill=True)
+        pdf.cell(20, 6, str(int(g_lTk)) if g_lTk else "-",     border=0, align="R", fill=True)
+        pdf.cell(27, 6, fmt(g_lT/g_lTk) if g_lTk else "-",     border=0, align="R", fill=True)
+    combined = (g_iT if show_indep else 0) + (g_lT if show_luro else 0)
+    pdf.set_text_color(*CORAL_C)
+    pdf.cell(27, 6, fmt(combined), border=0, align="R", fill=True)
+    pdf.ln(8)
+
+    # ── Reporte semanal (Lun–Sáb) ─────────────────────────────────
+    pdf.set_fill_color(*NAVY_C); pdf.set_text_color(*WHITE_C)
+    pdf.set_font("Helvetica", "B", 9)
+    pdf.cell(0, 7, "Reporte Semanal (Lun-Sab)", ln=True, fill=True, align="L")
+    pdf.ln(2)
+
+    wcols: list[tuple[str, int, str]] = [("Semana", 36, "L"), ("Dias c/datos", 22, "R")]
+    if show_indep:
+        wcols += [("Indep Total", 32, "R"), ("Indep Prom/dia", 30, "R"), ("Indep Tickets", 24, "R")]
+    if show_luro:
+        wcols += [("Luro Total",  32, "R"), ("Luro Prom/dia",  30, "R"), ("Luro Tickets",  24, "R")]
+    wcols.append(("Total Semanal", 30, "R"))
+
+    pdf.set_fill_color(*NAVY_C); pdf.set_text_color(*WHITE_C)
+    pdf.set_font("Helvetica", "B", 7)
+    for label, w, align in wcols:
+        pdf.cell(w, 6, _safe(label), border=0, align=align, fill=True)
+    pdf.ln()
+
+    # Agrupar Lun–Sáb
+    weeks_groups: list[list[str]] = []
+    current_week: list[str] = []
+    for d in range(1, days_count + 1):
+        date_str = f"{year}-{month_idx+1:02d}-{d:02d}"
+        dow = datetime(year, month_idx + 1, d).weekday()  # 0=Lun, 6=Dom
+        if dow == 0 and current_week:
+            weeks_groups.append(current_week)
+            current_week = []
+        if dow != 6:
+            current_week.append(date_str)
+    if current_week:
+        weeks_groups.append(current_week)
+
+    for wi, wdates in enumerate(weeks_groups):
+        wSales = [s for s in sales if str(s.sale_date) in wdates]
         wIndep = [s for s in wSales if s.branch_id == 2]
         wLuro  = [s for s in wSales if s.branch_id == 1]
-        wiT = sum(float(s.total_amount or 0) for s in wIndep)
-        wlT = sum(float(s.total_amount or 0) for s in wLuro)
-        wiTk = sum(int(s.ticket_count  or 0) for s in wIndep)
-        wlTk = sum(int(s.ticket_count  or 0) for s in wLuro)
-        days_with = len(set(str(s.sale_date) for s in wSales))
-        week_rows.append({
-            "label": f"Semana {len(week_rows)+1}",
-            "days": days_with or "—",
-            "iT": fmt(wiT), "iProm": fmt(wiT/days_with) if days_with else "—", "iTk": wiTk or "—",
-            "lT": fmt(wlT), "lProm": fmt(wlT/days_with) if days_with else "—", "lTk": wlTk or "—",
-            "total": fmt(wiT + wlT) if (wiT + wlT) else "—",
-        })
+        wiT  = sum(float(s.total_amount or 0) for s in wIndep)
+        wlT  = sum(float(s.total_amount or 0) for s in wLuro)
+        wiTk = sum(int(s.ticket_count   or 0) for s in wIndep)
+        wlTk = sum(int(s.ticket_count   or 0) for s in wLuro)
+        days_wd = len(wdates)
+        days_data = len(set(str(s.sale_date) for s in wSales if s.total_amount))
 
-    days_with_data = len(set(str(s.sale_date) for s in sales))
+        label = f"Semana {wi + 1}"
+        if days_wd < 6:
+            label += f" ({days_wd} dias)"
 
-    # CSS combinado: base + extra de ventas (sin llaves Jinja2)
-    sales_css = BASE_CSS + _SALES_EXTRA_CSS
+        pdf.set_fill_color(*(LIGHT_C if wi % 2 == 0 else WHITE_C))
+        pdf.set_text_color(*TEXT_C)
+        pdf.set_font("Helvetica", "", 7)
 
-    return _render(
-        "sales",
-        css=sales_css,          # sobreescribe el css por defecto
-        rows=rows, totals=totals, weeks=week_rows,
-        year=year, month=month, branch_label=branch_label,
-        show_indep=show_indep, show_luro=show_luro,
-        days_with_data=days_with_data,
-        doc_title=f"Ventas Diarias — {branch_label}",
-    )
+        wrow: list[tuple[str, int, str]] = [
+            (_safe(label),                          36, "L"),
+            (str(days_data) if days_data else "-",  22, "R"),
+        ]
+        if show_indep:
+            wrow += [(fmt(wiT) if wiT else "-",           32, "R"),
+                     (fmt(wiT/days_data) if days_data else "-", 30, "R"),
+                     (str(wiTk) if wiTk else "-",         24, "R")]
+        if show_luro:
+            wrow += [(fmt(wlT) if wlT else "-",           32, "R"),
+                     (fmt(wlT/days_data) if days_data else "-", 30, "R"),
+                     (str(wlTk) if wlTk else "-",         24, "R")]
+        wTotal = (wiT if show_indep else 0) + (wlT if show_luro else 0)
+        wrow.append((fmt(wTotal) if wTotal else "-", 30, "R"))
+
+        for text, w, align in wrow:
+            pdf.cell(w, 5, str(text), border=0, align=align, fill=True)
+        pdf.ln()
+
+    # Pie
+    pdf.ln(4)
+    pdf.set_text_color(*MUTED_C); pdf.set_font("Helvetica", "", 7)
+    pdf.cell(0, 5, "Sur Maderas · Mar del Plata · Sistema ERP v1.0", align="C", ln=True)
+
+    return bytes(pdf.output())
