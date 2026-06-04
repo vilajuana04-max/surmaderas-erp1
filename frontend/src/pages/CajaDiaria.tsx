@@ -588,8 +588,10 @@ export default function CajaDiaria() {
 
               {/* ── Resumen ── */}
               {(() => {
-                const parcial = (caja.total_transf) + (caja.total_salidas) + (caja.total_gastos)
-                const totalDia = parcial + (caja.total_tarjetas)
+                // Parcial = todas las entradas (transf + link) más las salidas (gastos + retiros)
+                // NO sumar total_gastos por separado: ya está incluido en total_salidas
+                const parcial  = caja.total_transf + (caja.total_link ?? 0) + caja.total_salidas
+                const totalDia = parcial + caja.total_tarjetas
                 return (
                 <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
                   <div className="px-5 py-3 border-b border-gray-100" style={{ background: NAVY }}>
@@ -598,9 +600,9 @@ export default function CajaDiaria() {
                   {/* Fila 1: tres componentes del parcial */}
                   <div className="grid grid-cols-3 divide-x divide-gray-100">
                     {[
-                      { label: 'Total Transferencias', value: caja.total_transf,   color: '#2563eb' },
-                      { label: 'Total Salidas',         value: caja.total_salidas,  color: '#22c55e' },
-                      { label: 'Total Gastos',          value: caja.total_gastos,   color: '#ef4444' },
+                      { label: 'Total Transferencias', value: caja.total_transf,       color: '#2563eb' },
+                      { label: 'Link de Pago',          value: caja.total_link ?? 0,   color: '#22c55e' },
+                      { label: 'Total Salidas',         value: caja.total_salidas,      color: '#ef4444' },
                     ].map(({ label, value, color }) => (
                       <div key={label} className="px-5 py-4">
                         <p className="text-xs text-gray-400 font-semibold mb-1">{label}</p>
