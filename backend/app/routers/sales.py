@@ -188,7 +188,12 @@ def sales_pdf(
         q = q.filter(DailySales.branch_id == 2)
 
     sales = q.order_by(DailySales.sale_date, DailySales.branch_id).all()
-    pdf   = generate_sales_pdf(sales, year, month, branch)
+    try:
+        pdf = generate_sales_pdf(sales, year, month, branch)
+    except Exception as exc:
+        import traceback
+        raise HTTPException(status_code=500,
+            detail=f"Error generando PDF: {type(exc).__name__}: {exc}\n{traceback.format_exc()[-800:]}")
 
     filename = f"ventas-{month}-{year}-{branch}.pdf"
     return Response(

@@ -42,17 +42,18 @@ export const api = {
     let res: Response
     try {
       res = await fetch(url, { headers: { ...authHeaders() } })
-    } catch {
-      throw new Error('No se pudo conectar con el servidor. Verificá tu conexión.')
+    } catch (e: unknown) {
+      const detail = e instanceof Error ? e.message : String(e)
+      throw new Error(`No se pudo conectar con el servidor (${detail}). URL: ${url}`)
     }
     if (!res.ok) {
       const text = await res.text().catch(() => res.statusText)
-      throw new Error(`Error del servidor (${res.status}): ${text.slice(0, 200)}`)
+      throw new Error(`Error del servidor (${res.status}): ${text.slice(0, 400)}`)
     }
     const contentType = res.headers.get('content-type') ?? ''
     if (!contentType.includes('pdf')) {
       const text = await res.text().catch(() => '')
-      throw new Error(`El servidor no devolvió un PDF. Respuesta: ${text.slice(0, 200)}`)
+      throw new Error(`El servidor no devolvió un PDF (${contentType}): ${text.slice(0, 300)}`)
     }
     const blob = await res.blob()
     const link = URL.createObjectURL(blob)
