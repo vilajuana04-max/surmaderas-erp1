@@ -272,25 +272,20 @@ def _generate_caja_pdf(data: dict) -> bytes:
     ]
     for i, (lbl, val, r, g, b) in enumerate(kpi_items):
         x = x0 + cw_kpi * i
-        # borde superior coloreado
         pdf.set_draw_color(r, g, b)
         pdf.set_line_width(2.0)
         pdf.line(x, kpi_y, x + cw_kpi, kpi_y)
-        # caja
         pdf.set_draw_color(215, 215, 215)
         pdf.set_line_width(0.3)
         pdf.rect(x, kpi_y, cw_kpi, 18)
-        # etiqueta
         pdf.set_xy(x + 3, kpi_y + 3)
         pdf.set_font("Helvetica", "", 6.5)
         pdf.set_text_color(120, 120, 120)
         pdf.cell(cw_kpi - 6, 4, lbl, ln=0)
-        # valor
         pdf.set_xy(x + 3, kpi_y + 9)
         pdf.set_font("Helvetica", "B", 11)
         pdf.set_text_color(r, g, b)
-        prefix = "- " if "GASTO" in lbl else ""
-        pdf.cell(cw_kpi - 6, 7, prefix + _fmt(val), ln=0)
+        pdf.cell(cw_kpi - 6, 7, _fmt(val), ln=0)   # sin prefijo negativo
     pdf.set_y(kpi_y + 23)
 
     # ── Total del Dia (banner navy) ───────────────────────────────
@@ -304,7 +299,10 @@ def _generate_caja_pdf(data: dict) -> bytes:
     pdf.set_xy(x0, tot_y + 2)
     pdf.set_font("Helvetica", "B", 19)
     pdf.set_text_color(CORAL_R, CORAL_G, CORAL_B)
-    pdf.cell(W - 5, 12, _fmt(data["total_del_dia"]), ln=0, align="R")
+    # Total = transf + link + salidas + tarjetas (igual al frontend)
+    total_pdf = (data["total_transf"] + data["total_link"] +
+                 data["total_salidas"] + data["total_tarjetas"])
+    pdf.cell(W - 5, 12, _fmt(total_pdf), ln=0, align="R")
     pdf.ln(20)
 
     # ── Observaciones ────────────────────────────────────────────

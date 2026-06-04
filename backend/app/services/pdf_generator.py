@@ -539,7 +539,7 @@ def generate_sales_pdf(sales: list, year: int, month: str, branch: str = "all") 
         pdf.set_fill_color(*NAVY_C); pdf.set_text_color(*WHITE_C)
         pdf.set_font("Helvetica", "B", 7)
         for label, w, align in cols:
-            pdf.cell(w, 6, _safe(label), border=0, align=align, fill=True)
+            pdf.cell(w, 6, label, border=0, align=align, fill=True)
         pdf.ln()
 
     draw_header_row()
@@ -588,7 +588,7 @@ def generate_sales_pdf(sales: list, year: int, month: str, branch: str = "all") 
         row.append((fmt(row_total) if row_total else "-", 27, "R"))
 
         for text, w, align in row:
-            pdf.cell(w, 5, _safe(str(text)), border=0, align=align, fill=True)
+            pdf.cell(w, 5, str(text), border=0, align=align, fill=True)
         pdf.ln()
 
     # ── Fila totales ───────────────────────────────────────────────
@@ -626,10 +626,10 @@ def generate_sales_pdf(sales: list, year: int, month: str, branch: str = "all") 
     pdf.set_fill_color(*NAVY_C); pdf.set_text_color(*WHITE_C)
     pdf.set_font("Helvetica", "B", 7)
     for label, w, align in wcols:
-        pdf.cell(w, 6, _safe(label), border=0, align=align, fill=True)
+        pdf.cell(w, 6, label, border=0, align=align, fill=True)
     pdf.ln()
 
-    # Agrupar Lun–Sáb
+    # Agrupar Lun–Sab
     weeks_groups: list[list[str]] = []
     current_week: list[str] = []
     for d in range(1, days_count + 1):
@@ -663,7 +663,7 @@ def generate_sales_pdf(sales: list, year: int, month: str, branch: str = "all") 
         pdf.set_font("Helvetica", "", 7)
 
         wrow: list[tuple[str, int, str]] = [
-            (_safe(label),                          36, "L"),
+            (label,                                 36, "L"),
             (str(days_data) if days_data else "-",  22, "R"),
         ]
         if show_indep:
