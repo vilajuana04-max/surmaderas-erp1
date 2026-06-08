@@ -920,6 +920,7 @@ function SueldosTab() {
       bruto_manual:       m.bruto_manual ? parseFloat(m.bruto_manual) : null,
       comision:           m.comision     ? parseFloat(m.comision)     : null,
       comision_desc:      m.comision_desc || null,
+      es_base:            !!m.es_base,
     })
     load()
   }
@@ -1139,9 +1140,10 @@ ${cards}
     // 2. Sueldo base manual (Patricia) — plus sobre la base, más comisión
     const bm = parseFloat(m.bruto_manual) || 0
     if (bm !== 0) return bm * factor + com
-    // 3. Estándar — dep×2 siempre, factor aplica el plus, más comisión
-    const dep = parseFloat(m.deposito_banco) || 0
-    return dep * 2 * factor + com
+    // 3. Estándar o Base — dep×2 (estándar) o dep×1 (es_base=true)
+    const dep  = parseFloat(m.deposito_banco) || 0
+    const mult = m.es_base ? 1 : 2
+    return dep * mult * factor + com
   }
 
   const calcPlusP = (m: any): number => {
@@ -1154,9 +1156,10 @@ ${cards}
     // Sueldo base manual: plus sobre la base (sin comisión)
     const bm = parseFloat(m.bruto_manual) || 0
     if (bm !== 0) return bm * (pf - 1)
-    // Estándar: plus sobre dep × 2 (sin comisión)
-    const dep = parseFloat(m.deposito_banco) || 0
-    return dep * 2 * (pf - 1)
+    // Estándar o Base
+    const dep  = parseFloat(m.deposito_banco) || 0
+    const mult = m.es_base ? 1 : 2
+    return dep * mult * (pf - 1)
   }
 
   const calcPerc = (m: any): number => {
@@ -1166,7 +1169,7 @@ ${cards}
     const h  = parseFloat(m.horas)        || 0
     const ph = parseFloat(m.precio_hora)  || 0
     const bm = parseFloat(m.bruto_manual) || 0
-    if ((h > 0 && ph > 0) || bm !== 0) return bruto - adelanto
+    if (m.es_base || (h > 0 && ph > 0) || bm !== 0) return bruto - adelanto
     // Estándar: se restan depósito y adelanto
     const dep = parseFloat(m.deposito_banco) || 0
     return bruto - dep - adelanto
@@ -1260,20 +1263,20 @@ ${cards}
             <table className="w-full min-w-[960px] text-sm border-collapse">
               <thead>
                 <tr>
-                  <TH style={{ width: 28, textAlign: 'center' }}>N°</TH>
-                  <TH>Empleado</TH>
-                  <TH>Inasistencias</TH>
-                  <TH right>Adelantos</TH>
-                  <TH right>Dep. Banco</TH>
-                  <TH right style={{ width: 70 }}>Horas</TH>
-                  {branchId === 1 && <TH right style={{ width: 80 }}>$ × Hora</TH>}
-                  <TH right style={{ width: 90 }} title="Sueldo base fijo (Patricia). El plus se aplica sobre este monto.">Sueldo Base</TH>
-                  <TH right style={{ width: 100 }} title="Comisión, incentivo o horas extra. La descripción aparece en el recibo.">Comisión</TH>
-                  <TH right style={{ width: 60 }} title="Porcentaje de plus sobre el bruto (ej: 30 = 30%)">Plus %</TH>
-                  <TH right style={{ background: '#FFF8E1', color: '#92400E' }}>Plus $</TH>
-                  <TH right style={{ background: '#FFF3CD', color: '#92400E' }}>Total Bruto</TH>
-                  <TH right style={{ background: '#D1FAE5', color: '#065F46' }}>Total Percibido</TH>
-                  <TH style={{ width: 32 }}>{''}</TH>
+                  <TH style={{ width: 28, minWidth: 28, textAlign: 'center' }}>N°</TH>
+                  <TH style={{ width: 160, minWidth: 160 }}>Empleado</TH>
+                  <TH style={{ width: 110, minWidth: 110 }}>Inasistencias</TH>
+                  <TH right style={{ width: 100, minWidth: 100 }}>Adelantos</TH>
+                  <TH right style={{ width: 120, minWidth: 120 }}>Dep. Banco</TH>
+                  <TH right style={{ width: 70, minWidth: 70 }}>Horas</TH>
+                  {branchId === 1 && <TH right style={{ width: 100, minWidth: 100 }}>$ × Hora</TH>}
+                  <TH right style={{ width: 100, minWidth: 100 }} title="Sueldo base fijo. El plus se aplica sobre este monto.">Sueldo Base</TH>
+                  <TH right style={{ width: 100, minWidth: 100 }} title="Comisión, incentivo o horas extra.">Comisión</TH>
+                  <TH right style={{ width: 60, minWidth: 60 }} title="Porcentaje de plus (ej: 30 = 30%)">Plus %</TH>
+                  <TH right style={{ width: 90, minWidth: 90, background: '#FFF8E1', color: '#92400E' }}>Plus $</TH>
+                  <TH right style={{ width: 110, minWidth: 110, background: '#FFF3CD', color: '#92400E' }}>Total Bruto</TH>
+                  <TH right style={{ width: 110, minWidth: 110, background: '#D1FAE5', color: '#065F46' }}>Total Percibido</TH>
+                  <TH style={{ width: 32, minWidth: 32 }}>{''}</TH>
                 </tr>
               </thead>
               <tbody>
@@ -1307,11 +1310,24 @@ ${cards}
                           onChange={v => setField(item.id, 'adelanto', v)}
                           onBlur={_v => saveItem(item.id, item)} />
                       </td>
-                      {/* Deposito banco */}
+                      {/* Deposito banco + toggle ×1/×2 */}
                       <td className="px-2 py-1.5">
-                        <NumInput disabled={isClosed} value={m.deposito_banco}
-                          onChange={v => setField(item.id, 'deposito_banco', v)}
-                          onBlur={_v => saveItem(item.id, item)} />
+                        <div className="flex items-center gap-1">
+                          <NumInput disabled={isClosed} value={m.deposito_banco}
+                            onChange={v => setField(item.id, 'deposito_banco', v)}
+                            onBlur={_v => saveItem(item.id, item)} />
+                          <button
+                            type="button"
+                            disabled={isClosed}
+                            title={m.es_base ? 'Bruto = Dep. × 1 (base)' : 'Bruto = Dep. × 2 (estándar)'}
+                            onClick={() => { setField(item.id, 'es_base', !m.es_base); setTimeout(() => saveItem(item.id, item), 50) }}
+                            className="text-[10px] font-bold px-1 py-0.5 rounded border transition-colors shrink-0 disabled:opacity-40"
+                            style={m.es_base
+                              ? { background: CORAL, color: 'white', borderColor: CORAL }
+                              : { background: 'white', color: '#9ca3af', borderColor: '#e5e7eb' }}>
+                            ×{m.es_base ? '1' : '2'}
+                          </button>
+                        </div>
                       </td>
                       {/* Horas */}
                       <td className="px-2 py-1.5">
@@ -2737,19 +2753,43 @@ function AjustesTab() {
 function NumInput({ value, onBlur, onChange, disabled, integer = false, step = 1 }: {
   value: any
   onBlur:   (v: string) => void
-  onChange?: (v: string) => void   // ← para actualizar cálculos en tiempo real
+  onChange?: (v: string) => void
   disabled?: boolean
   integer?:  boolean
   step?:     number
 }) {
-  const [v, setV] = useState(value ?? '')
-  useEffect(() => { setV(value ?? '') }, [value])
+  const raw = value != null && value !== '' ? Number(value) : null
+  const fmt = (n: number | null) =>
+    n != null && n !== 0 ? n.toLocaleString('es-AR') : ''
+
+  const [display, setDisplay] = useState(fmt(raw))
+  const [focused, setFocused] = useState(false)
+  useEffect(() => { if (!focused) setDisplay(fmt(raw)) }, [value, focused])
+
   return (
-    <input type="number" step={step}
-      className="border border-gray-200 rounded-lg py-1 px-1.5 text-xs text-right w-20 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed font-body"
-      disabled={disabled} value={v}
-      onChange={e => { setV(e.target.value); onChange?.(e.target.value) }}
-      onBlur={() => onBlur(v)}
+    <input
+      type="text" inputMode="decimal"
+      className="border border-gray-200 rounded-lg py-1 px-1.5 text-xs text-right focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed font-body"
+      style={{ width: 88, minWidth: 88 }}
+      disabled={disabled}
+      value={focused ? display : fmt(raw)}
+      onFocus={e => {
+        setFocused(true)
+        const n = raw != null ? String(raw) : ''
+        setDisplay(n)
+        setTimeout(() => e.target.select(), 0)
+      }}
+      onChange={e => {
+        const raw2 = e.target.value.replace(/[^\d.,]/g, '')
+        setDisplay(raw2)
+        onChange?.(raw2.replace(',', '.'))
+      }}
+      onBlur={() => {
+        setFocused(false)
+        const n = parseFloat(display.replace(/\./g, '').replace(',', '.')) || 0
+        setDisplay(fmt(n))
+        onBlur(String(n))
+      }}
     />
   )
 }

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Numeric, ForeignKey
+from sqlalchemy import Column, Integer, String, Numeric, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -46,6 +46,7 @@ class PayrollItem(Base):
     bruto_manual       = Column(Numeric(15, 2), nullable=True)        # sueldo base manual (Patricia)
     comision           = Column(Numeric(15, 2), nullable=True)        # incentivo / comisión / hora extra
     comision_desc      = Column(String,         nullable=True)        # etiqueta para el recibo
+    es_base            = Column(Boolean,        default=False)        # True = bruto = dep×1 (no ×2)
 
     period   = relationship("PayrollPeriod", back_populates="items")
     employee = relationship("Employee", back_populates="payroll_items")
@@ -66,8 +67,9 @@ class PayrollItem(Base):
             return round(float(self.horas) * float(self.precio_hora) + comision, 2)
         if self.bruto_manual and float(self.bruto_manual) != 0:
             return round(float(self.bruto_manual) * pf + comision, 2)
-        dep = float(self.deposito_banco or 0)
-        return round(dep * 2 * pf + comision, 2)
+        dep        = float(self.deposito_banco or 0)
+        multiplier = 1 if self.es_base else 2   # es_base=True → bruto = dep×1
+        return round(dep * multiplier * pf + comision, 2)
 
     @property
     def plus_pesos(self) -> float:
@@ -84,8 +86,9 @@ class PayrollItem(Base):
             return 0.0
         if self.bruto_manual and float(self.bruto_manual) != 0:
             return round(float(self.bruto_manual) * (pf - 1), 2)
-        dep = float(self.deposito_banco or 0)
-        return round(dep * 2 * (pf - 1), 2)
+        dep        = float(self.deposito_banco or 0)
+        multiplier = 1 if self.es_base else 2
+        return round(dep * multiplier * (pf - 1), 2)
 
     @property
     def total_percibido(self) -> float:
@@ -96,7 +99,7 @@ class PayrollItem(Base):
         """
         bruto    = self.total_bruto
         adelanto = float(self.adelanto or 0)
-        if (self.horas and self.precio_hora) or (self.bruto_manual and float(self.bruto_manual) != 0):
-            return round(bruto - adelanto, 2)
+        if self.es_base or (self.horas and self.precio_hora) or (self.bruto_manual and float(self.bruto_manual) != 0):
+            return round(bruto - adelanto, 2)   # no se resta deposito
         deposito = float(self.deposito_banco or 0)
         return round(bruto - deposito - adelanto, 2)
