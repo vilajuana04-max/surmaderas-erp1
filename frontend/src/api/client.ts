@@ -9,13 +9,19 @@ function authHeaders(): Record<string, string> {
 
 async function req<T>(path: string, opts?: RequestInit): Promise<T> {
   const url = `${BASE}${path}`
-  const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json', ...authHeaders(), ...opts?.headers },
-    ...opts,
-  })
+  let res: Response
+  try {
+    res = await fetch(url, {
+      headers: { 'Content-Type': 'application/json', ...authHeaders(), ...opts?.headers },
+      ...opts,
+    })
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e)
+    throw new Error(`${msg} [URL: ${url}]`)
+  }
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText)
-    throw new Error(`${res.status}: ${text}`)
+    throw new Error(`${res.status}: ${text.slice(0, 300)}`)
   }
   if (res.status === 204) return undefined as T
   return res.json()
