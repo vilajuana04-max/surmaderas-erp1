@@ -29,8 +29,13 @@ def list_periods(
     return [_enrich_period(p) for p in periods]
 
 
-@router.post("/periods", status_code=201)
-def create_period(month: str, year: int, branch_id: int, db: Session = Depends(get_db)):
+@router.get("/periods/ensure")
+def ensure_period(month: str, year: int, branch_id: int, db: Session = Depends(get_db)):
+    """GET que crea el período si no existe (evita preflight CORS de POST)."""
+    return _get_or_create_period(month, year, branch_id, db)
+
+
+def _get_or_create_period(month: str, year: int, branch_id: int, db):
     existing = db.query(PayrollPeriod).filter(
         PayrollPeriod.month     == month.upper(),
         PayrollPeriod.year      == year,
@@ -54,6 +59,11 @@ def create_period(month: str, year: int, branch_id: int, db: Session = Depends(g
     db.commit()
     db.refresh(period)
     return _enrich_period(period)
+
+
+@router.post("/periods", status_code=201)
+def create_period(month: str, year: int, branch_id: int, db: Session = Depends(get_db)):
+    return _get_or_create_period(month, year, branch_id, db)
 
 
 @router.post("/periods/{period_id}/close")

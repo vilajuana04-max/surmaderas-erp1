@@ -843,12 +843,14 @@ function SueldosTab() {
   // Estado de edición local — actualiza los cálculos sin esperar al servidor
   const [localEdits, setLocalEdits] = useState<Record<number, Record<string, any>>>({})
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
+    // Auto-crear períodos para ambas sucursales si no existen (vía GET para evitar preflight CORS)
+    await Promise.allSettled([
+      api.get(`/payroll/periods/ensure?month=${month}&year=${year}&branch_id=1`),
+      api.get(`/payroll/periods/ensure?month=${month}&year=${year}&branch_id=2`),
+    ])
     api.get<any[]>(`/payroll/periods?year=${year}`).then(setPeriods)
-    // No limpiar localEdits acá: si el usuario está tipando en otro campo
-    // mientras se guarda el anterior, los valores locales se perderían.
-    // localEdits se resetea solo cuando cambia el mes (useEffect de month).
-  }, [year])
+  }, [month, year])
 
   const loadHistory = useCallback(() => {
     api.get<any[]>('/payroll/periods').then(setHistoryPeriods)
@@ -1189,11 +1191,8 @@ ${cards}
             </p>
           </div>
           <div className="flex gap-2 flex-wrap">
-            {!period && (
-              <button onClick={() => createPeriod(branchId)} disabled={creating}
-                className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-xs font-semibold font-body flex items-center gap-1">
-                <Plus size={12} /> Abrir Mes
-              </button>
+            {!period && creating && (
+              <span className="text-white/60 text-xs font-body animate-pulse">Abriendo…</span>
             )}
             {period && !isClosed && (
               <button onClick={() => closePeriod(period.id)}
@@ -1381,10 +1380,7 @@ ${cards}
           </div>
         ) : (
           <div className="px-5 py-12 text-center text-gray-400 text-sm font-body">
-            No hay liquidación para {month} {year}.{' '}
-            <button onClick={() => createPeriod(branchId)} className="font-semibold hover:underline" style={{ color: CORAL }}>
-              Abrir mes
-            </button>
+            <div className="animate-pulse">Cargando planilla…</div>
           </div>
         )}
       </div>
