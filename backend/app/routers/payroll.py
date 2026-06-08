@@ -11,6 +11,11 @@ from app.schemas import PayrollItemCreate, PayrollItemOut, PayrollPeriodOut
 router = APIRouter(prefix="/payroll", tags=["Sueldos"])
 
 
+@router.get("/version")
+def payroll_version():
+    return {"version": "v10-debug", "ok": True}
+
+
 # ── Períodos ─────────────────────────────────────────────────────────────────
 
 @router.get("/periods")
