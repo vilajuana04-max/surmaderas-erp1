@@ -13,32 +13,33 @@ router = APIRouter(prefix="/payroll", tags=["Sueldos"])
 
 # ── Períodos ─────────────────────────────────────────────────────────────────
 
-@router.get("/periods", response_model=list[PayrollPeriodOut])
+@router.get("/periods")
 def list_periods(
     year:      Optional[int] = None,
     branch_id: Optional[int] = None,
     month:     Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    # Auto-crear períodos si se pasa month+year (no falla aunque ocurra error)
-    if month and year:
-        for bid in [1, 2]:
-            try:
-                _get_or_create_period(month, year, bid, db)
-            except Exception as e:
-                print(f"[payroll] auto-create branch {bid}: {e}")
+    import traceback
+    try:
+        if month and year:
+            for bid in [1, 2]:
                 try:
-                    db.rollback()
-                except Exception:
-                    pass
+                    _get_or_create_period(month, year, bid, db)
+                except Exception as e:
+                    try: db.rollback()
+                    except: pass
 
-    q = db.query(PayrollPeriod)
-    if year:
-        q = q.filter(PayrollPeriod.year == year)
-    if branch_id:
-        q = q.filter(PayrollPeriod.branch_id == branch_id)
-    periods = q.order_by(PayrollPeriod.year, PayrollPeriod.month).all()
-    return [_enrich_period(p) for p in periods]
+        q = db.query(PayrollPeriod)
+        if year:
+            q = q.filter(PayrollPeriod.year == year)
+        if branch_id:
+            q = q.filter(PayrollPeriod.branch_id == branch_id)
+        periods = q.order_by(PayrollPeriod.year, PayrollPeriod.month).all()
+        return [_enrich_period(p) for p in periods]
+    except Exception as e:
+        raise HTTPException(status_code=500,
+            detail=f"{type(e).__name__}: {e}\n{traceback.format_exc()[-600:]}")
 
 
 @router.get("/periods/ensure")
