@@ -47,6 +47,7 @@ class PayrollItem(Base):
     comision           = Column(Numeric(15, 2), nullable=True)        # incentivo / comisión / hora extra
     comision_desc      = Column(String,         nullable=True)        # etiqueta para el recibo
     es_base            = Column(Boolean,        default=False)        # True = bruto = dep×1 (no ×2)
+    sin_dep            = Column(Boolean,        default=False)        # True = percibido = bruto − adelanto (sin descontar dep)
 
     period   = relationship("PayrollPeriod", back_populates="items")
     employee = relationship("Employee", back_populates="payroll_items")
@@ -99,6 +100,9 @@ class PayrollItem(Base):
         """
         bruto    = self.total_bruto
         adelanto = float(self.adelanto or 0)
+        # sin_dep (Alejandro): percibido = bruto − adelanto (NO descuenta deposito)
+        if self.sin_dep:
+            return round(bruto - adelanto, 2)
         # Por horas o sueldo base manual (Patricia): percibido = bruto − adelanto
         # es_base (Cecilia) y estándar: percibido = bruto − deposito − adelanto
         if not self.es_base and ((self.horas and self.precio_hora) or (self.bruto_manual and float(self.bruto_manual) != 0)):

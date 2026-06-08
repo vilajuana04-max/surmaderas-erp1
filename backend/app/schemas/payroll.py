@@ -16,6 +16,7 @@ class PayrollItemCreate(BaseModel):
     comision:           Optional[Decimal] = None    # incentivo / comisión / hora extra
     comision_desc:      Optional[str]     = None    # etiqueta para el recibo
     es_base:            bool              = False   # True = bruto = dep×1 (sin ×2)
+    sin_dep:            bool              = False   # True = percibido = bruto − adelanto
 
 
 class PayrollItemOut(BaseModel):
@@ -33,6 +34,7 @@ class PayrollItemOut(BaseModel):
     comision:           Optional[Decimal] = None
     comision_desc:      Optional[str]     = None
     es_base:            bool              = False
+    sin_dep:            bool              = False
     # Calculados
     total_bruto:        float
     plus_pesos:         float

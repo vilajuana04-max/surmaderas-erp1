@@ -124,7 +124,7 @@ def _generate_caja_pdf(data: dict) -> bytes:
 
     # Landscape A4: 297 x 210 mm
     pdf = FPDF(orientation="L", format="A4")
-    pdf.set_auto_page_break(auto=True, margin=14)
+    pdf.set_auto_page_break(auto=False)   # una sola hoja, sin páginas fantasma
     pdf.add_page()
     W  = 267.0   # 297 - 30 (margenes 15 c/u)
     x0 = 15.0
@@ -238,12 +238,13 @@ def _generate_caja_pdf(data: dict) -> bytes:
     # Tarjetas (filas fijas de terminales) — fila 3 lado izquierdo
     pdf.set_fill_color(110, 70, 200)
     pdf.set_xy(x_l, row3_y)
-    pdf.set_font("Helvetica", "B", 8.5)
+    pdf.set_font("Helvetica", "B", 9)
     pdf.set_text_color(255, 255, 255)
-    pdf.cell(col_w, 8, "  TARJETAS", ln=0, fill=True)
+    pdf.cell(col_w, 11, "  TARJETAS", ln=0, fill=True)
     pdf.set_xy(x_l, row3_y)
-    pdf.cell(col_w - 2, 8, _fmt(data["total_tarjetas"]), ln=0, align="R", fill=True)
-    yT = row3_y + 8
+    pdf.set_font("Helvetica", "B", 15)   # total tarjetas mas grande
+    pdf.cell(col_w - 3, 11, _fmt(data["total_tarjetas"]), ln=0, align="R", fill=True)
+    yT = row3_y + 11
     for idx, (label, key) in enumerate([
             ("PROVINCIA", "tarjeta_provincia"), ("NAVE",   "tarjeta_nave"),
             ("FRANCES",   "tarjeta_frances"),   ("COMAFI", "tarjeta_comafi")]):
@@ -261,49 +262,36 @@ def _generate_caja_pdf(data: dict) -> bytes:
 
     pdf.set_y(max(yL3, yT) + 6)
 
-    # ── KPI: 4 boxes con borde superior de color ─────────────────
-    kpi_y  = pdf.get_y()
-    cw_kpi = W / 4
-    kpi_items = [
-        ("TRANSFERENCIAS",    data["total_transf"],        37,  99, 235),
-        ("LINK DE PAGO",      data["total_link"],          34, 197,  94),
-        ("TARJETAS",          data["total_tarjetas"],     124,  58, 237),
-        ("GASTOS + RETIROS",  data["total_salidas"],      200,  50,  50),
-    ]
-    for i, (lbl, val, r, g, b) in enumerate(kpi_items):
-        x = x0 + cw_kpi * i
-        pdf.set_draw_color(r, g, b)
-        pdf.set_line_width(2.0)
-        pdf.line(x, kpi_y, x + cw_kpi, kpi_y)
-        pdf.set_draw_color(215, 215, 215)
-        pdf.set_line_width(0.3)
-        pdf.rect(x, kpi_y, cw_kpi, 18)
-        pdf.set_xy(x + 3, kpi_y + 3)
-        pdf.set_font("Helvetica", "", 6.5)
-        pdf.set_text_color(120, 120, 120)
-        pdf.cell(cw_kpi - 6, 4, lbl, ln=0)
-        pdf.set_xy(x + 3, kpi_y + 9)
-        pdf.set_font("Helvetica", "B", 11)
-        pdf.set_text_color(r, g, b)
-        pdf.cell(cw_kpi - 6, 7, _fmt(val), ln=0)   # sin prefijo negativo
-    pdf.set_y(kpi_y + 23)
-
-    # ── Total del Dia (banner navy) ───────────────────────────────
-    tot_y = pdf.get_y()
-    pdf.set_fill_color(NAVY_R, NAVY_G, NAVY_B)
-    pdf.rect(x0, tot_y, W, 16, "F")
-    pdf.set_xy(x0 + 5, tot_y + 4)
-    pdf.set_font("Helvetica", "B", 8.5)
-    pdf.set_text_color(140, 140, 180)
-    pdf.cell(W * 0.45, 8, "TOTAL DEL DIA", ln=0)
-    pdf.set_xy(x0, tot_y + 2)
-    pdf.set_font("Helvetica", "B", 19)
-    pdf.set_text_color(CORAL_R, CORAL_G, CORAL_B)
-    # Total = transf + link + salidas + tarjetas (igual al frontend)
     total_pdf = (data["total_transf"] + data["total_link"] +
                  data["total_salidas"] + data["total_tarjetas"])
-    pdf.cell(W - 5, 12, _fmt(total_pdf), ln=0, align="R")
-    pdf.ln(20)
+    parcial   = data["total_transf"] + data["total_link"] + data["total_salidas"]
+
+    # ── Parcial del día (strip azul) ──────────────────────────────
+    par_y = pdf.get_y()
+    pdf.set_fill_color(240, 244, 255)
+    pdf.rect(x0, par_y, W, 11, "F")
+    pdf.set_xy(x0 + 5, par_y + 3)
+    pdf.set_font("Helvetica", "B", 9)
+    pdf.set_text_color(37, 99, 235)
+    pdf.cell(W * 0.5, 5, "PARCIAL DEL DIA", ln=0)
+    pdf.set_xy(x0, par_y + 1)
+    pdf.set_font("Helvetica", "B", 15)
+    pdf.cell(W - 5, 8, _fmt(parcial), ln=0, align="R")
+    pdf.set_y(par_y + 14)
+
+    # ── Total del Dia (banner navy, grande) ───────────────────────
+    tot_y = pdf.get_y()
+    pdf.set_fill_color(NAVY_R, NAVY_G, NAVY_B)
+    pdf.rect(x0, tot_y, W, 22, "F")
+    pdf.set_xy(x0 + 6, tot_y + 7)
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_text_color(200, 200, 220)
+    pdf.cell(W * 0.45, 8, "TOTAL DEL DIA", ln=0)
+    pdf.set_xy(x0, tot_y + 3)
+    pdf.set_font("Helvetica", "B", 30)   # total del dia mucho mas grande
+    pdf.set_text_color(CORAL_R, CORAL_G, CORAL_B)
+    pdf.cell(W - 6, 16, _fmt(total_pdf), ln=0, align="R")
+    pdf.set_y(tot_y + 26)
 
     # ── Observaciones ────────────────────────────────────────────
     if data.get("observaciones"):
@@ -315,7 +303,6 @@ def _generate_caja_pdf(data: dict) -> bytes:
         pdf.set_font("Helvetica", "", 8.5)
         pdf.set_text_color(50, 50, 50)
         pdf.multi_cell(W, 5, _safe(data.get("observaciones") or ""))
-        pdf.ln(2)
 
     # ── Footer ───────────────────────────────────────────────────
     pdf.set_y(pdf.h - 13)

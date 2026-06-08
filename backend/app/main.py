@@ -39,6 +39,7 @@ def _run_migrations():
             "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS comision NUMERIC(15,2);",
             "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS comision_desc VARCHAR(100);",
             "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS es_base BOOLEAN DEFAULT FALSE;",
+            "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS sin_dep BOOLEAN DEFAULT FALSE;",
         ]:
             db.execute(text(col_sql))
         # Renombrar usuario 'Caja' → 'CAJA' y asegurar role caja_diaria

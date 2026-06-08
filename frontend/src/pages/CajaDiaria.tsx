@@ -587,95 +587,76 @@ export default function CajaDiaria() {
 
           {caja && !loading && (
             <>
-              {/* ── Secciones ── */}
+              {/* ── Movimientos en efectivo ── */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Fila 1 */}
                 <Section title="Gastos" icon={<ArrowUpCircle size={16}/>} color="#ef4444"
                   total={caja.total_gastos} items={gastos} tipo="gasto" disabled={disabled}
                   onAdd={addMov} onChange={updateMov} onDelete={deleteMov} />
                 <Section title="Transferencias" icon={<ArrowDownCircle size={16}/>} color="#2563eb"
                   total={caja.total_transf} items={transf} tipo="transferencia" disabled={disabled}
                   onAdd={addMov} onChange={updateMov} onDelete={deleteMov} />
-
-                {/* Fila 2 */}
-                <Section title="Link de Pago" icon={<Smartphone size={16}/>} color="#22c55e"
-                  total={caja.total_link ?? 0} items={links} tipo="link" disabled={disabled}
-                  onAdd={addMov} onChange={updateMov} onDelete={deleteMov} />
                 <Section title="Retiro de Caja" icon={<Banknote size={16}/>} color="#f59e0b"
                   total={caja.total_retiros} items={retiros} tipo="retiro" disabled={disabled}
                   onAdd={addMov} onChange={updateMov} onDelete={deleteMov} />
               </div>
 
-              {/* ── Tarjetas (fila completa) ── */}
-              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                <div className="px-4 py-3 flex items-center gap-2 border-b border-gray-100"
-                     style={{ borderLeftWidth: 3, borderLeftColor: '#8b5cf6' }}>
-                  <CreditCard size={16} style={{ color: '#8b5cf6' }} />
-                  <span className="font-bold text-sm text-gray-800 flex-1">Tarjetas</span>
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                        style={{ background: '#8b5cf618', color: '#8b5cf6' }}>
-                    {fmt$(caja.total_tarjetas)}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-gray-100 px-0">
-                  {TERMINALES.map(t => {
-                    const key = `tarjeta_${t.key}` as keyof Caja
-                    const val = caja[key] as number
-                    return (
-                      <div key={t.key} className="px-4 py-3">
-                        <p className="text-[10px] font-bold text-gray-400 mb-1">{t.label}</p>
-                        <PesosInput
-                          value={val}
-                          disabled={disabled}
-                          onSave={n => { if (n !== val) patchCaja({ [key]: n }) }}
-                          className="w-full text-sm font-bold text-right border-b border-gray-200 focus:border-purple-400 outline-none py-0.5 bg-transparent disabled:opacity-50"
-                        />
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* ── Resumen ── */}
+              {/* ── Parcial del día (cierre de la parte en efectivo) ── */}
               {(() => {
-                // Parcial = todas las entradas (transf + link) más las salidas (gastos + retiros)
-                // NO sumar total_gastos por separado: ya está incluido en total_salidas
                 const parcial  = caja.total_transf + (caja.total_link ?? 0) + caja.total_salidas
                 const totalDia = parcial + caja.total_tarjetas
                 return (
-                <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                  <div className="px-5 py-3 border-b border-gray-100" style={{ background: NAVY }}>
-                    <p className="text-white/60 text-[11px] font-bold tracking-[2px] uppercase">Resumen del día</p>
+                <>
+                  <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                    <div className="px-5 py-4 flex items-center justify-between" style={{ background: '#f0f4ff' }}>
+                      <p className="font-bold text-blue-700 text-sm uppercase tracking-wide">Parcial del día</p>
+                      <p className="text-2xl font-bold text-blue-700">{fmt$(parcial)}</p>
+                    </div>
                   </div>
-                  {/* Fila 1: tres componentes del parcial */}
-                  <div className="grid grid-cols-3 divide-x divide-gray-100">
-                    {[
-                      { label: 'Total Transferencias', value: caja.total_transf,       color: '#2563eb' },
-                      { label: 'Link de Pago',          value: caja.total_link ?? 0,   color: '#22c55e' },
-                      { label: 'Total Salidas',         value: caja.total_salidas,      color: '#ef4444' },
-                    ].map(({ label, value, color }) => (
-                      <div key={label} className="px-5 py-4">
-                        <p className="text-xs text-gray-400 font-semibold mb-1">{label}</p>
-                        <p className="text-lg font-bold" style={{ color }}>{fmt$(value)}</p>
+
+                  {/* ── Sección virtual: Link de Pago + Tarjetas ── */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Section title="Link de Pago" icon={<Smartphone size={16}/>} color="#22c55e"
+                      total={caja.total_link ?? 0} items={links} tipo="link" disabled={disabled}
+                      onAdd={addMov} onChange={updateMov} onDelete={deleteMov} />
+
+                    <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                      <div className="px-4 py-3 flex items-center gap-2 border-b border-gray-100"
+                           style={{ borderLeftWidth: 3, borderLeftColor: '#8b5cf6' }}>
+                        <CreditCard size={16} style={{ color: '#8b5cf6' }} />
+                        <span className="font-bold text-sm text-gray-800 flex-1">Tarjetas</span>
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                              style={{ background: '#8b5cf618', color: '#8b5cf6' }}>
+                          {fmt$(caja.total_tarjetas)}
+                        </span>
                       </div>
-                    ))}
+                      <div className="grid grid-cols-2 divide-x divide-y divide-gray-100">
+                        {TERMINALES.map(t => {
+                          const key = `tarjeta_${t.key}` as keyof Caja
+                          const val = caja[key] as number
+                          return (
+                            <div key={t.key} className="px-4 py-3">
+                              <p className="text-[10px] font-bold text-gray-400 mb-1">{t.label}</p>
+                              <PesosInput
+                                value={val}
+                                disabled={disabled}
+                                onSave={n => { if (n !== val) patchCaja({ [key]: n }) }}
+                                className="w-full text-sm font-bold text-right border-b border-gray-200 focus:border-purple-400 outline-none py-0.5 bg-transparent disabled:opacity-50"
+                              />
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
                   </div>
-                  {/* Parcial del día */}
-                  <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between" style={{ background: '#f0f4ff' }}>
-                    <p className="font-bold text-blue-700 text-sm uppercase tracking-wide">Parcial del día</p>
-                    <p className="text-2xl font-bold text-blue-700">{fmt$(parcial)}</p>
+
+                  {/* ── Total del día ── */}
+                  <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                    <div className="px-6 py-5 flex items-center justify-between" style={{ background: NAVY }}>
+                      <p className="font-bold text-white text-base uppercase tracking-wide">Total del día</p>
+                      <p className="text-4xl font-bold" style={{ color: CORAL }}>{fmt$(totalDia)}</p>
+                    </div>
                   </div>
-                  {/* Tarjetas */}
-                  <div className="px-5 py-4 border-t border-gray-100">
-                    <p className="text-xs text-gray-400 font-semibold mb-1">Total Tarjetas</p>
-                    <p className="text-lg font-bold" style={{ color: '#8b5cf6' }}>{fmt$(caja.total_tarjetas)}</p>
-                  </div>
-                  {/* Total del día */}
-                  <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-between" style={{ background: '#f8f7f5' }}>
-                    <p className="font-bold text-gray-600 text-sm uppercase tracking-wide">Total del día</p>
-                    <p className="text-3xl font-bold" style={{ color: CORAL }}>{fmt$(totalDia)}</p>
-                  </div>
-                </div>
+                </>
                 )
               })()}
 

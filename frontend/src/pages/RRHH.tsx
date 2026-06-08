@@ -921,6 +921,7 @@ function SueldosTab() {
       comision:           m.comision     ? parseFloat(m.comision)     : null,
       comision_desc:      m.comision_desc || null,
       es_base:            !!m.es_base,
+      sin_dep:            !!m.sin_dep,
     })
     load()
   }
@@ -1165,7 +1166,8 @@ ${cards}
   const calcPerc = (m: any): number => {
     const bruto   = calcBruto(m)
     const adelanto = parseFloat(m.adelanto) || 0
-    // Por horas o sueldo base: solo se resta el adelanto
+    // sin_dep (Alejandro): percibido = bruto − adelanto (no descuenta deposito)
+    if (m.sin_dep) return bruto - adelanto
     const h  = parseFloat(m.horas)        || 0
     const ph = parseFloat(m.precio_hora)  || 0
     const bm = parseFloat(m.bruto_manual) || 0
@@ -1268,7 +1270,7 @@ ${cards}
                   <TH style={{ width: 160, minWidth: 160 }}>Empleado</TH>
                   <TH style={{ width: 110, minWidth: 110 }}>Inasistencias</TH>
                   <TH right style={{ width: 100, minWidth: 100 }}>Adelantos</TH>
-                  <TH right style={{ width: 120, minWidth: 120 }}>Dep. Banco</TH>
+                  <TH right style={{ width: 170, minWidth: 170 }}>Dep. Banco</TH>
                   <TH right style={{ width: 70, minWidth: 70 }}>Horas</TH>
                   {branchId === 1 && <TH right style={{ width: 100, minWidth: 100 }}>$ × Hora</TH>}
                   <TH right style={{ width: 100, minWidth: 100 }} title="Sueldo base fijo. El plus se aplica sobre este monto.">Sueldo Base</TH>
@@ -1311,7 +1313,7 @@ ${cards}
                           onChange={v => setField(item.id, 'adelanto', v)}
                           onBlur={_v => saveItem(item.id, item)} />
                       </td>
-                      {/* Deposito banco + toggle ×1/×2 */}
+                      {/* Deposito banco + toggle ×1/×2 + toggle sin descuento */}
                       <td className="px-2 py-1.5">
                         <div className="flex items-center gap-1">
                           <NumInput disabled={isClosed} value={m.deposito_banco}
@@ -1327,6 +1329,19 @@ ${cards}
                               ? { background: CORAL, color: 'white', borderColor: CORAL }
                               : { background: 'white', color: '#9ca3af', borderColor: '#e5e7eb' }}>
                             ×{m.es_base ? '1' : '2'}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isClosed}
+                            title={m.sin_dep
+                              ? 'Percibido NO descuenta el depósito (bruto − adelanto)'
+                              : 'Percibido descuenta el depósito (estándar)'}
+                            onClick={() => { setField(item.id, 'sin_dep', !m.sin_dep); setTimeout(() => saveItem(item.id, item), 50) }}
+                            className="text-[10px] font-bold px-1 py-0.5 rounded border transition-colors shrink-0 disabled:opacity-40"
+                            style={m.sin_dep
+                              ? { background: '#16a34a', color: 'white', borderColor: '#16a34a' }
+                              : { background: 'white', color: '#9ca3af', borderColor: '#e5e7eb' }}>
+                            {m.sin_dep ? 'S/D' : 'C/D'}
                           </button>
                         </div>
                       </td>
