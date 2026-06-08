@@ -99,7 +99,9 @@ class PayrollItem(Base):
         """
         bruto    = self.total_bruto
         adelanto = float(self.adelanto or 0)
-        if self.es_base or (self.horas and self.precio_hora) or (self.bruto_manual and float(self.bruto_manual) != 0):
-            return round(bruto - adelanto, 2)   # no se resta deposito
+        # Por horas o sueldo base manual (Patricia): percibido = bruto − adelanto
+        # es_base (Cecilia) y estándar: percibido = bruto − deposito − adelanto
+        if not self.es_base and ((self.horas and self.precio_hora) or (self.bruto_manual and float(self.bruto_manual) != 0)):
+            return round(bruto - adelanto, 2)
         deposito = float(self.deposito_banco or 0)
         return round(bruto - deposito - adelanto, 2)

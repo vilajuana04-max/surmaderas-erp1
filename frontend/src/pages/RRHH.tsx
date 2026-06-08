@@ -1169,8 +1169,9 @@ ${cards}
     const h  = parseFloat(m.horas)        || 0
     const ph = parseFloat(m.precio_hora)  || 0
     const bm = parseFloat(m.bruto_manual) || 0
-    if (m.es_base || (h > 0 && ph > 0) || bm !== 0) return bruto - adelanto
-    // Estándar: se restan depósito y adelanto
+    // Por horas o sueldo base manual (sin es_base): percibido = bruto − adelanto
+    // es_base (Cecilia) o estándar: percibido = bruto − deposito − adelanto
+    if (!m.es_base && ((h > 0 && ph > 0) || bm !== 0)) return bruto - adelanto
     const dep = parseFloat(m.deposito_banco) || 0
     return bruto - dep - adelanto
   }
