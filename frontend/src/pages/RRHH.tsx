@@ -843,10 +843,21 @@ function SueldosTab() {
   // Estado de edición local — actualiza los cálculos sin esperar al servidor
   const [localEdits, setLocalEdits] = useState<Record<number, Record<string, any>>>({})
 
-  const load = useCallback(() => {
-    // month en la URL → el backend auto-crea los períodos si no existen
-    api.get<any[]>(`/payroll/periods?year=${year}&month=${month}`)
-      .then(setPeriods).catch(() => setPeriods([]))
+  const load = useCallback(async () => {
+    // 1. Crear períodos si no existen (GET simple, sin preflight)
+    await Promise.allSettled([
+      api.get(`/payroll/periods/ensure?month=${month}&year=${year}&branch_id=1`),
+      api.get(`/payroll/periods/ensure?month=${month}&year=${year}&branch_id=2`),
+    ])
+    // 2. Cargar todos los períodos del año
+    try {
+      const data = await api.get<any[]>(`/payroll/periods?year=${year}`)
+      setPeriods(data)
+    } catch {
+      // Si falla igual intentar con month para aprovechar el auto-create
+      api.get<any[]>(`/payroll/periods?year=${year}&month=${month}`)
+        .then(setPeriods).catch(() => setPeriods([]))
+    }
   }, [year, month])
 
   const loadHistory = useCallback(() => {

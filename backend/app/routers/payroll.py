@@ -21,10 +21,17 @@ def list_periods(
     month:     Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    # Si viene month+year, auto-crear ambos períodos si no existen
+    # Auto-crear períodos si se pasa month+year (no falla aunque ocurra error)
     if month and year:
         for bid in [1, 2]:
-            _get_or_create_period(month, year, bid, db)
+            try:
+                _get_or_create_period(month, year, bid, db)
+            except Exception as e:
+                print(f"[payroll] auto-create branch {bid}: {e}")
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
 
     q = db.query(PayrollPeriod)
     if year:
