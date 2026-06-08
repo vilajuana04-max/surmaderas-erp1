@@ -876,7 +876,11 @@ function SueldosTab() {
     setCreating(true)
     try {
       await api.post(`/payroll/periods?month=${month}&year=${year}&branch_id=${branchId}`, {})
-      load()
+      await new Promise<void>(res => {
+        api.get<any[]>(`/payroll/periods?year=${year}`).then(data => { setPeriods(data); res() })
+      })
+    } catch (err: unknown) {
+      alert(`Error al abrir el mes: ${err instanceof Error ? err.message : String(err)}`)
     } finally { setCreating(false) }
   }
 
