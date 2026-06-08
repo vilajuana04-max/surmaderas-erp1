@@ -27,6 +27,17 @@ def _run_migrations():
         db.execute(text(
             "ALTER TABLE luro_expenses ADD COLUMN IF NOT EXISTS caja_id INTEGER;"
         ))
+        # Columnas nuevas en payroll_items (agregadas al modelo pero faltaban en la DB)
+        for col_sql in [
+            "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS inasistencias_desc VARCHAR(100);",
+            "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS horas NUMERIC(8,2);",
+            "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS precio_hora NUMERIC(15,2);",
+            "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS plus_factor NUMERIC(5,3);",
+            "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS bruto_manual NUMERIC(15,2);",
+            "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS comision NUMERIC(15,2);",
+            "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS comision_desc VARCHAR(100);",
+        ]:
+            db.execute(text(col_sql))
         # Renombrar usuario 'Caja' → 'CAJA' y asegurar role caja_diaria
         db.execute(text(
             "UPDATE users SET username = 'CAJA', role = 'caja_diaria' WHERE username IN ('Caja', 'caja') AND role != 'admin';"
