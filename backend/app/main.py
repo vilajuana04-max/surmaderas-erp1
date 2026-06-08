@@ -27,9 +27,11 @@ def _run_migrations():
         db.execute(text(
             "ALTER TABLE luro_expenses ADD COLUMN IF NOT EXISTS caja_id INTEGER;"
         ))
-        # Columnas nuevas en payroll_items (agregadas al modelo pero faltaban en la DB)
+        # Todas las columnas de payroll_items (la tabla se creó con solo id+period_id+employee_id)
         for col_sql in [
             "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS inasistencias_desc VARCHAR(100);",
+            "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS adelanto NUMERIC(15,2) DEFAULT 0;",
+            "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS deposito_banco NUMERIC(15,2) DEFAULT 0;",
             "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS horas NUMERIC(8,2);",
             "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS precio_hora NUMERIC(15,2);",
             "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS plus_factor NUMERIC(5,3);",
