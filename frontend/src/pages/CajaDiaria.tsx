@@ -487,22 +487,46 @@ export default function CajaDiaria() {
     if (!caja) return
     const [y, m, d] = caja.fecha.split('-')
     const sucLabel = caja.sucursal === 'luro' ? 'Luro' : 'Independencia'
+
+    // Total correcto = transferencias + link + salidas + tarjetas
+    const totalDia =
+      caja.total_transf + (caja.total_link ?? 0) + caja.total_salidas + caja.total_tarjetas
+
+    // Detalle de cada movimiento por tipo
+    const detalle = (tipo: string) =>
+      caja.movimientos
+        .filter(mv => mv.tipo === tipo)
+        .map(mv => `   · ${mv.descripcion || 's/desc'}: ${fmt$(mv.monto)}`)
+
+    const lineGastos  = detalle('gasto')
+    const lineTransf  = detalle('transferencia')
+    const lineRetiros = detalle('retiro')
+    const lineLinks   = detalle('link')
+
     const msg = [
-      `📋 *Resumen del día — Sur Maderas*`,
-      `📅 ${d}/${m}/${y} | Sucursal ${sucLabel}`,
+      `*Resumen del día — Sur Maderas*`,
+      `${d}/${m}/${y} | Sucursal ${sucLabel}`,
       ``,
-      `🔄 Transferencias: ${fmt$(caja.total_transf)}`,
-      `🔗 Link de pago: ${fmt$(caja.total_link ?? 0)}`,
-      `💳 Tarjetas: ${fmt$(caja.total_tarjetas)}`,
+      `*Transferencias: ${fmt$(caja.total_transf)}*`,
+      ...lineTransf,
+      ``,
+      `*Link de pago: ${fmt$(caja.total_link ?? 0)}*`,
+      ...lineLinks,
+      ``,
+      `*Tarjetas: ${fmt$(caja.total_tarjetas)}*`,
       `   · PROVINCIA: ${fmt$(caja.tarjeta_provincia)}`,
       `   · NAVE: ${fmt$(caja.tarjeta_nave)}`,
-      `   · FRANCÉS: ${fmt$(caja.tarjeta_frances)}`,
+      `   · FRANCES: ${fmt$(caja.tarjeta_frances)}`,
       `   · COMAFI: ${fmt$(caja.tarjeta_comafi)}`,
       ``,
-      `⬆️ Gastos + Retiros: ${fmt$(caja.total_salidas)}`,
+      `*Gastos: ${fmt$(caja.total_gastos)}*`,
+      ...lineGastos,
       ``,
-      `💰 *TOTAL DEL DÍA: ${fmt$(caja.total_del_dia)}*`,
-      caja.observaciones ? `\n📝 ${caja.observaciones}` : '',
+      `*Retiros: ${fmt$(caja.total_retiros)}*`,
+      ...lineRetiros,
+      ``,
+      `*TOTAL DEL DIA: ${fmt$(totalDia)}*`,
+      caja.observaciones ? `\nObs: ${caja.observaciones}` : '',
     ].filter(Boolean).join('\n')
 
     const url = `https://wa.me/${GUSTAVO_WA}?text=${encodeURIComponent(msg)}`
