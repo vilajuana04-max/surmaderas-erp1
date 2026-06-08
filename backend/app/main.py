@@ -71,22 +71,9 @@ def _seed_users():
 _seed_users()
 
 # ── CORS ────────────────────────────────────────────────────────
-# En producción, solo el frontend de Vercel/Render puede conectarse.
-# En desarrollo, se permiten localhost.
-FRONTEND_URL = os.getenv("FRONTEND_URL", "")
-
-ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:5173",
-]
-
-if FRONTEND_URL:
-    ALLOWED_ORIGINS.append(FRONTEND_URL)
-
-# Permite cualquier subdominio de vercel.app y onrender.com para previews
-ALLOWED_ORIGIN_REGEX = (
-    r"https://(.*\.vercel\.app|.*\.onrender\.com|surmaderas.*\.vercel\.app)"
-)
+# App interna de Sur Maderas — aceptamos cualquier origen para
+# evitar conflictos de preflight con URLs de preview de Vercel.
+# La autenticación se maneja con JWT en el header Authorization.
 
 app = FastAPI(
     title       = "Sur Maderas ERP API",
@@ -98,11 +85,10 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins       = ALLOWED_ORIGINS,
-    allow_origin_regex  = ALLOWED_ORIGIN_REGEX,
-    allow_credentials   = True,
-    allow_methods       = ["*"],
-    allow_headers       = ["*"],
+    allow_origins     = ["*"],   # all origins — app interna, JWT protege los datos
+    allow_credentials = False,   # debe ser False cuando allow_origins=["*"]
+    allow_methods     = ["*"],
+    allow_headers     = ["*"],
 )
 
 app.include_router(auth_router)
