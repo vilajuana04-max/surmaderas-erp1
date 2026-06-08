@@ -18,8 +18,14 @@ router = APIRouter(prefix="/payroll", tags=["Sueldos"])
 def list_periods(
     year:      Optional[int] = None,
     branch_id: Optional[int] = None,
+    month:     Optional[str] = None,
     db: Session = Depends(get_db)
 ):
+    # Si viene month+year, auto-crear ambos períodos si no existen
+    if month and year:
+        for bid in [1, 2]:
+            _get_or_create_period(month, year, bid, db)
+
     q = db.query(PayrollPeriod)
     if year:
         q = q.filter(PayrollPeriod.year == year)

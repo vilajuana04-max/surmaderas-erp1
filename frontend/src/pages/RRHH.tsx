@@ -844,8 +844,10 @@ function SueldosTab() {
   const [localEdits, setLocalEdits] = useState<Record<number, Record<string, any>>>({})
 
   const load = useCallback(() => {
-    api.get<any[]>(`/payroll/periods?year=${year}`).then(setPeriods).catch(() => setPeriods([]))
-  }, [year])
+    // month en la URL → el backend auto-crea los períodos si no existen
+    api.get<any[]>(`/payroll/periods?year=${year}&month=${month}`)
+      .then(setPeriods).catch(() => setPeriods([]))
+  }, [year, month])
 
   const loadHistory = useCallback(() => {
     api.get<any[]>('/payroll/periods').then(setHistoryPeriods)
