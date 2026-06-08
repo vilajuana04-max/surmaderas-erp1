@@ -859,6 +859,15 @@ function SueldosTab() {
   useEffect(() => { load() }, [load])
   useEffect(() => { if (vista === 'historial') loadHistory() }, [vista, loadHistory])
 
+  // Reintenta cargar cada 3s hasta que ambos períodos estén disponibles
+  useEffect(() => {
+    const needsRetry = !periods.some(p => p.month === month && p.year === year && p.branch_id === 1)
+                    || !periods.some(p => p.month === month && p.year === year && p.branch_id === 2)
+    if (!needsRetry) return
+    const t = setTimeout(load, 3000)
+    return () => clearTimeout(t)
+  }, [periods, month, year, load])
+
   const getPeriod = (branchId: number) =>
     periods.find(p => p.branch_id === branchId && p.month === month && p.year === year)
 
@@ -1260,7 +1269,7 @@ ${cards}
                 {items.length === 0 && (
                   <tr>
                     <td colSpan={14} className="px-5 py-6 text-center text-gray-300 text-xs font-body">
-                      {period ? 'Sin empleados en este período.' : 'Preparando planilla…'}
+                      {period ? 'Sin empleados activos en esta sucursal.' : 'Conectando con el servidor…'}
                     </td>
                   </tr>
                 )}
@@ -1400,11 +1409,7 @@ ${cards}
               Por horas: Bruto = Horas × $×Hora · Percibido = Bruto − Adelantos
             </p>
           </div>
-        ) : (
-          <div className="px-5 py-4 text-center text-gray-300 text-xs font-body animate-pulse">
-            Preparando planilla…
-          </div>
-        )}
+        ) : null}
       </div>
     )
   }
