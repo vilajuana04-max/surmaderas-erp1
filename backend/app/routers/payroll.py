@@ -5,9 +5,8 @@ from typing import Optional
 from app.database import get_db
 from app.models import PayrollPeriod, PayrollItem, Employee, Branch
 from app.schemas import PayrollItemCreate, PayrollItemOut, PayrollPeriodOut
-from app.services.pdf_generator import (
-    generate_payroll_pdf, generate_payslips_pdf, generate_single_payslip_pdf
-)
+# Los imports de PDF son lazy (dentro de cada función) para que un fallo
+# de WeasyPrint no rompa todo el router de sueldos.
 
 router = APIRouter(prefix="/payroll", tags=["Sueldos"])
 
@@ -123,6 +122,7 @@ def export_single_payslip(item_id: int, db: Session = Depends(get_db)):
     period = item.period
     if not period:
         raise HTTPException(404, "Periodo no encontrado")
+    from app.services.pdf_generator import generate_single_payslip_pdf
     pdf_bytes = generate_single_payslip_pdf(item, period)
     safe_name = (item.employee.name or "empleado").replace(", ", "_").replace(" ", "_")
     return Response(
@@ -137,6 +137,7 @@ def export_payroll_pdf(period_id: int, db: Session = Depends(get_db)):
     period = db.query(PayrollPeriod).filter(PayrollPeriod.id == period_id).first()
     if not period:
         raise HTTPException(404, "Periodo no encontrado")
+    from app.services.pdf_generator import generate_payroll_pdf
     pdf_bytes = generate_payroll_pdf(period)
     return Response(
         content    = pdf_bytes,
@@ -150,6 +151,7 @@ def export_payslips(period_id: int, db: Session = Depends(get_db)):
     period = db.query(PayrollPeriod).filter(PayrollPeriod.id == period_id).first()
     if not period:
         raise HTTPException(404, "Periodo no encontrado")
+    from app.services.pdf_generator import generate_payslips_pdf
     pdf_bytes = generate_payslips_pdf(period)
     return Response(
         content    = pdf_bytes,
