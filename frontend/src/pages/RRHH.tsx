@@ -5,6 +5,7 @@ import {
   Upload, CheckCircle, Clock, X, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { api, fmt$, MONTHS, CURRENT_YEAR, CURRENT_MONTH_IDX } from '../api'
+import { reqWithRetry } from '../api/client'
 
 const NAVY  = '#070614'
 const CORAL = '#C8603A'
@@ -875,7 +876,9 @@ function SueldosTab() {
   const createPeriod = async (branchId: number) => {
     setCreating(true)
     try {
-      await api.post(`/payroll/periods?month=${month}&year=${year}&branch_id=${branchId}`, {})
+      // Reintentos automáticos por si Render está despertando (free tier)
+      const url = `/payroll/periods?month=${month}&year=${year}&branch_id=${branchId}`
+      await reqWithRetry(url, { method: 'POST', body: '{}' }, 3, 5000)
       await new Promise<void>(res => {
         api.get<any[]>(`/payroll/periods?year=${year}`).then(data => { setPeriods(data); res() })
       })

@@ -7,6 +7,16 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
+// ── Ping de calentamiento para Render free tier ───────────────────
+// Se llama una sola vez al cargar la app. Si el servidor está durmiendo,
+// este fetch lo despierta silenciosamente antes de que el usuario haga algo.
+let _pinged = false
+export function warmupServer() {
+  if (_pinged || !BASE) return
+  _pinged = true
+  fetch(`${BASE}/health`, { method: 'GET' }).catch(() => { /* silencioso */ })
+}
+
 async function req<T>(path: string, opts?: RequestInit): Promise<T> {
   const url = `${BASE}${path}`
   let res: Response
@@ -25,6 +35,24 @@ async function req<T>(path: string, opts?: RequestInit): Promise<T> {
   }
   if (res.status === 204) return undefined as T
   return res.json()
+}
+
+// ── req con reintentos automáticos ────────────────────────────────
+// Reintenta hasta `retries` veces con espera creciente.
+// Útil para POST/PUT cuando Render está despertando.
+export async function reqWithRetry<T>(
+  path: string, opts: RequestInit, retries = 3, delayMs = 4000
+): Promise<T> {
+  let last: Error = new Error('timeout')
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await req<T>(path, opts)
+    } catch (e: unknown) {
+      last = e instanceof Error ? e : new Error(String(e))
+      if (i < retries - 1) await new Promise(r => setTimeout(r, delayMs))
+    }
+  }
+  throw last
 }
 
 export const api = {
