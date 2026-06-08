@@ -843,14 +843,9 @@ function SueldosTab() {
   // Estado de edición local — actualiza los cálculos sin esperar al servidor
   const [localEdits, setLocalEdits] = useState<Record<number, Record<string, any>>>({})
 
-  const load = useCallback(async () => {
-    // Auto-crear períodos para ambas sucursales si no existen (vía GET para evitar preflight CORS)
-    await Promise.allSettled([
-      api.get(`/payroll/periods/ensure?month=${month}&year=${year}&branch_id=1`),
-      api.get(`/payroll/periods/ensure?month=${month}&year=${year}&branch_id=2`),
-    ])
-    api.get<any[]>(`/payroll/periods?year=${year}`).then(setPeriods)
-  }, [month, year])
+  const load = useCallback(() => {
+    api.get<any[]>(`/payroll/periods?year=${year}`).then(setPeriods).catch(() => setPeriods([]))
+  }, [year])
 
   const loadHistory = useCallback(() => {
     api.get<any[]>('/payroll/periods').then(setHistoryPeriods)
@@ -1161,6 +1156,24 @@ ${cards}
     return f > 1 ? String(Math.round((f - 1) * 100)) : ''
   }
 
+  /* Auto-crea el período al montar o cambiar mes */
+  useEffect(() => {
+    const ensure = async () => {
+      try {
+        await reqWithRetry(
+          `/payroll/periods?month=${month}&year=${year}&branch_id=1`,
+          { method: 'POST', body: '{}' }, 2, 3000
+        )
+        await reqWithRetry(
+          `/payroll/periods?month=${month}&year=${year}&branch_id=2`,
+          { method: 'POST', body: '{}' }, 2, 3000
+        )
+        load()
+      } catch { load() }
+    }
+    ensure()
+  }, [month, year]) // eslint-disable-line
+
   /* ── Render single-branch full table ── */
   const renderBranchTable = (branchId: number, branchName: string) => {
     const period   = getPeriod(branchId)
@@ -1215,7 +1228,7 @@ ${cards}
           </div>
         </div>
 
-        {period ? (
+        {true ? (
           <div className="overflow-x-auto">
             {/*
               Columnas exactas del Excel:
@@ -1242,6 +1255,13 @@ ${cards}
                 </tr>
               </thead>
               <tbody>
+                {items.length === 0 && (
+                  <tr>
+                    <td colSpan={14} className="px-5 py-6 text-center text-gray-300 text-xs font-body">
+                      {period ? 'Sin empleados en este período.' : 'Preparando planilla…'}
+                    </td>
+                  </tr>
+                )}
                 {items.map((item: any, i: number) => {
                   const m         = merged(item)   // item + ediciones locales en curso
                   const liveBruto = calcBruto(m)
@@ -1379,8 +1399,8 @@ ${cards}
             </p>
           </div>
         ) : (
-          <div className="px-5 py-12 text-center text-gray-400 text-sm font-body">
-            <div className="animate-pulse">Cargando planilla…</div>
+          <div className="px-5 py-4 text-center text-gray-300 text-xs font-body animate-pulse">
+            Preparando planilla…
           </div>
         )}
       </div>
