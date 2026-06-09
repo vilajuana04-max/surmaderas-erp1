@@ -1,3 +1,4 @@
+// Sección Clientes — base de datos con compras y cupones (sync automático)
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api'
 import {
