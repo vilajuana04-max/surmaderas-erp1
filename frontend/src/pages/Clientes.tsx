@@ -71,6 +71,17 @@ export default function Clientes() {
     return () => clearTimeout(t)
   }, [load])
 
+  // Auto-sincronización con el registro de cupones al abrir la sección (silenciosa)
+  useEffect(() => {
+    let cancelado = false
+    setSync(true)
+    api.post('/clientes/sync-cupones', {})
+      .then(() => { if (!cancelado) load() })
+      .catch(() => { /* silencioso: si el server de encuestas no responde, no rompe la sección */ })
+      .finally(() => { if (!cancelado) setSync(false) })
+    return () => { cancelado = true }
+  }, [])  // eslint-disable-line
+
   // Recargar el cliente seleccionado tras una acción
   const refreshSel = (c: Cliente) => {
     setSel(c)
@@ -100,8 +111,9 @@ export default function Clientes() {
         </div>
         <div className="flex gap-2">
           <button onClick={importarCupones} disabled={sync}
-            className="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50">
-            <RefreshCw size={15} className={sync ? 'animate-spin' : ''}/> {sync ? 'Importando…' : 'Importar de cupones'}
+            className="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
+            title="Se sincroniza automáticamente al abrir. Tocá para forzar ahora.">
+            <RefreshCw size={15} className={sync ? 'animate-spin' : ''}/> {sync ? 'Sincronizando…' : 'Sincronizar ahora'}
           </button>
           <button onClick={() => setCreando(true)}
             style={{ background: CORAL }}
@@ -307,13 +319,6 @@ function ClienteDetalle({ cliente, onClose, onChange, onDeleted }: {
     finally { setBusy(false) }
   }
 
-  const toggleCuponRegistro = async () => {
-    setBusy(true)
-    try {
-      apply(await api.put<Cliente>(`/clientes/${c.id}`, { cupon_registro_usado: !c.cupon_registro_usado }))
-    } finally { setBusy(false) }
-  }
-
   const bajaFeliz15 = async () => {
     if (!window.confirm(`¿Dar de baja el cupón FELIZ15 de ${c.nombre} para ${ANIO_ACTUAL}? Solo se puede una vez por año.`)) return
     setBusy(true)
@@ -435,7 +440,7 @@ function ClienteDetalle({ cliente, onClose, onChange, onDeleted }: {
               <Gift size={13}/> Cupones
             </p>
 
-            {/* Cupón de registro */}
+            {/* Cupón de registro — estado sincronizado desde el sistema de cupones (solo lectura) */}
             <div className="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2.5 mb-2">
               <div className="flex items-center gap-2">
                 <Ticket size={15} style={{ color: CORAL }} />
@@ -443,16 +448,16 @@ function ClienteDetalle({ cliente, onClose, onChange, onDeleted }: {
                   <p className="text-sm font-semibold text-gray-700">Cupón de registro (15% OFF)</p>
                   <p className="text-[11px] text-gray-400">
                     {c.cupon_registro_usado ? `Usado el ${fmtFecha(c.cupon_registro_fecha)}` : 'Disponible'}
+                    <span className="ml-1 text-gray-300">· se sincroniza solo</span>
                   </p>
                 </div>
               </div>
-              <button onClick={toggleCuponRegistro} disabled={busy}
-                className="text-xs font-bold px-3 py-1.5 rounded-lg disabled:opacity-50"
+              <span className="text-xs font-bold px-3 py-1.5 rounded-lg"
                 style={c.cupon_registro_usado
-                  ? { background: '#16a34a', color: 'white' }
-                  : { background: '#f3f4f6', color: '#374151' }}>
-                {c.cupon_registro_usado ? '✓ Usado' : 'Marcar usado'}
-              </button>
+                  ? { background: '#16a34a18', color: '#16a34a' }
+                  : { background: '#f3f4f6', color: '#9ca3af' }}>
+                {c.cupon_registro_usado ? '✓ Usado' : 'Disponible'}
+              </span>
             </div>
 
             {/* Cupón FELIZ15 (cumpleaños) */}
