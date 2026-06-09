@@ -1108,6 +1108,74 @@ td{padding:5px 8px;border-bottom:1px solid #eee;font-size:9pt}
     if (win) { win.document.write(html); win.document.close() }
   }
 
+  /* Planilla combinada de AMBAS sucursales en un solo PDF */
+  const printPlanillaAmbas = () => {
+    const buildTable = (period: any, branchName: string) => {
+      if (!period || !(period.items?.length)) {
+        return `<h2>${branchName}</h2><p style="color:#999">Sin liquidación para este mes.</p>`
+      }
+      const items: any[] = period.items
+      const totBruto = items.reduce((a: number, i: any) => a + calcBruto(merged(i)), 0)
+      const totPerc  = items.reduce((a: number, i: any) => a + calcPerc(merged(i)),  0)
+      const rows = items.map((item, idx) => {
+        const m = merged(item)
+        const pct = factorToPct(m.plus_factor)
+        const com = parseFloat(m.comision) || 0
+        return `<tr style="background:${idx%2===0?'#fff':'#fafaf8'}">
+          <td style="text-align:center;color:#C8603A;font-weight:bold">${idx+1}</td>
+          <td>${m.employee_name}</td>
+          <td>${m.inasistencias_desc||'—'}</td>
+          <td style="text-align:right">${parseFloat(m.adelanto)>0?fmtARS(parseFloat(m.adelanto)):'—'}</td>
+          <td style="text-align:right">${parseFloat(m.deposito_banco)>0?fmtARS(parseFloat(m.deposito_banco)):'—'}</td>
+          <td style="text-align:right">${com>0?fmtARS(com):'—'}</td>
+          <td style="text-align:center">${pct?pct+'%':'—'}</td>
+          <td style="text-align:right">${calcPlusP(m)>0?fmtARS(calcPlusP(m)):'—'}</td>
+          <td style="text-align:right;background:#FFFBEB;color:#92400E;font-weight:bold">${fmtARS(calcBruto(m))}</td>
+          <td style="text-align:right;background:#ECFDF5;color:#065F46;font-weight:bold">${fmtARS(calcPerc(m))}</td>
+        </tr>`
+      }).join('')
+      return `<h2>${branchName}</h2>
+        <table>
+        <thead><tr>
+          <th>N°</th><th>Empleado</th><th>Inasistencias</th>
+          <th style="text-align:right">Adelantos</th><th style="text-align:right">Dep. Banco</th>
+          <th style="text-align:right">Comisión</th><th style="text-align:center">Plus</th>
+          <th style="text-align:right">Plus $</th>
+          <th style="text-align:right;background:#92400E">Total Bruto</th>
+          <th style="text-align:right;background:#065F46">Total Percibido</th>
+        </tr></thead>
+        <tbody>${rows}
+        <tr class="tot">
+          <td colspan="8">TOTALES ${branchName}</td>
+          <td style="text-align:right">${fmtARS(totBruto)}</td>
+          <td style="text-align:right">${fmtARS(totPerc)}</td>
+        </tr></tbody></table>`
+    }
+
+    const luro  = buildTable(getPeriod(1), 'LURO')
+    const indep = buildTable(getPeriod(2), 'INDEPENDENCIA')
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Sueldos Ambas Sucursales ${month} ${year}</title>
+<style>${pdfCSS}
+h1{color:#070614;font-size:14pt;margin-bottom:4px}
+h2{color:#C8603A;font-size:11pt;margin:18px 0 6px}
+p{color:#666;font-size:9pt;margin:0 0 12px}
+table{width:100%;border-collapse:collapse;margin-bottom:8px}
+th{background:#070614;color:#fff;padding:6px 8px;font-size:8pt;text-align:left}
+td{padding:5px 8px;border-bottom:1px solid #eee;font-size:9pt}
+.tot td{background:#070614;color:#fff;font-weight:bold}
+</style></head><body>
+<h1>Liquidación de Sueldos — Ambas Sucursales</h1>
+<p>${month} ${year}</p>
+${luro}
+${indep}
+<script>window.onload=function(){window.print()}</script>
+</body></html>`
+    const win = window.open('', '_blank', 'width=1000,height=700')
+    if (win) { win.document.write(html); win.document.close() }
+  }
+
   /* Todos los recibos de una sucursal en una sola ventana */
   const printAllPayslips = (period: any, branchName: string) => {
     if (!period) return
@@ -1471,9 +1539,28 @@ ${cards}
 
     return (
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div style={{ background: NAVY }} className="px-5 py-3">
-          <p className="text-white text-sm font-bold font-head tracking-wide">PLANILLA SUELDOS — AMBAS SUCURSALES</p>
-          <p className="text-white/50 text-[11px] font-body">{month} {year}</p>
+        <div style={{ background: NAVY }} className="px-5 py-3 flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <p className="text-white text-sm font-bold font-head tracking-wide">PLANILLA SUELDOS — AMBAS SUCURSALES</p>
+            <p className="text-white/50 text-[11px] font-body">{month} {year}</p>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <button onClick={printPlanillaAmbas}
+              disabled={allItems.length === 0}
+              className="bg-white/20 hover:bg-white/30 disabled:opacity-40 text-white px-3 py-1.5 rounded-lg text-xs font-semibold font-body flex items-center gap-1">
+              <FileDown size={12} /> Planilla PDF (ambas)
+            </button>
+            <button onClick={() => printPlanilla(getPeriod(1), 'LURO')}
+              disabled={!periodLuro?.items?.length}
+              className="bg-white/20 hover:bg-white/30 disabled:opacity-40 text-white px-3 py-1.5 rounded-lg text-xs font-semibold font-body flex items-center gap-1">
+              <FileDown size={12} /> Solo Luro
+            </button>
+            <button onClick={() => printPlanilla(getPeriod(2), 'INDEPENDENCIA')}
+              disabled={!periodIndep?.items?.length}
+              className="bg-white/20 hover:bg-white/30 disabled:opacity-40 text-white px-3 py-1.5 rounded-lg text-xs font-semibold font-body flex items-center gap-1">
+              <FileDown size={12} /> Solo Independencia
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[600px] text-sm border-collapse">
