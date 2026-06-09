@@ -54,43 +54,78 @@ function fmtDate(iso: string) {
 }
 
 // ── PesosInput ────────────────────────────────────────────────────
-// Muestra el número formateado (100.000) cuando no está en foco,
-// y deja escribir dígitos libres cuando está activo.
-function PesosInput({ value, disabled, onSave, className }: {
+// Formato es-AR: miles con punto, decimales con coma (ej: 55.000,04).
+// Acepta hasta 2 decimales ingresados con coma.
+function parsePesos(s: string): number {
+  if (!s) return 0
+  // Quita separadores de miles (.) y convierte la coma decimal en punto
+  const limpio = s.replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '')
+  const n = parseFloat(limpio)
+  return isNaN(n) ? 0 : n
+}
+function fmtPesos(n: number): string {
+  if (!n) return ''
+  return n.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+}
+
+function PesosInput({ value, disabled, onSave, className, confirmable }: {
   value: number; disabled: boolean
   onSave: (n: number) => void
   className?: string
+  confirmable?: boolean   // muestra un botón ✓ para aprobar el valor
 }) {
-  const fmt = (n: number) => n ? n.toLocaleString('es-AR') : ''
-  const [display, setDisplay] = useState(fmt(value))
+  const [display, setDisplay] = useState(fmtPesos(value))
   const [focused, setFocused] = useState(false)
+  const [dirty,   setDirty]   = useState(false)
 
   useEffect(() => {
-    if (!focused) setDisplay(fmt(value))
+    if (!focused) setDisplay(fmtPesos(value))
   }, [value, focused])
 
-  return (
+  const commit = () => {
+    const n = parsePesos(display)
+    setDisplay(fmtPesos(n))
+    setDirty(false)
+    setFocused(false)
+    onSave(n)
+  }
+
+  const input = (
     <input
       type="text"
-      inputMode="numeric"
+      inputMode="decimal"
       value={display}
       disabled={disabled}
       placeholder="0"
       className={className}
       onFocus={e => {
         setFocused(true)
-        const raw = String(value || '')
-        setDisplay(raw)
+        setDisplay(value ? String(value).replace('.', ',') : '')
         setTimeout(() => e.target.select(), 0)
       }}
-      onChange={e => setDisplay(e.target.value.replace(/[^\d]/g, ''))}
-      onBlur={() => {
-        setFocused(false)
-        const n = parseInt(display || '0', 10) || 0
-        setDisplay(fmt(n))
-        onSave(n)
-      }}
+      onChange={e => { setDisplay(e.target.value.replace(/[^\d.,]/g, '')); setDirty(true) }}
+      onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+      onBlur={commit}
     />
+  )
+
+  if (!confirmable) return input
+
+  return (
+    <div className="flex items-center gap-1">
+      {input}
+      {dirty && !disabled && (
+        <button
+          type="button"
+          // onMouseDown para que dispare antes del blur del input
+          onMouseDown={e => { e.preventDefault(); commit() }}
+          title="Aprobar"
+          className="shrink-0 text-[11px] font-bold text-white rounded px-1.5 py-0.5"
+          style={{ background: '#8b5cf6' }}>
+          ✓
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -102,6 +137,7 @@ function InlineRow({ mov, tipo, disabled, onChange, onDelete }: {
 }) {
   const [desc, setDesc] = useState(mov.descripcion)
   const [cat,  setCat]  = useState(mov.categoria || GASTO_CATS[0])
+  const [confirmDel, setConfirmDel] = useState(false)
 
   return (
     <div className="flex items-center gap-2 py-1.5 group">
@@ -123,11 +159,29 @@ function InlineRow({ mov, tipo, disabled, onChange, onDelete }: {
         onSave={n => { if (n !== mov.monto) onChange(mov.id, { monto: n }) }}
         className="w-24 text-sm text-right bg-transparent border-b border-gray-200 focus:border-gray-400 outline-none px-1 py-0.5 disabled:opacity-50"
       />
-      {!disabled && (
-        <button onClick={() => onDelete(mov.id)}
+      {!disabled && !confirmDel && (
+        <button onClick={() => setConfirmDel(true)}
           className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity shrink-0">
           <Trash2 size={13} />
         </button>
+      )}
+      {!disabled && confirmDel && (
+        <div className="flex items-center gap-1 shrink-0">
+          <span className="text-[10px] text-red-500 font-semibold">¿Borrar?</span>
+          <button onClick={() => {
+              if (window.confirm(`¿Seguro que querés borrar "${mov.descripcion || 'este ítem'}"? Esta acción no se puede deshacer.`)) {
+                onDelete(mov.id)
+              }
+              setConfirmDel(false)
+            }}
+            className="text-[10px] font-bold text-white bg-red-500 hover:bg-red-600 rounded px-1.5 py-0.5">
+            Sí
+          </button>
+          <button onClick={() => setConfirmDel(false)}
+            className="text-[10px] font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 rounded px-1.5 py-0.5">
+            No
+          </button>
+        </div>
       )}
     </div>
   )
@@ -149,7 +203,7 @@ function Section({ title, icon, color, total, items, tipo, disabled, onAdd, onCh
 
   function startAdd() { setAdding(true); setTimeout(() => descRef.current?.focus(), 50) }
   function confirmAdd() {
-    const n = parseInt(monto.replace(/\./g, ''), 10) || 0
+    const n = parsePesos(monto)
     if (desc.trim() || n) onAdd(tipo, desc.trim(), n, tipo === 'gasto' ? cat : undefined)
     setDesc(''); setMonto(''); setCat(GASTO_CATS[0]); setAdding(false)
   }
@@ -185,10 +239,9 @@ function Section({ title, icon, color, total, items, tipo, disabled, onAdd, onCh
               className="flex-1 min-w-0 text-sm border-b outline-none px-1 py-0.5" style={{ borderBottomColor: color }} />
             <input
               value={monto}
-              onChange={e => setMonto(e.target.value.replace(/[^\d]/g, ''))}
-              onFocus={e => { setMonto(monto.replace(/\./g, '')); setTimeout(() => e.target.select(), 0) }}
-              onBlur={() => { const n = parseInt(monto.replace(/\./g, ''), 10)||0; setMonto(n ? n.toLocaleString('es-AR') : '') }}
-              inputMode="numeric" placeholder="0"
+              onChange={e => setMonto(e.target.value.replace(/[^\d.,]/g, ''))}
+              onBlur={() => { const n = parsePesos(monto); setMonto(fmtPesos(n)) }}
+              inputMode="decimal" placeholder="0"
               onKeyDown={e => { if (e.key==='Enter') confirmAdd(); if (e.key==='Escape') cancelAdd() }}
               className="w-24 text-sm text-right border-b outline-none px-1 py-0.5" style={{ borderBottomColor: color }} />
             <button onClick={confirmAdd} className="text-green-500 hover:text-green-700 text-xs font-bold">✓</button>
@@ -663,8 +716,9 @@ export default function CajaDiaria() {
                               <PesosInput
                                 value={val}
                                 disabled={disabled}
+                                confirmable
                                 onSave={n => { if (n !== val) patchCaja({ [key]: n }) }}
-                                className="w-full text-sm font-bold text-right border-b border-gray-200 focus:border-purple-400 outline-none py-0.5 bg-transparent disabled:opacity-50"
+                                className="flex-1 text-sm font-bold text-right border-b border-gray-200 focus:border-purple-400 outline-none py-0.5 bg-transparent disabled:opacity-50"
                               />
                             </div>
                           )

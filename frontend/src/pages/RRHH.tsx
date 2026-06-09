@@ -995,8 +995,8 @@ function SueldosTab() {
     return `
 <div class="card">
   <div class="hdr">
-    <div class="co">SUR MADERAS</div>
-    <div class="doc">RECIBO DE SUELDO &nbsp;·&nbsp; ${branchName}</div>
+    <div class="co">RECIBO DE SUELDO</div>
+    <div class="doc">${branchName}</div>
     <div class="emp">${m.employee_name}</div>
     <div class="per">${month} ${year}</div>
   </div>
