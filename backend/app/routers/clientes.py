@@ -6,9 +6,10 @@ Base de datos de clientes de Sur Maderas.
 - Cupón de registro (15% OFF bienvenida)
 - Cupón de cumpleaños FELIZ15 — baja una sola vez por año
 """
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -93,6 +94,82 @@ def list_clientes(q: Optional[str] = Query(None), db: Session = Depends(get_db))
         )
     clientes = query.order_by(Cliente.nombre).all()
     return [_serialize(c) for c in clientes]
+
+
+# ── Sincronización con el registro de cupones (sistema de encuestas) ──
+def _norm_sucursal(b: str) -> str:
+    b = (b or "").strip().lower()
+    if "luro" in b: return "Luro"
+    if "indep" in b: return "Independencia"
+    return ""
+
+def _parse_iso_date(s: Optional[str]):
+    if not s:
+        return None
+    try:
+        return datetime.fromisoformat(s.replace("Z", "+00:00")).date()
+    except Exception:
+        return None
+
+
+@router.post("/sync-cupones")
+async def sync_cupones(db: Session = Depends(get_db)):
+    """Importa/actualiza clientes desde las encuestas de cupones de registro."""
+    from app.routers.cupones import _get_token, _auth_headers, ENCUESTAS_BASE
+
+    token = await _get_token()
+    async with httpx.AsyncClient(timeout=20) as client:
+        res = await client.get(f"{ENCUESTAS_BASE}/api/encuestas", headers=_auth_headers(token))
+    if not res.is_success:
+        raise HTTPException(502, f"No se pudo obtener las encuestas ({res.status_code})")
+
+    data = res.json()
+    items = data.get("items") or data.get("encuestas") or (data if isinstance(data, list) else [])
+
+    creados = 0
+    actualizados = 0
+    for e in items:
+        codigo = (e.get("couponCode") or "").strip().upper()
+        nombre = (e.get("fullName") or "").strip()
+        if not codigo and not nombre:
+            continue
+
+        existente = None
+        if codigo:
+            existente = db.query(Cliente).filter(Cliente.numero_cliente == codigo).first()
+        if not existente and e.get("email"):
+            existente = db.query(Cliente).filter(Cliente.email == e.get("email").strip()).first()
+
+        usado  = bool(e.get("couponUsed"))
+        f_uso  = _parse_iso_date(e.get("couponUsedAt"))
+        suc    = _norm_sucursal(e.get("branch") or "")
+        tel    = (e.get("phone") or "").strip()
+        mail   = (e.get("email") or "").strip()
+
+        if existente:
+            # Completa solo campos vacíos para no pisar ediciones manuales
+            if not existente.numero_cliente and codigo: existente.numero_cliente = codigo
+            if not existente.telefono and tel:  existente.telefono = tel
+            if not existente.email and mail:    existente.email = mail
+            if not existente.sucursal and suc:  existente.sucursal = suc
+            # El estado del cupón de registro SÍ se sincroniza siempre
+            existente.cupon_registro_usado = usado
+            existente.cupon_registro_fecha = f_uso if usado else None
+            actualizados += 1
+        else:
+            db.add(Cliente(
+                numero_cliente       = codigo,
+                nombre               = nombre or "(sin nombre)",
+                telefono             = tel,
+                email                = mail,
+                sucursal             = suc,
+                cupon_registro_usado = usado,
+                cupon_registro_fecha = f_uso if usado else None,
+            ))
+            creados += 1
+
+    db.commit()
+    return {"creados": creados, "actualizados": actualizados, "total_encuestas": len(items)}
 
 
 @router.post("", status_code=201)

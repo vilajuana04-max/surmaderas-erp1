@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api'
 import {
   Users, Search, Plus, X, Trash2, ShoppingBag, Gift, Ticket,
-  CheckCircle, Calendar, Phone, Mail, Cake, MapPin,
+  CheckCircle, Calendar, Phone, Mail, Cake, MapPin, RefreshCw,
 } from 'lucide-react'
 
 const NAVY  = '#070614'
@@ -55,6 +55,7 @@ export default function Clientes() {
   const [loading, setLoading]   = useState(false)
   const [sel, setSel]           = useState<Cliente | null>(null)
   const [creando, setCreando]   = useState(false)
+  const [sync, setSync]         = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -76,6 +77,18 @@ export default function Clientes() {
     setClientes(prev => prev.map(x => x.id === c.id ? c : x))
   }
 
+  const importarCupones = async () => {
+    if (!window.confirm('¿Importar/actualizar clientes desde el registro de cupones?\n\nSe traen los datos de las encuestas (nombre, contacto, sucursal y estado del cupón de registro). No se pisan datos cargados manualmente.')) return
+    setSync(true)
+    try {
+      const r = await api.post<{ creados: number; actualizados: number; total_encuestas: number }>('/clientes/sync-cupones', {})
+      alert(`Listo ✓\n\nNuevos clientes: ${r.creados}\nActualizados: ${r.actualizados}\nEncuestas procesadas: ${r.total_encuestas}`)
+      load()
+    } catch (err: unknown) {
+      alert(`Error al importar: ${err instanceof Error ? err.message : String(err)}`)
+    } finally { setSync(false) }
+  }
+
   return (
     <div className="space-y-5">
       {/* ── Header ── */}
@@ -85,11 +98,17 @@ export default function Clientes() {
           <h1 className="text-2xl font-bold text-white flex items-center gap-2"><Users size={22}/> Clientes</h1>
           <p className="text-white/50 text-sm">Base de datos de clientes, compras y cupones</p>
         </div>
-        <button onClick={() => setCreando(true)}
-          style={{ background: CORAL }}
-          className="flex items-center gap-2 hover:opacity-90 text-white px-4 py-2 rounded-lg text-sm font-semibold">
-          <Plus size={16}/> Nuevo cliente
-        </button>
+        <div className="flex gap-2">
+          <button onClick={importarCupones} disabled={sync}
+            className="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50">
+            <RefreshCw size={15} className={sync ? 'animate-spin' : ''}/> {sync ? 'Importando…' : 'Importar de cupones'}
+          </button>
+          <button onClick={() => setCreando(true)}
+            style={{ background: CORAL }}
+            className="flex items-center gap-2 hover:opacity-90 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+            <Plus size={16}/> Nuevo cliente
+          </button>
+        </div>
       </div>
 
       {/* ── Buscador ── */}
