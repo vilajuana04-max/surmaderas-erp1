@@ -16,6 +16,7 @@ import CajaDiaria       from './pages/CajaDiaria'
 import Comisiones        from './pages/Comisiones'
 import PuntoEquilibrio  from './pages/PuntoEquilibrio'
 import Cupones          from './pages/Cupones'
+import Clientes         from './pages/Clientes'
 
 export default function App() {
   return (
@@ -148,6 +149,17 @@ export default function App() {
             <ProtectedRoute>
               <Layout>
                 <Cupones />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/clientes"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Clientes />
               </Layout>
             </ProtectedRoute>
           }

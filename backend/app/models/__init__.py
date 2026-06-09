@@ -11,6 +11,7 @@ from .cashflow import CashFlowEntry
 from .receipts import PayslipUpload
 from .vencimientos import Vencimiento, VencimientoEstado, VencimientoOneOff
 from .gastos_personales import GastoPersonal
+from .clientes import Cliente, ClienteCompra, ClienteFeliz15
 
 __all__ = [
     "User",
@@ -26,4 +27,5 @@ __all__ = [
     "PayslipUpload",
     "Vencimiento", "VencimientoEstado", "VencimientoOneOff",
     "GastoPersonal",
+    "Cliente", "ClienteCompra", "ClienteFeliz15",
 ]

@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingCart, Package,
-  Users, Receipt, Menu, X, ChevronDown, TrendingUp, Bell, Wallet, LogOut, BookOpen, Percent, Scale, Ticket,
+  Users, Receipt, Menu, X, ChevronDown, TrendingUp, Bell, Wallet, LogOut, BookOpen, Percent, Scale, Ticket, Contact,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
@@ -276,6 +276,19 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
             <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>12</span>
             <Ticket size={16} strokeWidth={2} />
             <span className="tracking-[1px] uppercase text-[12px]">Cupones</span>
+          </NavLink>
+        )}
+
+        {/* ── Clientes — admin y caja_diaria ── */}
+        {canSeeCupones && (
+          <NavLink
+            to="/clientes"
+            onClick={onClose}
+            className={({ isActive }) => navLinkClass(isActive)}
+            style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
+            <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>13</span>
+            <Contact size={16} strokeWidth={2} />
+            <span className="tracking-[1px] uppercase text-[12px]">Clientes</span>
           </NavLink>
         )}
       </nav>
