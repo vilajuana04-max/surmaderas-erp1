@@ -17,6 +17,7 @@ import Comisiones        from './pages/Comisiones'
 import PuntoEquilibrio  from './pages/PuntoEquilibrio'
 import Cupones          from './pages/Cupones'
 import Clientes         from './pages/Clientes'
+import Marketing        from './pages/Marketing'
 
 export default function App() {
   return (
@@ -160,6 +161,17 @@ export default function App() {
             <ProtectedRoute>
               <Layout>
                 <Clientes />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/marketing"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <Layout>
+                <Marketing />
               </Layout>
             </ProtectedRoute>
           }

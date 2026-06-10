@@ -13,3 +13,4 @@ from .vencimientos import router as vencimientos_router
 from .gastos_personales import router as gastos_personales_router
 from .cupones import router as cupones_router
 from .clientes import router as clientes_router
+from .marketing import router as marketing_router
