@@ -161,18 +161,50 @@ function CalendarView({ eventos, cursor, setCursor, onDay, onEvent }: {
   const offset = (primerDia.getDay() + 6) % 7   // lunes = 0
   const diasMes = new Date(y, m + 1, 0).getDate()
 
-  // Map fecha (YYYY-MM-DD) → eventos de ese día
-  const porDia = useMemo(() => {
-    const map: Record<string, Evento[]> = {}
-    eventos.forEach(e => {
-      if (!e.fecha_inicio) return
-      const [yy, mm] = e.fecha_inicio.split('-').map(Number)
-      if (yy === y && mm === m + 1) {
-        (map[e.fecha_inicio] = map[e.fecha_inicio] || []).push(e)
-      }
+  // ── Asignación de carriles (lanes) para barras continuas estilo Google ──
+  // Para cada día (1..diasMes) y cada carril, qué evento lo ocupa.
+  const { lanesPorDia, totalCarriles } = useMemo(() => {
+    const firstOfMonth = new Date(y, m, 1)
+    const lastOfMonth  = new Date(y, m, diasMes)
+
+    // Eventos que se solapan con este mes, con su rango de días en el mes
+    type Tramo = { ev: Evento; sIdx: number; eIdx: number }
+    const tramos: Tramo[] = []
+    eventos.forEach(ev => {
+      if (!ev.fecha_inicio) return
+      const start = new Date(ev.fecha_inicio + 'T12:00')
+      const end   = ev.fecha_fin ? new Date(ev.fecha_fin + 'T12:00') : start
+      if (end < firstOfMonth || start > lastOfMonth) return
+      const effStart = start < firstOfMonth ? firstOfMonth : start
+      const effEnd   = end   > lastOfMonth  ? lastOfMonth  : end
+      tramos.push({ ev, sIdx: effStart.getDate(), eIdx: effEnd.getDate() })
     })
-    return map
-  }, [eventos, y, m])
+
+    // Orden: por día de inicio, y a igual inicio los más largos primero
+    tramos.sort((a, b) => a.sIdx - b.sIdx || (b.eIdx - b.sIdx) - (a.eIdx - a.sIdx))
+
+    // Greedy: el carril libre más bajo cuyo último día ocupado sea < sIdx
+    const finCarril: number[] = []   // último día ocupado por carril
+    const carrilDe = new Map<Evento, number>()
+    tramos.forEach(t => {
+      let lane = 0
+      while (lane < finCarril.length && finCarril[lane] >= t.sIdx) lane++
+      finCarril[lane] = t.eIdx
+      carrilDe.set(t.ev, lane)
+    })
+
+    // Para cada día, array indexado por carril
+    const lanesPorDia: Record<number, (Tramo | null)[]> = {}
+    const total = finCarril.length
+    for (let d = 1; d <= diasMes; d++) {
+      lanesPorDia[d] = Array(total).fill(null)
+    }
+    tramos.forEach(t => {
+      const lane = carrilDe.get(t.ev)!
+      for (let d = t.sIdx; d <= t.eIdx; d++) lanesPorDia[d][lane] = t
+    })
+    return { lanesPorDia, totalCarriles: total }
+  }, [eventos, y, m, diasMes])
 
   const celdas: (number | null)[] = [
     ...Array(offset).fill(null),
@@ -202,10 +234,11 @@ function CalendarView({ eventos, cursor, setCursor, onDay, onEvent }: {
       <div className="grid grid-cols-7">
         {celdas.map((d, i) => {
           const iso = d ? `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}` : ''
-          const evs = d ? (porDia[iso] || []) : []
+          const lanes = d ? lanesPorDia[d] : []
+          const esLunes = i % 7 === 0   // primera columna de la semana
           return (
             <div key={i}
-              className={`min-h-[92px] border-b border-r border-gray-100 p-1.5 ${d ? 'cursor-pointer hover:bg-gray-50' : 'bg-gray-50/40'}`}
+              className={`min-h-[92px] border-b border-r border-gray-100 px-1.5 pt-1.5 pb-1.5 overflow-hidden ${d ? 'cursor-pointer hover:bg-gray-50' : 'bg-gray-50/40'}`}
               onClick={() => d && onDay(iso)}>
               {d && (
                 <div className="flex items-center justify-between mb-1">
@@ -213,17 +246,37 @@ function CalendarView({ eventos, cursor, setCursor, onDay, onEvent }: {
                         style={isHoy(d) ? { background: CORAL } : {}}>{d}</span>
                 </div>
               )}
-              <div className="space-y-1">
-                {evs.map(e => (
-                  <button key={e.id}
-                    onClick={ev => { ev.stopPropagation(); onEvent(e) }}
-                    className="w-full text-left text-[10px] font-semibold text-white rounded px-1.5 py-0.5 truncate"
-                    style={{ background: TIPO_COLOR[e.tipo] }}
-                    title={e.titulo}>
-                    {e.titulo}
-                  </button>
-                ))}
-              </div>
+              {d && (
+                <div className="space-y-1">
+                  {Array.from({ length: totalCarriles }).map((_, lane) => {
+                    const t = lanes[lane]
+                    if (!t) return <div key={lane} className="h-[18px]" />   // espaciador para alinear
+                    const isStart = t.sIdx === d
+                    const isEnd   = t.eIdx === d
+                    // Mostrar el título en el inicio o al comenzar una nueva semana
+                    const showTitle = isStart || esLunes
+                    return (
+                      <button key={lane}
+                        onClick={ev => { ev.stopPropagation(); onEvent(t.ev) }}
+                        title={t.ev.titulo}
+                        className="block text-left text-[10px] font-semibold text-white h-[18px] leading-[18px] truncate"
+                        style={{
+                          background: TIPO_COLOR[t.ev.tipo],
+                          marginLeft:  isStart ? 2 : -7,
+                          marginRight: isEnd   ? 2 : -7,
+                          paddingLeft:  isStart ? 6 : 8,
+                          paddingRight: 6,
+                          borderTopLeftRadius:     isStart ? 4 : 0,
+                          borderBottomLeftRadius:  isStart ? 4 : 0,
+                          borderTopRightRadius:    isEnd   ? 4 : 0,
+                          borderBottomRightRadius: isEnd   ? 4 : 0,
+                        }}>
+                        {showTitle ? t.ev.titulo : ' '}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           )
         })}
