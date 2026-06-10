@@ -22,4 +22,9 @@ class MarketingEvent(Base):
     link_doppler  = Column(String(400), default="")
     es_permanente = Column(Boolean, default=False)
 
+    # Checklist de preparación por canal (JSON: [{texto, canal, hecho}])
+    tareas           = Column(Text, default="[]")
+    # Días antes del lanzamiento en que empieza la ventana de preparación
+    dias_preparacion = Column(Integer, default=0)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())

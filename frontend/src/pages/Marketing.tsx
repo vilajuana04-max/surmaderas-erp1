@@ -14,6 +14,8 @@ const CORAL = '#C8603A'
 type Tipo = 'email_automatico' | 'campaña_manual' | 'promo' | 'fecha_especial' | 'recordatorio'
 type Estado = 'idea' | 'en_progreso' | 'listo' | 'enviado'
 
+interface Tarea { texto: string; canal: string; hecho: boolean }
+
 interface Evento {
   id: number
   titulo: string
@@ -28,6 +30,59 @@ interface Evento {
   asunto_email: string
   link_doppler: string
   es_permanente: boolean
+  tareas: Tarea[]
+  dias_preparacion: number
+}
+
+// ── Checklist por canal — qué preparar para cada uno ──────────────
+const CANAL_TAREAS: Record<string, { label: string; icon: React.ReactNode; tareas: string[] }> = {
+  sucursal_fisica: {
+    label: 'Sucursal física', icon: <Megaphone size={13}/>,
+    tareas: [
+      'Cartelería / señalética en el local',
+      'Actualizar precios y etiquetas',
+      'Briefear al equipo de ventas',
+      'Destacar producto en vidriera / góndola',
+      'Verificar stock suficiente',
+    ],
+  },
+  meta: {
+    label: 'Meta Ads', icon: <Megaphone size={13}/>,
+    tareas: [
+      'Diseñar creatividades (feed + stories)',
+      'Redactar copy del anuncio',
+      'Definir segmentación y público',
+      'Asignar presupuesto y fechas',
+      'Programar campaña en Meta Ads',
+    ],
+  },
+  instagram: {
+    label: 'Instagram orgánico', icon: <Star size={13}/>,
+    tareas: [
+      'Diseñar posts y reels',
+      'Escribir captions y hashtags',
+      'Programar publicaciones',
+      'Preparar stories del día',
+    ],
+  },
+  email: {
+    label: 'Email (Doppler)', icon: <Mail size={13}/>,
+    tareas: [
+      'Diseñar el email en Doppler',
+      'Definir asunto y preheader',
+      'Elegir lista / segmento',
+      'Cargar cupón o descuento',
+      'Programar envío y pegar el link',
+    ],
+  },
+  whatsapp: {
+    label: 'WhatsApp', icon: <MessageCircle size={13}/>,
+    tareas: [
+      'Redactar el mensaje',
+      'Armar lista de difusión',
+      'Definir horario de envío',
+    ],
+  },
 }
 
 const TIPO_COLOR: Record<Tipo, string> = {
@@ -74,6 +129,7 @@ const EMPTY: Omit<Evento, 'id'> = {
   titulo: '', fecha_inicio: null, fecha_fin: null, tipo: 'campaña_manual',
   estado: 'idea', descripcion: '', segmento: 'todos', descuento: '',
   canal: 'email', asunto_email: '', link_doppler: '', es_permanente: false,
+  tareas: [], dias_preparacion: 30,
 }
 
 export default function Marketing() {
@@ -168,16 +224,27 @@ function CalendarView({ eventos, cursor, setCursor, onDay, onEvent }: {
     const lastOfMonth  = new Date(y, m, diasMes)
 
     // Eventos que se solapan con este mes, con su rango de días en el mes
-    type Tramo = { ev: Evento; sIdx: number; eIdx: number }
+    type Tramo = { ev: Evento; sIdx: number; eIdx: number; esPrep: boolean }
     const tramos: Tramo[] = []
+    const pushClamped = (ev: Evento, start: Date, end: Date, esPrep: boolean) => {
+      if (end < firstOfMonth || start > lastOfMonth) return
+      const effStart = start < firstOfMonth ? firstOfMonth : start
+      const effEnd   = end   > lastOfMonth  ? lastOfMonth  : end
+      if (effStart > effEnd) return
+      tramos.push({ ev, sIdx: effStart.getDate(), eIdx: effEnd.getDate(), esPrep })
+    }
     eventos.forEach(ev => {
       if (!ev.fecha_inicio) return
       const start = new Date(ev.fecha_inicio + 'T12:00')
       const end   = ev.fecha_fin ? new Date(ev.fecha_fin + 'T12:00') : start
-      if (end < firstOfMonth || start > lastOfMonth) return
-      const effStart = start < firstOfMonth ? firstOfMonth : start
-      const effEnd   = end   > lastOfMonth  ? lastOfMonth  : end
-      tramos.push({ ev, sIdx: effStart.getDate(), eIdx: effEnd.getDate() })
+      // Ventana de preparación: N días antes del lanzamiento (color tenue)
+      if (ev.dias_preparacion > 0) {
+        const prepStart = new Date(start); prepStart.setDate(prepStart.getDate() - ev.dias_preparacion)
+        const prepEnd   = new Date(start); prepEnd.setDate(prepEnd.getDate() - 1)
+        pushClamped(ev, prepStart, prepEnd, true)
+      }
+      // Evento real
+      pushClamped(ev, start, end, false)
     })
 
     // Orden: por día de inicio, y a igual inicio los más largos primero
@@ -185,12 +252,12 @@ function CalendarView({ eventos, cursor, setCursor, onDay, onEvent }: {
 
     // Greedy: el carril libre más bajo cuyo último día ocupado sea < sIdx
     const finCarril: number[] = []   // último día ocupado por carril
-    const carrilDe = new Map<Evento, number>()
+    const carrilDe = new Map<Tramo, number>()
     tramos.forEach(t => {
       let lane = 0
       while (lane < finCarril.length && finCarril[lane] >= t.sIdx) lane++
       finCarril[lane] = t.eIdx
-      carrilDe.set(t.ev, lane)
+      carrilDe.set(t, lane)
     })
 
     // Para cada día, array indexado por carril
@@ -200,7 +267,7 @@ function CalendarView({ eventos, cursor, setCursor, onDay, onEvent }: {
       lanesPorDia[d] = Array(total).fill(null)
     }
     tramos.forEach(t => {
-      const lane = carrilDe.get(t.ev)!
+      const lane = carrilDe.get(t)!
       for (let d = t.sIdx; d <= t.eIdx; d++) lanesPorDia[d][lane] = t
     })
     return { lanesPorDia, totalCarriles: total }
@@ -258,10 +325,12 @@ function CalendarView({ eventos, cursor, setCursor, onDay, onEvent }: {
                     return (
                       <button key={lane}
                         onClick={ev => { ev.stopPropagation(); onEvent(t.ev) }}
-                        title={t.ev.titulo}
-                        className="block text-left text-[10px] font-semibold text-white h-[18px] leading-[18px] truncate"
+                        title={t.esPrep ? `Preparar: ${t.ev.titulo}` : t.ev.titulo}
+                        className="block text-left text-[10px] font-semibold h-[18px] leading-[18px] truncate"
                         style={{
-                          background: TIPO_COLOR[t.ev.tipo],
+                          background: t.esPrep ? TIPO_COLOR[t.ev.tipo] + '22' : TIPO_COLOR[t.ev.tipo],
+                          color: t.esPrep ? TIPO_COLOR[t.ev.tipo] : '#fff',
+                          border: t.esPrep ? `1px dashed ${TIPO_COLOR[t.ev.tipo]}88` : 'none',
                           marginLeft:  isStart ? 2 : -7,
                           marginRight: isEnd   ? 2 : -7,
                           paddingLeft:  isStart ? 6 : 8,
@@ -271,7 +340,7 @@ function CalendarView({ eventos, cursor, setCursor, onDay, onEvent }: {
                           borderTopRightRadius:    isEnd   ? 4 : 0,
                           borderBottomRightRadius: isEnd   ? 4 : 0,
                         }}>
-                        {showTitle ? t.ev.titulo : ' '}
+                        {showTitle ? (t.esPrep ? 'Preparar: ' + t.ev.titulo : t.ev.titulo) : ' '}
                       </button>
                     )
                   })}
@@ -516,6 +585,24 @@ function EventModal({ ev, onClose, onSaved }: {
 
   const set = (k: keyof Evento, v: unknown) => setF(prev => ({ ...prev, [k]: v }))
 
+  // ── Checklist por canal ──
+  const tareas: Tarea[] = f.tareas ?? []
+  const canalesActivos = new Set(tareas.map(t => t.canal))
+
+  const toggleCanal = (canal: string) => {
+    if (canalesActivos.has(canal)) {
+      set('tareas', tareas.filter(t => t.canal !== canal))
+    } else {
+      const nuevas = CANAL_TAREAS[canal].tareas.map(texto => ({ texto, canal, hecho: false }))
+      set('tareas', [...tareas, ...nuevas])
+    }
+  }
+  const toggleTarea = (idx: number) =>
+    set('tareas', tareas.map((t, i) => i === idx ? { ...t, hecho: !t.hecho } : t))
+
+  const totalTareas = tareas.length
+  const hechas = tareas.filter(t => t.hecho).length
+
   const guardar = async () => {
     if (!f.titulo?.trim()) { alert('El título es obligatorio.'); return }
     setSaving(true)
@@ -599,12 +686,65 @@ function EventModal({ ev, onClose, onSaved }: {
               <label className={lbl}>Descuento (opc.)</label>
               <input className={input} value={f.descuento ?? ''} onChange={e => set('descuento', e.target.value)} placeholder="Ej: 15%" />
             </div>
-            <div className="flex items-end pb-1">
-              <label className="flex items-center gap-2 text-xs text-gray-600">
-                <input type="checkbox" checked={!!f.es_permanente} onChange={e => set('es_permanente', e.target.checked)} />
-                Automatización permanente
+            <div>
+              <label className={lbl} title="Días antes del lanzamiento en que el calendario te muestra el aviso de preparación (tenue)">
+                Preparar (días antes)
               </label>
+              <input type="number" min={0} className={input}
+                value={f.dias_preparacion ?? 0}
+                onChange={e => set('dias_preparacion', parseInt(e.target.value) || 0)} />
             </div>
+          </div>
+
+          <label className="flex items-center gap-2 text-xs text-gray-600">
+            <input type="checkbox" checked={!!f.es_permanente} onChange={e => set('es_permanente', e.target.checked)} />
+            Automatización permanente (sin fecha)
+          </label>
+
+          {/* ── Checklist de preparación por canal ── */}
+          <div className="border-t border-gray-100 pt-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className={lbl}>Checklist por canal</p>
+              {totalTareas > 0 && (
+                <span className="text-[11px] font-semibold" style={{ color: hechas === totalTareas ? '#2D7A3A' : CORAL }}>
+                  {hechas}/{totalTareas} listas
+                </span>
+              )}
+            </div>
+            {/* Toggles de canal */}
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {Object.entries(CANAL_TAREAS).map(([key, { label, icon }]) => (
+                <button key={key} type="button" onClick={() => toggleCanal(key)}
+                  className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-all"
+                  style={canalesActivos.has(key)
+                    ? { background: CORAL, color: 'white', borderColor: CORAL }
+                    : { color: '#555', borderColor: '#e5e7eb' }}>
+                  {icon} {label}
+                </button>
+              ))}
+            </div>
+            {/* Tareas agrupadas por canal */}
+            {totalTareas === 0 ? (
+              <p className="text-[11px] text-gray-300 italic">Elegí los canales para cargar la checklist de cada uno.</p>
+            ) : (
+              <div className="space-y-3">
+                {Object.keys(CANAL_TAREAS).filter(c => canalesActivos.has(c)).map(canal => (
+                  <div key={canal}>
+                    <p className="text-[11px] font-bold text-gray-500 mb-1 flex items-center gap-1">
+                      {CANAL_TAREAS[canal].icon} {CANAL_TAREAS[canal].label}
+                    </p>
+                    <div className="space-y-1">
+                      {tareas.map((t, idx) => t.canal === canal && (
+                        <label key={idx} className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+                          <input type="checkbox" checked={t.hecho} onChange={() => toggleTarea(idx)} />
+                          <span className={t.hecho ? 'line-through text-gray-400' : ''}>{t.texto}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>

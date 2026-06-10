@@ -3,8 +3,9 @@ Calendario de Contenido y Marketing — Sur Maderas.
 CRUD de eventos/campañas + seed de fechas especiales y automatizaciones.
 """
 import calendar
+import json
 from datetime import date
-from typing import Optional
+from typing import Optional, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -40,50 +41,60 @@ def last_weekday(year: int, month: int, weekday: int) -> date:
 
 # ── Schemas ───────────────────────────────────────────────────────
 class EventIn(BaseModel):
-    titulo:        str
-    fecha_inicio:  Optional[date] = None
-    fecha_fin:     Optional[date] = None
-    tipo:          str = "campaña_manual"
-    estado:        str = "idea"
-    descripcion:   Optional[str] = ""
-    segmento:      str = "todos"
-    descuento:     Optional[str] = ""
-    canal:         str = "email"
-    asunto_email:  Optional[str] = ""
-    link_doppler:  Optional[str] = ""
-    es_permanente: bool = False
+    titulo:           str
+    fecha_inicio:     Optional[date] = None
+    fecha_fin:        Optional[date] = None
+    tipo:             str = "campaña_manual"
+    estado:           str = "idea"
+    descripcion:      Optional[str] = ""
+    segmento:         str = "todos"
+    descuento:        Optional[str] = ""
+    canal:            str = "email"
+    asunto_email:     Optional[str] = ""
+    link_doppler:     Optional[str] = ""
+    es_permanente:    bool = False
+    tareas:           list[Any] = []
+    dias_preparacion: int = 0
 
 
 class EventUpdate(BaseModel):
-    titulo:        Optional[str]  = None
-    fecha_inicio:  Optional[date] = None
-    fecha_fin:     Optional[date] = None
-    tipo:          Optional[str]  = None
-    estado:        Optional[str]  = None
-    descripcion:   Optional[str]  = None
-    segmento:      Optional[str]  = None
-    descuento:     Optional[str]  = None
-    canal:         Optional[str]  = None
-    asunto_email:  Optional[str]  = None
-    link_doppler:  Optional[str]  = None
-    es_permanente: Optional[bool] = None
+    titulo:           Optional[str]  = None
+    fecha_inicio:     Optional[date] = None
+    fecha_fin:        Optional[date] = None
+    tipo:             Optional[str]  = None
+    estado:           Optional[str]  = None
+    descripcion:      Optional[str]  = None
+    segmento:         Optional[str]  = None
+    descuento:        Optional[str]  = None
+    canal:            Optional[str]  = None
+    asunto_email:     Optional[str]  = None
+    link_doppler:     Optional[str]  = None
+    es_permanente:    Optional[bool] = None
+    tareas:           Optional[list[Any]] = None
+    dias_preparacion: Optional[int]  = None
 
 
 def _serialize(e: MarketingEvent) -> dict:
+    try:
+        tareas = json.loads(e.tareas) if e.tareas else []
+    except Exception:
+        tareas = []
     return {
-        "id":            e.id,
-        "titulo":        e.titulo,
-        "fecha_inicio":  e.fecha_inicio.isoformat() if e.fecha_inicio else None,
-        "fecha_fin":     e.fecha_fin.isoformat() if e.fecha_fin else None,
-        "tipo":          e.tipo,
-        "estado":        e.estado,
-        "descripcion":   e.descripcion or "",
-        "segmento":      e.segmento,
-        "descuento":     e.descuento or "",
-        "canal":         e.canal,
-        "asunto_email":  e.asunto_email or "",
-        "link_doppler":  e.link_doppler or "",
-        "es_permanente": bool(e.es_permanente),
+        "id":               e.id,
+        "titulo":           e.titulo,
+        "fecha_inicio":     e.fecha_inicio.isoformat() if e.fecha_inicio else None,
+        "fecha_fin":        e.fecha_fin.isoformat() if e.fecha_fin else None,
+        "tipo":             e.tipo,
+        "estado":           e.estado,
+        "descripcion":      e.descripcion or "",
+        "segmento":         e.segmento,
+        "descuento":        e.descuento or "",
+        "canal":            e.canal,
+        "asunto_email":     e.asunto_email or "",
+        "link_doppler":     e.link_doppler or "",
+        "es_permanente":    bool(e.es_permanente),
+        "tareas":           tareas,
+        "dias_preparacion": e.dias_preparacion or 0,
     }
 
 
@@ -103,7 +114,9 @@ def list_events(db: Session = Depends(get_db)):
 @router.post("", status_code=201)
 @router.post("/", status_code=201)
 def create_event(data: EventIn, db: Session = Depends(get_db)):
-    e = MarketingEvent(**data.model_dump())
+    payload = data.model_dump()
+    payload["tareas"] = json.dumps(payload.get("tareas") or [])
+    e = MarketingEvent(**payload)
     db.add(e)
     db.commit()
     db.refresh(e)
@@ -116,6 +129,8 @@ def update_event(event_id: int, data: EventUpdate, db: Session = Depends(get_db)
     if not e:
         raise HTTPException(404, "Evento no encontrado")
     for k, v in data.model_dump(exclude_unset=True).items():
+        if k == "tareas":
+            v = json.dumps(v or [])
         setattr(e, k, v)
     db.commit()
     db.refresh(e)
@@ -158,6 +173,8 @@ def duplicar_evento(event_id: int, anio_siguiente: bool = Query(False), db: Sess
         asunto_email  = e.asunto_email,
         link_doppler  = "",
         es_permanente = e.es_permanente,
+        tareas        = e.tareas,
+        dias_preparacion = e.dias_preparacion,
     )
     db.add(nuevo)
     db.commit()
