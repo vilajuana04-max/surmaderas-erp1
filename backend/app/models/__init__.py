@@ -13,6 +13,7 @@ from .vencimientos import Vencimiento, VencimientoEstado, VencimientoOneOff
 from .gastos_personales import GastoPersonal
 from .clientes import Cliente, ClienteCompra, ClienteFeliz15
 from .marketing import MarketingEvent
+from .contenido import ContentEvent
 
 __all__ = [
     "User",
@@ -30,4 +31,5 @@ __all__ = [
     "GastoPersonal",
     "Cliente", "ClienteCompra", "ClienteFeliz15",
     "MarketingEvent",
+    "ContentEvent",
 ]

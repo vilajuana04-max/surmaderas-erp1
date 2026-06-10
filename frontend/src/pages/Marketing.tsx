@@ -138,12 +138,16 @@ export default function Marketing() {
   const [loading, setLoading] = useState(false)
   const [cursor, setCursor]   = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() } })
   const [modal, setModal]     = useState<{ open: boolean; ev: Partial<Evento> } | null>(null)
+  const [postsPorCampana, setPostsPorCampana] = useState<Record<number, number>>({})
 
   const load = useCallback(async () => {
     setLoading(true)
     try { setEventos(await api.get<Evento[]>('/marketing')) }
     catch { setEventos([]) }
     finally { setLoading(false) }
+    // Conteo de publicaciones de contenido vinculadas a cada campaña
+    api.get<Record<number, number>>('/contenido/counts-por-campana')
+      .then(setPostsPorCampana).catch(() => setPostsPorCampana({}))
   }, [])
 
   useEffect(() => { load() }, [load])
@@ -187,7 +191,7 @@ export default function Marketing() {
           onDay={abrirNuevo} onEvent={abrirEditar} />
       )}
       {!loading && vista === 'lista' && (
-        <ListView eventos={eventos} onEdit={abrirEditar} onReload={load} />
+        <ListView eventos={eventos} onEdit={abrirEditar} onReload={load} postsPorCampana={postsPorCampana} />
       )}
       {!loading && vista === 'resumen' && <ResumenView eventos={eventos} />}
 
@@ -367,8 +371,9 @@ function CalendarView({ eventos, cursor, setCursor, onDay, onEvent }: {
 // ════════════════════════════════════════════════════════════════
 // VISTA LISTA
 // ════════════════════════════════════════════════════════════════
-function ListView({ eventos, onEdit, onReload }: {
+function ListView({ eventos, onEdit, onReload, postsPorCampana }: {
   eventos: Evento[]; onEdit: (e: Evento) => void; onReload: () => void
+  postsPorCampana: Record<number, number>
 }) {
   const [fTipo, setFTipo]   = useState('')
   const [fEstado, setFEstado] = useState('')
@@ -483,7 +488,15 @@ function ListView({ eventos, onEdit, onReload }: {
             {filtrados.map((e, i) => (
               <tr key={e.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}>
                 <td className="px-3 py-2 text-xs font-semibold text-gray-600 whitespace-nowrap">{fmtFecha(e.fecha_inicio)}</td>
-                <td className="px-3 py-2 text-xs font-semibold text-gray-800">{e.titulo}</td>
+                <td className="px-3 py-2 text-xs font-semibold text-gray-800">
+                  {e.titulo}
+                  {postsPorCampana[e.id] > 0 && (
+                    <span className="ml-1.5 text-[9px] font-semibold rounded-full px-1.5 py-0.5 text-white" style={{ background: '#8134AF' }}
+                      title="Publicaciones de contenido vinculadas">
+                      {postsPorCampana[e.id]} posts
+                    </span>
+                  )}
+                </td>
                 <td className="px-3 py-2">
                   <span className="inline-flex items-center gap-1 text-[10px] font-bold text-white rounded px-1.5 py-0.5" style={{ background: TIPO_COLOR[e.tipo] }}>
                     {TIPO_ICON[e.tipo]} {TIPO_LABEL[e.tipo]}
