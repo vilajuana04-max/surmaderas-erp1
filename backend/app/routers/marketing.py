@@ -55,6 +55,7 @@ class EventIn(BaseModel):
     es_permanente:    bool = False
     tareas:           list[Any] = []
     dias_preparacion: int = 0
+    color:            Optional[str] = ""
 
 
 class EventUpdate(BaseModel):
@@ -72,6 +73,7 @@ class EventUpdate(BaseModel):
     es_permanente:    Optional[bool] = None
     tareas:           Optional[list[Any]] = None
     dias_preparacion: Optional[int]  = None
+    color:            Optional[str]  = None
 
 
 def _serialize(e: MarketingEvent) -> dict:
@@ -95,6 +97,7 @@ def _serialize(e: MarketingEvent) -> dict:
         "es_permanente":    bool(e.es_permanente),
         "tareas":           tareas,
         "dias_preparacion": e.dias_preparacion or 0,
+        "color":            e.color or "",
     }
 
 
@@ -111,6 +114,29 @@ def list_events(db: Session = Depends(get_db)):
     return [_serialize(e) for e in eventos]
 
 
+def _sync_doppler_task(e: MarketingEvent, db: Session):
+    """Si la campaña es un email automático con fecha, crea/actualiza una tarea
+    en el planificador de contenido: 'Programar en Doppler'."""
+    if e.tipo != "email_automatico" or not e.fecha_inicio:
+        return
+    from datetime import datetime, time
+    from app.models.contenido import ContentEvent
+    existente = db.query(ContentEvent).filter(ContentEvent.campana_id == e.id).first()
+    fecha = datetime.combine(e.fecha_inicio, time(9, 0))
+    titulo = f"Programar en Doppler: {e.titulo}"
+    if existente:
+        existente.titulo = titulo
+        existente.fecha_publicacion = fecha
+        existente.copy_text = e.descripcion or e.asunto_email or ""
+    else:
+        db.add(ContentEvent(
+            titulo=titulo, redes=json.dumps(["email_doppler"]), tipo="post_estatico",
+            fecha_publicacion=fecha, copy_text=e.descripcion or e.asunto_email or "",
+            estado="borrador", campana_id=e.id, archivos="[]",
+        ))
+    db.commit()
+
+
 @router.post("", status_code=201)
 @router.post("/", status_code=201)
 def create_event(data: EventIn, db: Session = Depends(get_db)):
@@ -120,6 +146,7 @@ def create_event(data: EventIn, db: Session = Depends(get_db)):
     db.add(e)
     db.commit()
     db.refresh(e)
+    _sync_doppler_task(e, db)
     return _serialize(e)
 
 
@@ -134,6 +161,7 @@ def update_event(event_id: int, data: EventUpdate, db: Session = Depends(get_db)
         setattr(e, k, v)
     db.commit()
     db.refresh(e)
+    _sync_doppler_task(e, db)
     return _serialize(e)
 
 

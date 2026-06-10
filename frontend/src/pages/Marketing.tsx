@@ -32,6 +32,12 @@ interface Evento {
   es_permanente: boolean
   tareas: Tarea[]
   dias_preparacion: number
+  color: string
+}
+
+// Color efectivo de un evento: el custom si existe, si no el del tipo
+function colorDe(e: { color?: string; tipo: Tipo }): string {
+  return e.color && e.color.trim() ? e.color : TIPO_COLOR[e.tipo]
 }
 
 // ── Checklist por canal — qué preparar para cada uno ──────────────
@@ -129,7 +135,7 @@ const EMPTY: Omit<Evento, 'id'> = {
   titulo: '', fecha_inicio: null, fecha_fin: null, tipo: 'campaña_manual',
   estado: 'idea', descripcion: '', segmento: 'todos', descuento: '',
   canal: 'email', asunto_email: '', link_doppler: '', es_permanente: false,
-  tareas: [], dias_preparacion: 30,
+  tareas: [], dias_preparacion: 30, color: '',
 }
 
 export default function Marketing() {
@@ -332,9 +338,9 @@ function CalendarView({ eventos, cursor, setCursor, onDay, onEvent }: {
                         title={t.esPrep ? `Preparar: ${t.ev.titulo}` : t.ev.titulo}
                         className="block text-left text-[10px] font-semibold h-[18px] leading-[18px] truncate"
                         style={{
-                          background: t.esPrep ? TIPO_COLOR[t.ev.tipo] + '22' : TIPO_COLOR[t.ev.tipo],
-                          color: t.esPrep ? TIPO_COLOR[t.ev.tipo] : '#fff',
-                          border: t.esPrep ? `1px dashed ${TIPO_COLOR[t.ev.tipo]}88` : 'none',
+                          background: t.esPrep ? colorDe(t.ev) + '22' : colorDe(t.ev),
+                          color: t.esPrep ? colorDe(t.ev) : '#fff',
+                          border: t.esPrep ? `1px dashed ${colorDe(t.ev)}88` : 'none',
                           marginLeft:  isStart ? 2 : -7,
                           marginRight: isEnd   ? 2 : -7,
                           paddingLeft:  isStart ? 6 : 8,
@@ -440,7 +446,7 @@ function ListView({ eventos, onEdit, onReload, postsPorCampana }: {
             {proximos.map(e => (
               <button key={e.id} onClick={() => onEdit(e)}
                 className="flex items-center gap-1.5 text-xs font-semibold text-white rounded-lg px-2.5 py-1"
-                style={{ background: TIPO_COLOR[e.tipo] }}>
+                style={{ background: colorDe(e) }}>
                 {TIPO_ICON[e.tipo]} {fmtFecha(e.fecha_inicio).slice(0, 5)} · {e.titulo}
               </button>
             ))}
@@ -498,7 +504,7 @@ function ListView({ eventos, onEdit, onReload, postsPorCampana }: {
                   )}
                 </td>
                 <td className="px-3 py-2">
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-white rounded px-1.5 py-0.5" style={{ background: TIPO_COLOR[e.tipo] }}>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-white rounded px-1.5 py-0.5" style={{ background: colorDe(e) }}>
                     {TIPO_ICON[e.tipo]} {TIPO_LABEL[e.tipo]}
                   </span>
                 </td>
@@ -706,6 +712,27 @@ function EventModal({ ev, onClose, onSaved }: {
               <input type="number" min={0} className={input}
                 value={f.dias_preparacion ?? 0}
                 onChange={e => set('dias_preparacion', parseInt(e.target.value) || 0)} />
+            </div>
+          </div>
+
+          {/* Color de la campaña */}
+          <div>
+            <label className={lbl}>Color de la campaña</label>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              {['', '#C8603A', '#2D5A8E', '#2D7A3A', '#E8A030', '#8134AF', '#DC2626', '#0891B2', '#888580'].map(c => (
+                <button key={c} type="button" onClick={() => set('color', c)}
+                  title={c || 'Por defecto (según tipo)'}
+                  className="w-7 h-7 rounded-full border-2 flex items-center justify-center"
+                  style={{
+                    background: c || `${TIPO_COLOR[f.tipo as Tipo] ?? '#ccc'}`,
+                    borderColor: (f.color ?? '') === c ? '#111' : 'transparent',
+                    opacity: c === '' ? 0.5 : 1,
+                  }}>
+                  {c === '' && <span className="text-[8px] font-bold text-white">auto</span>}
+                </button>
+              ))}
+              <input type="color" value={f.color || '#C8603A'} onChange={e => set('color', e.target.value)}
+                className="w-7 h-7 rounded cursor-pointer border border-gray-200" title="Color personalizado" />
             </div>
           </div>
 

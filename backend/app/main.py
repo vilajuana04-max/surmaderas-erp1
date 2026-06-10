@@ -42,6 +42,7 @@ def _run_migrations():
             "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS sin_dep BOOLEAN DEFAULT FALSE;",
             "ALTER TABLE marketing_calendar ADD COLUMN IF NOT EXISTS tareas TEXT DEFAULT '[]';",
             "ALTER TABLE marketing_calendar ADD COLUMN IF NOT EXISTS dias_preparacion INTEGER DEFAULT 0;",
+            "ALTER TABLE marketing_calendar ADD COLUMN IF NOT EXISTS color VARCHAR(20) DEFAULT '';",
         ]:
             db.execute(text(col_sql))
         # Renombrar usuario 'Caja' → 'CAJA' y asegurar role caja_diaria

@@ -4,19 +4,20 @@ import { api } from '../api'
 import {
   Instagram, Facebook, MessageCircle, Image as ImageIcon, Film, Layers, Square,
   Calendar as CalIcon, List, Grid3x3, ChevronLeft, ChevronRight, Plus, X, Trash2,
-  Copy, Edit2, Check, Eye, Upload, AlertTriangle, Download, Clock,
+  Copy, Edit2, Check, Eye, Upload, AlertTriangle, Download, Clock, Mail,
 } from 'lucide-react'
 
 const NAVY  = '#0A0A0A'
 const CORAL = '#C8603A'
 
 // ── Redes ─────────────────────────────────────────────────────────
-type Red = 'instagram_feed' | 'instagram_story' | 'facebook' | 'whatsapp_estado'
+type Red = 'instagram_feed' | 'instagram_story' | 'facebook' | 'whatsapp_estado' | 'email_doppler'
 const REDES: Record<Red, { label: string; corto: string; color: string; bg: string; icon: React.ReactNode }> = {
   instagram_feed:  { label: 'Instagram Feed',  corto: 'IG Feed',  color: '#DD2A7B', bg: 'linear-gradient(45deg,#F58529,#DD2A7B,#8134AF)', icon: <Instagram size={12}/> },
   instagram_story: { label: 'Instagram Story', corto: 'IG Story', color: '#8134AF', bg: '#8134AF', icon: <Instagram size={12}/> },
   facebook:        { label: 'Facebook',        corto: 'Facebook', color: '#1877F2', bg: '#1877F2', icon: <Facebook size={12}/> },
   whatsapp_estado: { label: 'WhatsApp Estado', corto: 'WA Estado',color: '#25D366', bg: '#25D366', icon: <MessageCircle size={12}/> },
+  email_doppler:   { label: 'Email (Doppler)', corto: 'Doppler',  color: '#0891B2', bg: '#0891B2', icon: <Mail size={12}/> },
 }
 const TIPOS: Record<string, { label: string; icon: React.ReactNode }> = {
   post_estatico: { label: 'Post estático', icon: <Square size={13}/> },
@@ -31,7 +32,7 @@ const ESTADO_LABEL: Record<string, string> = {
   borrador: 'Borrador', en_revision: 'En revisión', listo: 'Listo', publicado: 'Publicado',
 }
 const HORARIOS = 'Sugeridos · Instagram 12h y 19h · Facebook 13h y 20h · WhatsApp 8h y 19h'
-const LIMITES: Record<Red, number> = { instagram_feed: 2200, instagram_story: 2200, facebook: 63206, whatsapp_estado: 700 }
+const LIMITES: Record<Red, number> = { instagram_feed: 2200, instagram_story: 2200, facebook: 63206, whatsapp_estado: 700, email_doppler: 100000 }
 
 interface Contenido {
   id: number
@@ -508,7 +509,7 @@ function ContentModal({ ev, campanas, onClose, onSaved }: {
               <div>
                 <label className={lbl}>Redes</label>
                 <div className="grid grid-cols-2 gap-1.5 mt-1">
-                  {(Object.keys(REDES) as Red[]).map(r => (
+                  {(Object.keys(REDES) as Red[]).filter(r => r !== 'email_doppler').map(r => (
                     <button key={r} type="button" onClick={() => toggleRed(r)}
                       className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all"
                       style={redes.includes(r) ? { background: REDES[r].color, color: 'white', borderColor: REDES[r].color } : { color: '#555', borderColor: '#e5e7eb' }}>
@@ -638,7 +639,7 @@ function ContentModal({ ev, campanas, onClose, onSaved }: {
         {editando && (
           <div className="px-6 pt-3 flex flex-wrap items-center gap-2 border-t border-gray-100">
             <span className="text-[11px] font-semibold text-gray-400">Duplicar para otra red:</span>
-            {(Object.keys(REDES) as Red[]).map(r => (
+            {(Object.keys(REDES) as Red[]).filter(r => r !== 'email_doppler').map(r => (
               <button key={r} onClick={() => duplicarPara(r)}
                 className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg border border-gray-200 hover:bg-gray-50"
                 style={{ color: REDES[r].color }}>

@@ -26,5 +26,7 @@ class MarketingEvent(Base):
     tareas           = Column(Text, default="[]")
     # Días antes del lanzamiento en que empieza la ventana de preparación
     dias_preparacion = Column(Integer, default=0)
+    # Color personalizado de la campaña (sobreescribe el color por tipo)
+    color            = Column(String(20), default="")
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
