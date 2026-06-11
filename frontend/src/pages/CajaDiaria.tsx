@@ -802,9 +802,11 @@ export default function CajaDiaria() {
               onClick={async () => {
                 if (!window.confirm('¿Re-sincronizar todas las cajas cerradas con Gastos Luro y Ventas?')) return
                 try {
-                  const r = await api.post<{ cajas_sincronizadas: number; con_error: number; errores: string[] }>('/caja-diaria/resync-cierres', {})
-                  alert(`Listo ✓\nCajas sincronizadas: ${r.cajas_sincronizadas}\nCon error: ${r.con_error}` +
-                        (r.errores.length ? `\n\n${r.errores.join('\n')}` : ''))
+                  const r = await api.post<{ cajas_sincronizadas: number; con_error: number; errores: string[]; gastos_de_caja_total: number; gastos_por_mes: Record<string, number> }>('/caja-diaria/resync-cierres', {})
+                  const meses = Object.entries(r.gastos_por_mes).map(([k, v]) => `${k}: ${v}`).join('\n')
+                  alert(`Listo ✓\nCajas sincronizadas: ${r.cajas_sincronizadas}\nCon error: ${r.con_error}\n` +
+                        `\nGastos de caja en Gastos Luro: ${r.gastos_de_caja_total}\n${meses}` +
+                        (r.errores.length ? `\n\nERRORES:\n${r.errores.join('\n')}` : ''))
                 } catch (err: unknown) {
                   alert(`Error: ${err instanceof Error ? err.message : String(err)}`)
                 }

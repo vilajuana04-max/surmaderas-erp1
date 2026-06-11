@@ -362,6 +362,7 @@ def get_historial(sucursal: str, db: Session = Depends(get_db)):
 @router.post("/resync-cierres")
 def resync_cierres(db: Session = Depends(get_db)):
     """Re-sincroniza Gastos Luro y Ventas para TODAS las cajas ya cerradas."""
+    from app.models.expenses import LuroExpense
     cajas = db.query(CajaDiaria).filter(CajaDiaria.cerrada == True).all()  # noqa: E712
     ok = 0
     errores = []
@@ -371,7 +372,21 @@ def resync_cierres(db: Session = Depends(get_db)):
             errores.append(f"{c.fecha} {c.sucursal}: {'; '.join(errs)}")
         else:
             ok += 1
-    return {"cajas_sincronizadas": ok, "con_error": len(errores), "errores": errores[:10]}
+
+    # Diagnóstico: gastos de caja por mes que quedaron en Gastos Luro
+    rows = db.query(LuroExpense).filter(LuroExpense.caja_id.isnot(None)).all()
+    por_mes: dict = {}
+    for r in rows:
+        k = f"{r.month}/{r.year}"
+        por_mes[k] = por_mes.get(k, 0) + 1
+
+    return {
+        "cajas_sincronizadas": ok,
+        "con_error": len(errores),
+        "errores": errores[:10],
+        "gastos_de_caja_total": len(rows),
+        "gastos_por_mes": por_mes,
+    }
 
 
 # ── GET /caja-diaria/pdf/{caja_id} ───────────────────────────────
