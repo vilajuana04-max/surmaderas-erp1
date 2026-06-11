@@ -65,7 +65,7 @@ function parsePesos(s: string): number {
 }
 function fmtPesos(n: number): string {
   if (!n) return ''
-  return n.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+  return '$ ' + n.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
 }
 
 function PesosInput({ value, disabled, onSave, className, confirmable }: {
@@ -137,7 +137,12 @@ function InlineRow({ mov, tipo, disabled, onChange, onDelete }: {
 }) {
   const [desc, setDesc] = useState(mov.descripcion)
   const [cat,  setCat]  = useState(mov.categoria || GASTO_CATS[0])
-  const [confirmDel, setConfirmDel] = useState(false)
+
+  const pedirBorrar = () => {
+    if (window.confirm(`¿Borrar "${mov.descripcion || 'este ítem'}"?\n\nSí = Aceptar · No = Cancelar`)) {
+      onDelete(mov.id)
+    }
+  }
 
   return (
     <div className="flex items-center gap-2 py-1.5 group">
@@ -159,29 +164,11 @@ function InlineRow({ mov, tipo, disabled, onChange, onDelete }: {
         onSave={n => { if (n !== mov.monto) onChange(mov.id, { monto: n }) }}
         className="w-20 shrink-0 text-sm text-right bg-transparent border-b border-gray-200 focus:border-gray-400 outline-none px-1 py-0.5 disabled:opacity-50"
       />
-      {!disabled && !confirmDel && (
-        <button onClick={() => setConfirmDel(true)}
+      {!disabled && (
+        <button onClick={pedirBorrar}
           className="text-red-300 hover:text-red-600 transition-colors shrink-0">
           <Trash2 size={13} />
         </button>
-      )}
-      {!disabled && confirmDel && (
-        <div className="flex items-center gap-1 shrink-0">
-          <span className="text-[10px] text-red-500 font-semibold">¿Borrar?</span>
-          <button onClick={() => {
-              if (window.confirm(`¿Seguro que querés borrar "${mov.descripcion || 'este ítem'}"? Esta acción no se puede deshacer.`)) {
-                onDelete(mov.id)
-              }
-              setConfirmDel(false)
-            }}
-            className="text-[10px] font-bold text-white bg-red-500 hover:bg-red-600 rounded px-1.5 py-0.5">
-            Sí
-          </button>
-          <button onClick={() => setConfirmDel(false)}
-            className="text-[10px] font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 rounded px-1.5 py-0.5">
-            No
-          </button>
-        </div>
       )}
     </div>
   )

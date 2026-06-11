@@ -174,6 +174,20 @@ def _generate_caja_pdf(data: dict) -> bytes:
         pdf.cell(cw_meta - 3, 5, val, ln=0)
     pdf.set_y(strip_y + 18)
 
+    # ── Escala dinámica: una sola hoja siempre ────────────────────
+    # Calculamos alto de fila (rh) y tamaño de letra (fs) según cuántos
+    # movimientos hay, para que TODO entre en una página.
+    n_g, n_t, n_l, n_r = len(gastos), len(transf), len(links), len(retiros)
+    filas_apiladas = max(n_g or 1, n_t or 1) + max(n_l or 1, n_r or 1) + 4  # +4 tarjetas
+    sec_start = pdf.get_y()
+    TOTALS_H  = 46.0           # parcial + tarjetas/link + total del día
+    FOOTER_H  = 14.0
+    HEADERS_H = 8 + 8 + 11 + 10  # 2 headers de sección + tarjetas + gaps
+    disponible = (pdf.h - FOOTER_H) - sec_start - TOTALS_H - HEADERS_H
+    rh = disponible / filas_apiladas
+    rh = max(3.0, min(6.0, rh))
+    fs = 8.0 if rh >= 5.5 else 7.0 if rh >= 4.5 else 6.0 if rh >= 3.8 else 5.0
+
     # ── Helper: dibujar una seccion con coordenadas fijas ─────────
     def draw_section(title, items, total, hdr_r, hdr_g, hdr_b,
                      x_off, y_off, col_width):
@@ -192,24 +206,24 @@ def _generate_caja_pdf(data: dict) -> bytes:
         if not items:
             pdf.set_xy(x_off, y)
             pdf.set_text_color(160, 160, 160)
-            pdf.set_font("Helvetica", "I", 7.5)
-            pdf.cell(col_width, 6, "  Sin registros", border="LRB", ln=0)
-            y += 6
+            pdf.set_font("Helvetica", "I", max(5.5, fs - 1))
+            pdf.cell(col_width, rh, "  Sin registros", border="LRB", ln=0)
+            y += rh
         else:
             for idx, m in enumerate(items):
                 bg = (250, 250, 252) if idx % 2 == 1 else (255, 255, 255)
                 pdf.set_fill_color(*bg)
                 desc = _safe(m["descripcion"] or "-")[:42]
                 pdf.set_xy(x_off, y)
-                pdf.set_font("Helvetica", "", 8)
+                pdf.set_font("Helvetica", "", fs)
                 pdf.set_text_color(40, 40, 40)
-                pdf.cell(col_width * 0.65, 6, f"  {desc}",
+                pdf.cell(col_width * 0.6, rh, f"  {desc}",
                          border="LB", fill=True, ln=0)
-                pdf.set_xy(x_off + col_width * 0.65, y)
-                pdf.set_font("Helvetica", "B", 8)
-                pdf.cell(col_width * 0.35, 6, _fmt(m["monto"]),
+                pdf.set_xy(x_off + col_width * 0.6, y)
+                pdf.set_font("Helvetica", "B", fs)
+                pdf.cell(col_width * 0.4, rh, _fmt(m["monto"]),
                          border="RB", align="R", fill=True, ln=0)
-                y += 6
+                y += rh
         return y
 
     # ── Secciones en 2 columnas ───────────────────────────────────
@@ -254,22 +268,16 @@ def _generate_caja_pdf(data: dict) -> bytes:
         bg = (250, 250, 252) if idx % 2 == 1 else (255, 255, 255)
         pdf.set_fill_color(*bg)
         pdf.set_xy(x_l, yT)
-        pdf.set_font("Helvetica", "", 8)
+        pdf.set_font("Helvetica", "", fs)
         pdf.set_text_color(40, 40, 40)
-        pdf.cell(col_w * 0.55, 6, f"  {label}", border="LB", fill=True, ln=0)
+        pdf.cell(col_w * 0.55, rh, f"  {label}", border="LB", fill=True, ln=0)
         pdf.set_xy(x_l + col_w * 0.55, yT)
-        pdf.set_font("Helvetica", "B", 8)
-        pdf.cell(col_w * 0.45, 6, _fmt(data[key]),
+        pdf.set_font("Helvetica", "B", fs)
+        pdf.cell(col_w * 0.45, rh, _fmt(data[key]),
                  border="RB", align="R", fill=True, ln=0)
-        yT += 6
+        yT += rh
 
-    pdf.set_y(max(yL3, yT) + 6)
-
-    # Si no entra el bloque de totales (~52mm) en lo que queda de página,
-    # saltamos a una nueva para que el TOTAL nunca quede cortado.
-    if pdf.get_y() + 52 > pdf.h - 12:
-        pdf.add_page()
-        pdf.set_y(15)
+    pdf.set_y(max(yL3, yT) + 5)
 
     # Agrupación: Parcial = Transferencias + Salidas | Tarjetas+Link aparte
     parcial        = data["total_transf"] + data["total_salidas"]
@@ -288,23 +296,23 @@ def _generate_caja_pdf(data: dict) -> bytes:
         pdf.cell(W - 5, h - 2, _fmt(value), ln=0, align="R")
 
     y = pdf.get_y()
-    strip("PARCIAL (Transferencias + Salidas)", parcial, (240, 244, 255), (37, 99, 235), y)
+    strip("PARCIAL (Transferencias + Salidas)", parcial, (240, 244, 255), (37, 99, 235), y, h=10, fs=13)
+    y += 11
+    strip("TARJETAS + LINK DE PAGO", tarjetas_link, (243, 240, 252), (110, 70, 200), y, h=10, fs=13)
     y += 13
-    strip("TARJETAS + LINK DE PAGO", tarjetas_link, (243, 240, 252), (110, 70, 200), y)
-    y += 15
 
     # ── Total del Dia (banner navy, grande) ───────────────────────
     pdf.set_fill_color(NAVY_R, NAVY_G, NAVY_B)
-    pdf.rect(x0, y, W, 22, "F")
-    pdf.set_xy(x0 + 6, y + 7)
+    pdf.rect(x0, y, W, 20, "F")
+    pdf.set_xy(x0 + 6, y + 6)
     pdf.set_font("Helvetica", "B", 12)
     pdf.set_text_color(200, 200, 220)
     pdf.cell(W * 0.45, 8, "TOTAL DEL DIA", ln=0)
-    pdf.set_xy(x0, y + 3)
-    pdf.set_font("Helvetica", "B", 30)
+    pdf.set_xy(x0, y + 2)
+    pdf.set_font("Helvetica", "B", 28)
     pdf.set_text_color(CORAL_R, CORAL_G, CORAL_B)
     pdf.cell(W - 6, 16, _fmt(total_pdf), ln=0, align="R")
-    pdf.set_y(y + 26)
+    pdf.set_y(y + 23)
 
     # ── Observaciones ────────────────────────────────────────────
     if data.get("observaciones"):
