@@ -16,44 +16,40 @@ Base.metadata.create_all(bind=engine)
 
 # ── Migraciones de columnas nuevas (idempotentes) ────────────────
 def _run_migrations():
-    """Agrega columnas nuevas si aún no existen. Seguro de correr múltiples veces."""
+    """Agrega columnas nuevas si aún no existen. Cada sentencia corre en su
+    propia transacción para que un fallo no bloquee las demás."""
     from sqlalchemy import text
     from app.database import SessionLocal
-    db = SessionLocal()
-    try:
-        db.execute(text(
-            "ALTER TABLE caja_movimientos ADD COLUMN IF NOT EXISTS categoria VARCHAR(50);"
-        ))
-        db.execute(text(
-            "ALTER TABLE luro_expenses ADD COLUMN IF NOT EXISTS caja_id INTEGER;"
-        ))
-        # Todas las columnas de payroll_items (la tabla se creó con solo id+period_id+employee_id)
-        for col_sql in [
-            "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS inasistencias_desc VARCHAR(100);",
-            "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS adelanto NUMERIC(15,2) DEFAULT 0;",
-            "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS deposito_banco NUMERIC(15,2) DEFAULT 0;",
-            "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS horas NUMERIC(8,2);",
-            "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS precio_hora NUMERIC(15,2);",
-            "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS plus_factor NUMERIC(5,3);",
-            "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS bruto_manual NUMERIC(15,2);",
-            "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS comision NUMERIC(15,2);",
-            "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS comision_desc VARCHAR(100);",
-            "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS es_base BOOLEAN DEFAULT FALSE;",
-            "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS sin_dep BOOLEAN DEFAULT FALSE;",
-            "ALTER TABLE marketing_calendar ADD COLUMN IF NOT EXISTS tareas TEXT DEFAULT '[]';",
-            "ALTER TABLE marketing_calendar ADD COLUMN IF NOT EXISTS dias_preparacion INTEGER DEFAULT 0;",
-            "ALTER TABLE marketing_calendar ADD COLUMN IF NOT EXISTS color VARCHAR(20) DEFAULT '';",
-        ]:
-            db.execute(text(col_sql))
-        # Renombrar usuario 'Caja' → 'CAJA' y asegurar role caja_diaria
-        db.execute(text(
-            "UPDATE users SET username = 'CAJA', role = 'caja_diaria' WHERE username IN ('Caja', 'caja') AND role != 'admin';"
-        ))
-        db.commit()
-    except Exception as e:
-        print(f"[migration] Error: {e}")
-    finally:
-        db.close()
+
+    statements = [
+        "ALTER TABLE caja_movimientos ADD COLUMN IF NOT EXISTS categoria VARCHAR(50);",
+        "ALTER TABLE luro_expenses ADD COLUMN IF NOT EXISTS caja_id INTEGER;",
+        "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS inasistencias_desc VARCHAR(100);",
+        "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS adelanto NUMERIC(15,2) DEFAULT 0;",
+        "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS deposito_banco NUMERIC(15,2) DEFAULT 0;",
+        "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS horas NUMERIC(8,2);",
+        "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS precio_hora NUMERIC(15,2);",
+        "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS plus_factor NUMERIC(5,3);",
+        "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS bruto_manual NUMERIC(15,2);",
+        "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS comision NUMERIC(15,2);",
+        "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS comision_desc VARCHAR(100);",
+        "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS es_base BOOLEAN DEFAULT FALSE;",
+        "ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS sin_dep BOOLEAN DEFAULT FALSE;",
+        "ALTER TABLE marketing_calendar ADD COLUMN IF NOT EXISTS tareas TEXT DEFAULT '[]';",
+        "ALTER TABLE marketing_calendar ADD COLUMN IF NOT EXISTS dias_preparacion INTEGER DEFAULT 0;",
+        "ALTER TABLE marketing_calendar ADD COLUMN IF NOT EXISTS color VARCHAR(20) DEFAULT '';",
+        "UPDATE users SET username = 'CAJA', role = 'caja_diaria' WHERE username IN ('Caja', 'caja') AND role != 'admin';",
+    ]
+    for sql in statements:
+        db = SessionLocal()
+        try:
+            db.execute(text(sql))
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            print(f"[migration] '{sql[:50]}...' -> {e}")
+        finally:
+            db.close()
 
 _run_migrations()
 
