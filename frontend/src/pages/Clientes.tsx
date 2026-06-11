@@ -23,6 +23,7 @@ interface Cliente {
   notas: string
   cupon_registro_usado: boolean
   cupon_registro_fecha: string | null
+  cupon_feliz_code?: string
   total_compras: number
   ultima_compra: string | null
   compras: Compra[]
@@ -467,8 +468,12 @@ function ClienteDetalle({ cliente, onClose, onChange, onDeleted }: {
                 <div className="flex items-center gap-2">
                   <Cake size={15} style={{ color: '#ec4899' }} />
                   <div>
-                    <p className="text-sm font-semibold text-gray-700">FELIZ15 (cumpleaños)</p>
-                    <p className="text-[11px] text-gray-400">Una baja por año</p>
+                    <p className="text-sm font-semibold text-gray-700">Cupón de cumpleaños</p>
+                    <p className="text-[11px] text-gray-400">
+                      {c.cupon_feliz_code
+                        ? <>Código: <span className="font-mono font-bold text-pink-600">{c.cupon_feliz_code}</span> · una baja por año</>
+                        : 'Asigná un N° de cliente para generar el código'}
+                    </p>
                   </div>
                 </div>
                 <button onClick={bajaFeliz15} disabled={busy || feliz15EsteAnio}

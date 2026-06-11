@@ -88,10 +88,17 @@ function estadoCupon(e: Encuesta): { label: string; color: string; bg: string; i
   return               { label: 'Activo',        color: '#16a34a', bg: '#F0FDF4', icon: <CheckCircle size={12}/> }
 }
 
+// ── Resultado del cupón de cumpleaños FELIZ ───────────────────────
+interface FelizResult {
+  code: string; cliente_id: number; nombre: string; telefono: string; email: string
+  numero_cliente: string; anio: number; usado_este_anio: boolean; usado_fecha: string | null
+}
+
 // ── Componente de búsqueda rápida (inline en la tabla) ────────────
 function BusquedaRapida({ onValidar }: { onValidar: () => void }) {
   const [code,      setCode]      = useState('')
   const [cupon,     setCupon]     = useState<Encuesta | null>(null)
+  const [feliz,     setFeliz]     = useState<FelizResult | null>(null)
   const [msg,       setMsg]       = useState<{ text: string; ok: boolean } | null>(null)
   const [searching, setSearching] = useState(false)
   const [validating,setValidating]= useState(false)
@@ -100,15 +107,26 @@ function BusquedaRapida({ onValidar }: { onValidar: () => void }) {
     e.preventDefault()
     const c = code.trim().toUpperCase()
     if (!c) return
-    setSearching(true); setCupon(null); setMsg(null)
+    setSearching(true); setCupon(null); setFeliz(null); setMsg(null)
     try {
-      const res = await fetch(`${API}/cupones/consultar`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        credentials: 'omit', body: JSON.stringify({ couponCode: c }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.detail || 'No encontrado')
-      setCupon(data.coupon ?? data)
+      // Cupón de cumpleaños: FELIZ + número de cliente
+      if (c.startsWith('FELIZ')) {
+        const res = await fetch(`${API}/clientes/cupon-feliz/consultar`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          credentials: 'omit', body: JSON.stringify({ code: c }),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.detail || 'No encontrado')
+        setFeliz(data)
+      } else {
+        const res = await fetch(`${API}/cupones/consultar`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          credentials: 'omit', body: JSON.stringify({ couponCode: c }),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.detail || 'No encontrado')
+        setCupon(data.coupon ?? data)
+      }
     } catch (err: unknown) {
       setMsg({ text: err instanceof Error ? err.message : 'Error', ok: false })
     } finally { setSearching(false) }
@@ -133,6 +151,24 @@ function BusquedaRapida({ onValidar }: { onValidar: () => void }) {
     } finally { setValidating(false) }
   }
 
+  const darDeBajaFeliz = async () => {
+    if (!feliz) return
+    if (!window.confirm(`¿Dar de baja el cupón de cumpleaños de ${feliz.nombre} para ${feliz.anio}? Solo se puede una vez por año.`)) return
+    setValidating(true); setMsg(null)
+    try {
+      const res = await fetch(`${API}/clientes/cupon-feliz/validar`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        credentials: 'omit', body: JSON.stringify({ code: feliz.code }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail || 'Error')
+      setFeliz(prev => prev ? { ...prev, usado_este_anio: true } : prev)
+      setMsg({ text: '✓ Cupón de cumpleaños dado de baja', ok: true })
+    } catch (err: unknown) {
+      setMsg({ text: err instanceof Error ? err.message : 'Error', ok: false })
+    } finally { setValidating(false) }
+  }
+
   const est = cupon ? estadoCupon(cupon) : null
 
   return (
@@ -143,7 +179,7 @@ function BusquedaRapida({ onValidar }: { onValidar: () => void }) {
       </div>
       <form onSubmit={buscar} className="flex gap-2">
         <input value={code} onChange={e => setCode(e.target.value.toUpperCase())}
-          placeholder="Código del cupón…"
+          placeholder="Código del cupón (o FELIZ…)"
           className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm font-mono uppercase tracking-wider focus:outline-none focus:border-gray-400" />
         <button type="submit" disabled={searching || !code.trim()}
           className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white disabled:opacity-50"
@@ -156,6 +192,36 @@ function BusquedaRapida({ onValidar }: { onValidar: () => void }) {
           {msg.text}
         </p>
       )}
+
+      {/* Resultado cupón de cumpleaños FELIZ */}
+      {feliz && (
+        <div className="rounded-xl border overflow-hidden" style={{ borderColor: '#ec489940' }}>
+          <div className="flex items-center gap-2 px-3 py-2" style={{ background: '#fdf2f8' }}>
+            <span style={{ color: '#ec4899' }}>🎂</span>
+            <span className="text-xs font-bold" style={{ color: '#ec4899' }}>
+              {feliz.usado_este_anio ? `Ya usado en ${feliz.anio}` : 'Cupón de cumpleaños · disponible'}
+            </span>
+            <span className="ml-auto font-mono text-xs text-gray-500 font-bold">{feliz.code}</span>
+          </div>
+          <div className="px-3 py-2 space-y-1">
+            <p className="text-sm"><span className="text-gray-400">Cliente: </span><strong>{feliz.nombre}</strong></p>
+            {feliz.telefono && <p className="text-xs text-gray-500">{feliz.telefono} · {feliz.email}</p>}
+            {feliz.usado_este_anio && feliz.usado_fecha && (
+              <p className="text-xs text-gray-400">Usado el {feliz.usado_fecha.split('-').reverse().join('/')}</p>
+            )}
+          </div>
+          {!feliz.usado_este_anio && (
+            <div className="px-3 pb-3">
+              <button onClick={darDeBajaFeliz} disabled={validating}
+                className="w-full py-2 rounded-xl text-sm font-bold text-white disabled:opacity-50"
+                style={{ background: '#ec4899' }}>
+                {validating ? 'Procesando…' : '🎂 Dar de baja cumpleaños'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {cupon && est && (
         <div className="rounded-xl border overflow-hidden" style={{ borderColor: est.color + '40' }}>
           <div className="flex items-center gap-2 px-3 py-2" style={{ background: est.bg }}>

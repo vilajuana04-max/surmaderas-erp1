@@ -61,6 +61,7 @@ def _serialize(c: Cliente) -> dict:
         "notas":            c.notas or "",
         "cupon_registro_usado": bool(c.cupon_registro_usado),
         "cupon_registro_fecha": c.cupon_registro_fecha.isoformat() if c.cupon_registro_fecha else None,
+        "cupon_feliz_code":     f"FELIZ{c.numero_cliente}" if c.numero_cliente else "",
         "total_compras":    len(c.compras),
         "ultima_compra":    c.compras[0].fecha.isoformat() if c.compras else None,
         "compras": [
@@ -170,6 +171,64 @@ async def sync_cupones(db: Session = Depends(get_db)):
 
     db.commit()
     return {"creados": creados, "actualizados": actualizados, "total_encuestas": len(items)}
+
+
+# ── Cupón de cumpleaños por código (FELIZ + número de cliente) ────
+class CuponFelizReq(BaseModel):
+    code: str
+
+
+def _cliente_por_feliz(code: str, db: Session) -> Cliente:
+    c = (code or "").strip().upper()
+    if not c.startswith("FELIZ"):
+        raise HTTPException(400, "No es un cupón de cumpleaños (debe empezar con FELIZ).")
+    numero = c[len("FELIZ"):]
+    if not numero:
+        raise HTTPException(400, "Falta el número de cliente en el código.")
+    cliente = db.query(Cliente).filter(Cliente.numero_cliente == numero).first()
+    if not cliente:
+        raise HTTPException(404, f"No hay ningún cliente con el número {numero}.")
+    return cliente
+
+
+@router.post("/cupon-feliz/consultar")
+def consultar_feliz(body: CuponFelizReq, db: Session = Depends(get_db)):
+    cliente = _cliente_por_feliz(body.code, db)
+    year = date.today().year
+    usado = db.query(ClienteFeliz15).filter(
+        ClienteFeliz15.cliente_id == cliente.id,
+        ClienteFeliz15.anio == year,
+    ).first()
+    return {
+        "code":            body.code.strip().upper(),
+        "cliente_id":      cliente.id,
+        "nombre":          cliente.nombre,
+        "telefono":        cliente.telefono or "",
+        "email":           cliente.email or "",
+        "numero_cliente":  cliente.numero_cliente or "",
+        "anio":            year,
+        "usado_este_anio": bool(usado),
+        "usado_fecha":     usado.fecha.isoformat() if usado else None,
+    }
+
+
+@router.post("/cupon-feliz/validar")
+def validar_feliz(body: CuponFelizReq, db: Session = Depends(get_db)):
+    cliente = _cliente_por_feliz(body.code, db)
+    year = date.today().year
+    ya = db.query(ClienteFeliz15).filter(
+        ClienteFeliz15.cliente_id == cliente.id,
+        ClienteFeliz15.anio == year,
+    ).first()
+    if ya:
+        raise HTTPException(
+            400,
+            f"El cupón de cumpleaños ya fue usado en {year} (el {ya.fecha.strftime('%d/%m/%Y')}). "
+            "Solo se puede usar una vez por año.",
+        )
+    db.add(ClienteFeliz15(cliente_id=cliente.id, anio=year, fecha=date.today()))
+    db.commit()
+    return {"ok": True, "nombre": cliente.nombre, "anio": year}
 
 
 @router.post("", status_code=201)
