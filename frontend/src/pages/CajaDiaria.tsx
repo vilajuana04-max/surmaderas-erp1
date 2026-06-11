@@ -262,8 +262,10 @@ function HistorialRow({ c, onVer, onPdf }: { c: Caja; onVer: () => void; onPdf: 
           </span>
         </div>
         <div className="flex gap-4 mt-0.5">
-          <span className="text-xs text-gray-400">Total: <b className="text-gray-700">{fmt$(c.total_del_dia)}</b></span>
-          <span className="text-xs text-gray-400">Gastos: <b className="text-red-500">{fmt$(c.total_salidas)}</b></span>
+          <span className="text-xs text-gray-400">Total: <b className="text-gray-700">
+            {fmt$(c.total_transf + c.total_salidas + c.total_tarjetas + (c.total_link ?? 0))}
+          </b></span>
+          <span className="text-xs text-gray-400">Gastos: <b className="text-red-500">{fmt$(c.total_gastos)}</b></span>
         </div>
       </div>
       <div className="flex gap-2 shrink-0">
