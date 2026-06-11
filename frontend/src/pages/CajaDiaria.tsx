@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api, fmt$ } from '../api'
+import { reqWithRetry } from '../api/client'
 import {
   Plus, Trash2, Lock, Unlock,
   ArrowDownCircle, ArrowUpCircle, CreditCard, Banknote, Smartphone,
@@ -802,7 +803,8 @@ export default function CajaDiaria() {
               onClick={async () => {
                 if (!window.confirm('¿Re-sincronizar todas las cajas cerradas con Gastos Luro y Ventas?')) return
                 try {
-                  const r = await api.post<{ cajas_sincronizadas: number; con_error: number; errores: string[]; gastos_de_caja_total: number; gastos_por_mes: Record<string, number> }>('/caja-diaria/resync-cierres', {})
+                  // reintenta mientras Render despierta (free tier)
+                  const r = await reqWithRetry<{ cajas_sincronizadas: number; con_error: number; errores: string[]; gastos_de_caja_total: number; gastos_por_mes: Record<string, number> }>('/caja-diaria/resync-cierres', { method: 'POST', body: '{}' }, 4, 6000)
                   const meses = Object.entries(r.gastos_por_mes).map(([k, v]) => `${k}: ${v}`).join('\n')
                   alert(`Listo ✓\nCajas sincronizadas: ${r.cajas_sincronizadas}\nCon error: ${r.con_error}\n` +
                         `\nGastos de caja en Gastos Luro: ${r.gastos_de_caja_total}\n${meses}` +
