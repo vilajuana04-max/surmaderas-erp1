@@ -458,6 +458,29 @@ def update_caja(caja_id: int, body: CajaUpdate, db: Session = Depends(get_db)):
             )
             db.add(luro)
 
+        # ── Derivar Tarjetas y Total del día → Ventas (planilla) ──
+        from app.models.sales import DailySales
+        branch_id = 1 if caja.sucursal == 'luro' else 2
+        d = _serialize_caja(caja)
+        total_tarjetas = d["total_tarjetas"]
+        total_dia = (d["total_transf"] + d["total_salidas"] +
+                     d["total_tarjetas"] + d["total_link"])
+        month_label = MESES_ES[fecha.month - 1].upper()
+
+        venta = db.query(DailySales).filter(
+            DailySales.sale_date == fecha,
+            DailySales.branch_id == branch_id,
+        ).first()
+        if venta:
+            venta.card_payments = total_tarjetas
+            venta.total_amount  = total_dia
+        else:
+            db.add(DailySales(
+                sale_date=fecha, branch_id=branch_id,
+                total_amount=total_dia, card_payments=total_tarjetas,
+                month_label=month_label, year=fecha.year,
+            ))
+
     db.commit()
     db.refresh(caja)
     return _serialize_caja(caja)
