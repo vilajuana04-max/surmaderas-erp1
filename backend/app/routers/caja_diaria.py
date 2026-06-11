@@ -419,8 +419,6 @@ def get_or_create_caja(fecha: DateType, sucursal: str, db: Session = Depends(get
 # ── PUT /caja-diaria/{caja_id} ────────────────────────────────────
 @router.put("/{caja_id}")
 def update_caja(caja_id: int, body: CajaUpdate, db: Session = Depends(get_db)):
-    from app.models.expenses import LuroExpense
-
     caja = db.query(CajaDiaria).filter(CajaDiaria.id == caja_id).first()
     if not caja:
         raise HTTPException(404, "Caja no encontrada")
@@ -432,58 +430,61 @@ def update_caja(caja_id: int, body: CajaUpdate, db: Session = Depends(get_db)):
     if body.observaciones     is not None: caja.observaciones     = body.observaciones
     if body.cerrada           is not None: caja.cerrada           = body.cerrada
 
-    # ── Sync gastos → Gastos Luro cuando se cierra la caja ─────
-    if body.cerrada is True:
-        # Borrar entradas previas de esta caja (idempotente)
-        db.query(LuroExpense).filter(LuroExpense.caja_id == caja_id).delete()
-
-        # Crear una LuroExpense por cada movimiento tipo 'gasto'
-        fecha = caja.fecha
-        month_name = MESES_ES[fecha.month - 1]
-        gastos_movs = [m for m in caja.movimientos if m.tipo == 'gasto']
-        for mov in gastos_movs:
-            luro = LuroExpense(
-                caja_id        = caja_id,
-                month          = month_name,
-                year           = fecha.year,
-                expense_date   = fecha,
-                categoria      = mov.categoria or 'Gastos Caja',
-                subcategoria   = mov.descripcion or '',
-                detail         = mov.descripcion or '',
-                amount         = mov.monto,
-                payment_method = 'efectivo',
-                tipo_costo     = 'variable',
-                pagado         = 'SI',
-                paid_status    = True,
-            )
-            db.add(luro)
-
-        # ── Derivar Tarjetas y Total del día → Ventas (planilla) ──
-        from app.models.sales import DailySales
-        branch_id = 1 if caja.sucursal == 'luro' else 2
-        d = _serialize_caja(caja)
-        total_tarjetas = d["total_tarjetas"]
-        total_dia = (d["total_transf"] + d["total_salidas"] +
-                     d["total_tarjetas"] + d["total_link"])
-        month_label = MESES_ES[fecha.month - 1].upper()
-
-        venta = db.query(DailySales).filter(
-            DailySales.sale_date == fecha,
-            DailySales.branch_id == branch_id,
-        ).first()
-        if venta:
-            venta.card_payments = total_tarjetas
-            venta.total_amount  = total_dia
-        else:
-            db.add(DailySales(
-                sale_date=fecha, branch_id=branch_id,
-                total_amount=total_dia, card_payments=total_tarjetas,
-                month_label=month_label, year=fecha.year,
-            ))
-
+    # Guardar el estado de la caja PRIMERO (el cierre nunca debe fallar
+    # por un problema en las sincronizaciones posteriores).
     db.commit()
     db.refresh(caja)
+
+    # ── Sincronizaciones al cerrar (no bloquean el cierre si fallan) ──
+    if body.cerrada is True:
+        try:
+            _sync_cierre(caja, caja_id, db)
+        except Exception as e:
+            db.rollback()
+            print(f"[caja] sync al cerrar falló: {e}")
+
+    db.refresh(caja)
     return _serialize_caja(caja)
+
+
+def _sync_cierre(caja, caja_id: int, db: Session):
+    """Al cerrar: gastos → Gastos Luro, y tarjetas/total → Ventas."""
+    from app.models.expenses import LuroExpense
+    from app.models.sales import DailySales
+
+    fecha = caja.fecha
+    month_name = MESES_ES[fecha.month - 1]
+
+    # Gastos → Gastos Luro (idempotente)
+    db.query(LuroExpense).filter(LuroExpense.caja_id == caja_id).delete()
+    for mov in [m for m in caja.movimientos if m.tipo == 'gasto']:
+        db.add(LuroExpense(
+            caja_id=caja_id, month=month_name, year=fecha.year, expense_date=fecha,
+            categoria=mov.categoria or 'Gastos Caja',
+            subcategoria=mov.descripcion or '', detail=mov.descripcion or '',
+            amount=mov.monto, payment_method='efectivo', tipo_costo='variable',
+            pagado='SI', paid_status=True,
+        ))
+
+    # Tarjetas + Total del día → Ventas
+    branch_id = 1 if caja.sucursal == 'luro' else 2
+    d = _serialize_caja(caja)
+    total_tarjetas = d["total_tarjetas"]
+    total_dia = d["total_transf"] + d["total_salidas"] + d["total_tarjetas"] + d["total_link"]
+    venta = db.query(DailySales).filter(
+        DailySales.sale_date == fecha, DailySales.branch_id == branch_id,
+    ).first()
+    if venta:
+        venta.card_payments = total_tarjetas
+        venta.total_amount  = total_dia
+    else:
+        db.add(DailySales(
+            sale_date=fecha, branch_id=branch_id,
+            total_amount=total_dia, card_payments=total_tarjetas,
+            month_label=MESES_ES[fecha.month - 1].upper(), year=fecha.year,
+        ))
+
+    db.commit()
 
 
 # ── POST /caja-diaria/{caja_id}/movimientos ───────────────────────

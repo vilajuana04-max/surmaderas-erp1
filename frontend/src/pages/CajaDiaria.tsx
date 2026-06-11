@@ -494,6 +494,8 @@ export default function CajaDiaria() {
       await patchCaja({ cerrada: !caja.cerrada })
       // Forzar recarga del historial la próxima vez que se abra ese tab
       setHistorial([])
+    } catch (err: unknown) {
+      alert(`No se pudo ${caja.cerrada ? 'reabrir' : 'cerrar'} la caja: ${err instanceof Error ? err.message : String(err)}`)
     } finally { setClosing(false) }
   }
 
