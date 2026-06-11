@@ -152,16 +152,16 @@ function InlineRow({ mov, tipo, disabled, onChange, onDelete }: {
       <input value={desc} onChange={e => setDesc(e.target.value)}
         onBlur={() => { if (desc !== mov.descripcion) onChange(mov.id, { descripcion: desc }) }}
         disabled={disabled} placeholder="Descripción…"
-        className="flex-1 text-sm bg-transparent border-b border-gray-200 focus:border-gray-400 outline-none px-1 py-0.5 disabled:opacity-50" />
+        className="flex-1 min-w-0 text-sm bg-transparent border-b border-gray-200 focus:border-gray-400 outline-none px-1 py-0.5 disabled:opacity-50" />
       <PesosInput
         value={mov.monto}
         disabled={disabled}
         onSave={n => { if (n !== mov.monto) onChange(mov.id, { monto: n }) }}
-        className="w-24 text-sm text-right bg-transparent border-b border-gray-200 focus:border-gray-400 outline-none px-1 py-0.5 disabled:opacity-50"
+        className="w-20 shrink-0 text-sm text-right bg-transparent border-b border-gray-200 focus:border-gray-400 outline-none px-1 py-0.5 disabled:opacity-50"
       />
       {!disabled && !confirmDel && (
         <button onClick={() => setConfirmDel(true)}
-          className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity shrink-0">
+          className="text-red-300 hover:text-red-600 transition-colors shrink-0">
           <Trash2 size={13} />
         </button>
       )}
@@ -679,13 +679,17 @@ export default function CajaDiaria() {
 
               {/* ── Parcial del día (cierre de la parte en efectivo) ── */}
               {(() => {
-                const parcial  = caja.total_transf + (caja.total_link ?? 0) + caja.total_salidas
-                const totalDia = parcial + caja.total_tarjetas
+                const parcial       = caja.total_transf + caja.total_salidas
+                const tarjetasLink  = caja.total_tarjetas + (caja.total_link ?? 0)
+                const totalDia      = parcial + tarjetasLink
                 return (
                 <>
                   <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
                     <div className="px-5 py-4 flex items-center justify-between" style={{ background: '#f0f4ff' }}>
-                      <p className="font-bold text-blue-700 text-sm uppercase tracking-wide">Parcial del día</p>
+                      <div>
+                        <p className="font-bold text-blue-700 text-sm uppercase tracking-wide">Parcial del día</p>
+                        <p className="text-[10px] text-blue-400">Transferencias + Salidas</p>
+                      </div>
                       <p className="text-2xl font-bold text-blue-700">{fmt$(parcial)}</p>
                     </div>
                   </div>
@@ -724,6 +728,17 @@ export default function CajaDiaria() {
                           )
                         })}
                       </div>
+                    </div>
+                  </div>
+
+                  {/* ── Tarjetas + Link ── */}
+                  <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                    <div className="px-5 py-4 flex items-center justify-between" style={{ background: '#f3f0fc' }}>
+                      <div>
+                        <p className="font-bold text-sm uppercase tracking-wide" style={{ color: '#8b5cf6' }}>Tarjetas + Link de Pago</p>
+                        <p className="text-[10px]" style={{ color: '#a78bda' }}>Tarjetas {fmt$(caja.total_tarjetas)} + Link {fmt$(caja.total_link ?? 0)}</p>
+                      </div>
+                      <p className="text-2xl font-bold" style={{ color: '#8b5cf6' }}>{fmt$(tarjetasLink)}</p>
                     </div>
                   </div>
 

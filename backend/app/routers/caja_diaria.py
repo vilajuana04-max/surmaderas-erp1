@@ -177,14 +177,16 @@ def _generate_caja_pdf(data: dict) -> bytes:
     # ── Helper: dibujar una seccion con coordenadas fijas ─────────
     def draw_section(title, items, total, hdr_r, hdr_g, hdr_b,
                      x_off, y_off, col_width):
-        # cabecera coloreada
+        # cabecera coloreada: primero el fondo, luego título (izq) y total (der)
         pdf.set_fill_color(hdr_r, hdr_g, hdr_b)
-        pdf.set_xy(x_off, y_off)
-        pdf.set_font("Helvetica", "B", 8.5)
+        pdf.rect(x_off, y_off, col_width, 8, "F")
         pdf.set_text_color(255, 255, 255)
-        pdf.cell(col_width, 8, f"  {title}", ln=0, fill=True)
+        pdf.set_xy(x_off + 2, y_off)
+        pdf.set_font("Helvetica", "B", 8.5)
+        pdf.cell(col_width * 0.55, 8, _safe(title), ln=0, align="L")
         pdf.set_xy(x_off, y_off)
-        pdf.cell(col_width - 2, 8, _fmt(total), ln=0, align="R", fill=True)
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.cell(col_width - 2, 8, _fmt(total), ln=0, align="R")
         y = y_off + 8
         # filas
         if not items:
@@ -237,13 +239,14 @@ def _generate_caja_pdf(data: dict) -> bytes:
 
     # Tarjetas (filas fijas de terminales) — fila 3 lado izquierdo
     pdf.set_fill_color(110, 70, 200)
-    pdf.set_xy(x_l, row3_y)
-    pdf.set_font("Helvetica", "B", 9)
+    pdf.rect(x_l, row3_y, col_w, 11, "F")
     pdf.set_text_color(255, 255, 255)
-    pdf.cell(col_w, 11, "  TARJETAS", ln=0, fill=True)
+    pdf.set_xy(x_l + 2, row3_y)
+    pdf.set_font("Helvetica", "B", 9)
+    pdf.cell(col_w * 0.5, 11, "TARJETAS", ln=0, align="L")
     pdf.set_xy(x_l, row3_y)
-    pdf.set_font("Helvetica", "B", 15)   # total tarjetas mas grande
-    pdf.cell(col_w - 3, 11, _fmt(data["total_tarjetas"]), ln=0, align="R", fill=True)
+    pdf.set_font("Helvetica", "B", 14)   # total tarjetas mas grande
+    pdf.cell(col_w - 3, 11, _fmt(data["total_tarjetas"]), ln=0, align="R")
     yT = row3_y + 11
     for idx, (label, key) in enumerate([
             ("PROVINCIA", "tarjeta_provincia"), ("NAVE",   "tarjeta_nave"),
@@ -262,36 +265,46 @@ def _generate_caja_pdf(data: dict) -> bytes:
 
     pdf.set_y(max(yL3, yT) + 6)
 
-    total_pdf = (data["total_transf"] + data["total_link"] +
-                 data["total_salidas"] + data["total_tarjetas"])
-    parcial   = data["total_transf"] + data["total_link"] + data["total_salidas"]
+    # Si no entra el bloque de totales (~52mm) en lo que queda de página,
+    # saltamos a una nueva para que el TOTAL nunca quede cortado.
+    if pdf.get_y() + 52 > pdf.h - 12:
+        pdf.add_page()
+        pdf.set_y(15)
 
-    # ── Parcial del día (strip azul) ──────────────────────────────
-    par_y = pdf.get_y()
-    pdf.set_fill_color(240, 244, 255)
-    pdf.rect(x0, par_y, W, 11, "F")
-    pdf.set_xy(x0 + 5, par_y + 3)
-    pdf.set_font("Helvetica", "B", 9)
-    pdf.set_text_color(37, 99, 235)
-    pdf.cell(W * 0.5, 5, "PARCIAL DEL DIA", ln=0)
-    pdf.set_xy(x0, par_y + 1)
-    pdf.set_font("Helvetica", "B", 15)
-    pdf.cell(W - 5, 8, _fmt(parcial), ln=0, align="R")
-    pdf.set_y(par_y + 14)
+    # Agrupación: Parcial = Transferencias + Salidas | Tarjetas+Link aparte
+    parcial        = data["total_transf"] + data["total_salidas"]
+    tarjetas_link  = data["total_tarjetas"] + data["total_link"]
+    total_pdf      = parcial + tarjetas_link
+
+    def strip(label, value, bg, fg, y, h=11, fs=14):
+        pdf.set_fill_color(*bg)
+        pdf.rect(x0, y, W, h, "F")
+        pdf.set_text_color(*fg)
+        pdf.set_xy(x0 + 5, y + (h - 5) / 2)
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.cell(W * 0.5, 5, label, ln=0, align="L")
+        pdf.set_xy(x0, y + 1)
+        pdf.set_font("Helvetica", "B", fs)
+        pdf.cell(W - 5, h - 2, _fmt(value), ln=0, align="R")
+
+    y = pdf.get_y()
+    strip("PARCIAL (Transferencias + Salidas)", parcial, (240, 244, 255), (37, 99, 235), y)
+    y += 13
+    strip("TARJETAS + LINK DE PAGO", tarjetas_link, (243, 240, 252), (110, 70, 200), y)
+    y += 15
 
     # ── Total del Dia (banner navy, grande) ───────────────────────
-    tot_y = pdf.get_y()
     pdf.set_fill_color(NAVY_R, NAVY_G, NAVY_B)
-    pdf.rect(x0, tot_y, W, 22, "F")
-    pdf.set_xy(x0 + 6, tot_y + 7)
+    pdf.rect(x0, y, W, 22, "F")
+    pdf.set_xy(x0 + 6, y + 7)
     pdf.set_font("Helvetica", "B", 12)
     pdf.set_text_color(200, 200, 220)
     pdf.cell(W * 0.45, 8, "TOTAL DEL DIA", ln=0)
-    pdf.set_xy(x0, tot_y + 3)
-    pdf.set_font("Helvetica", "B", 30)   # total del dia mucho mas grande
+    pdf.set_xy(x0, y + 3)
+    pdf.set_font("Helvetica", "B", 30)
     pdf.set_text_color(CORAL_R, CORAL_G, CORAL_B)
     pdf.cell(W - 6, 16, _fmt(total_pdf), ln=0, align="R")
-    pdf.set_y(tot_y + 26)
+    pdf.set_y(y + 26)
 
     # ── Observaciones ────────────────────────────────────────────
     if data.get("observaciones"):
