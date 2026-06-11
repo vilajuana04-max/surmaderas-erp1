@@ -794,10 +794,24 @@ export default function CajaDiaria() {
       {/* ══════════════ TAB: HISTORIAL ══════════════ */}
       {tab === 'historial' && (
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-          <div className="px-5 py-3 border-b border-gray-100" style={{ background: NAVY }}>
+          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between gap-2" style={{ background: NAVY }}>
             <p className="text-white/60 text-[11px] font-bold tracking-[2px] uppercase">
               Últimos 60 días — {sucursal === 'luro' ? 'Sucursal Luro' : 'Sucursal Independencia'}
             </p>
+            <button
+              onClick={async () => {
+                if (!window.confirm('¿Re-sincronizar todas las cajas cerradas con Gastos Luro y Ventas?')) return
+                try {
+                  const r = await api.post<{ cajas_sincronizadas: number; con_error: number; errores: string[] }>('/caja-diaria/resync-cierres', {})
+                  alert(`Listo ✓\nCajas sincronizadas: ${r.cajas_sincronizadas}\nCon error: ${r.con_error}` +
+                        (r.errores.length ? `\n\n${r.errores.join('\n')}` : ''))
+                } catch (err: unknown) {
+                  alert(`Error: ${err instanceof Error ? err.message : String(err)}`)
+                }
+              }}
+              className="text-[10px] font-bold text-white bg-white/15 hover:bg-white/25 px-3 py-1.5 rounded-lg whitespace-nowrap">
+              Re-sincronizar cierres
+            </button>
           </div>
 
           {histLoading && <div className="text-center py-10 text-gray-400">Cargando historial…</div>}
