@@ -471,7 +471,8 @@ def _sync_cierre(caja, caja_id: int, db: Session) -> list:
 
     errores = []
     fecha = caja.fecha
-    month_name = MESES_ES[fecha.month - 1]
+    # La planilla de Gastos Luro filtra por mes en MAYÚSCULAS (ej: "JUNIO")
+    month_name = MESES_ES[fecha.month - 1].upper()
 
     # 1) Gastos → Gastos Luro (idempotente)
     try:
