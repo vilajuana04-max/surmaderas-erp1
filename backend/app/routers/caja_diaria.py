@@ -358,6 +358,36 @@ def get_historial(sucursal: str, db: Session = Depends(get_db)):
     return [_serialize_caja(c) for c in cajas]
 
 
+# ── GET /caja-diaria/debug-gastos ────────────────────────────────
+@router.get("/debug-gastos")
+def debug_gastos(db: Session = Depends(get_db)):
+    """Diagnóstico abierto en el navegador: qué hay y qué se sincronizaría."""
+    from app.models.expenses import LuroExpense
+    # Cajas cerradas y cuántos movimientos 'gasto' tiene cada una
+    cerradas = db.query(CajaDiaria).filter(CajaDiaria.cerrada == True).all()  # noqa: E712
+    cajas_info = []
+    for c in cerradas:
+        n_gastos = len([m for m in c.movimientos if m.tipo == 'gasto'])
+        cajas_info.append({"fecha": str(c.fecha), "sucursal": c.sucursal, "gastos_mov": n_gastos})
+    # Gastos de caja ya cargados en Gastos Luro
+    luro_caja = db.query(LuroExpense).filter(LuroExpense.caja_id.isnot(None)).all()
+    por_mes: dict = {}
+    for r in luro_caja:
+        por_mes[f"{r.month}/{r.year}"] = por_mes.get(f"{r.month}/{r.year}", 0) + 1
+    sample = [
+        {"month": r.month, "year": r.year, "amount": float(r.amount or 0),
+         "detail": r.detail, "caja_id": r.caja_id}
+        for r in luro_caja[:8]
+    ]
+    return {
+        "cajas_cerradas": len(cerradas),
+        "cajas": cajas_info,
+        "gastos_de_caja_en_luro_total": len(luro_caja),
+        "gastos_por_mes": por_mes,
+        "muestra": sample,
+    }
+
+
 # ── POST /caja-diaria/resync-cierres ─────────────────────────────
 @router.post("/resync-cierres")
 def resync_cierres(db: Session = Depends(get_db)):
