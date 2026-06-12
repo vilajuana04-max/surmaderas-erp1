@@ -180,7 +180,7 @@ def _generate_caja_pdf(data: dict) -> bytes:
     n_g, n_t, n_l, n_r = len(gastos), len(transf), len(links), len(retiros)
     filas_apiladas = max(n_g or 1, n_t or 1) + max(n_l or 1, n_r or 1) + 4  # +4 tarjetas
     sec_start = pdf.get_y()
-    TOTALS_H  = 46.0           # parcial + tarjetas/link + total del día
+    TOTALS_H  = 72.0           # parcial + salidas + tarjetas/link + total del día
     FOOTER_H  = 14.0
     HEADERS_H = 8 + 8 + 11 + 10  # 2 headers de sección + tarjetas + gaps
     disponible = (pdf.h - FOOTER_H) - sec_start - TOTALS_H - HEADERS_H
@@ -279,27 +279,32 @@ def _generate_caja_pdf(data: dict) -> bytes:
 
     pdf.set_y(max(yL3, yT) + 5)
 
-    # Agrupación: Parcial = Transferencias + Salidas | Tarjetas+Link aparte
-    parcial        = data["total_transf"] + data["total_salidas"]
+    # Agrupación nueva
+    total_salidas  = data["total_transf"] + data["total_gastos"]      # transf + gastos
+    parcial        = data["total_transf"] + data["total_salidas"]     # como en la web
     tarjetas_link  = data["total_tarjetas"] + data["total_link"]
-    total_pdf      = parcial + tarjetas_link
+    total_pdf      = data["total_retiros"] + total_salidas + tarjetas_link  # efectivo + salidas + tarjetas
 
-    def strip(label, value, bg, fg, y, h=11, fs=14):
+    def strip(label, value, bg, fg, y, h=11, val_fs=14, lbl_fs=9):
         pdf.set_fill_color(*bg)
         pdf.rect(x0, y, W, h, "F")
         pdf.set_text_color(*fg)
-        pdf.set_xy(x0 + 5, y + (h - 5) / 2)
-        pdf.set_font("Helvetica", "B", 9)
-        pdf.cell(W * 0.5, 5, label, ln=0, align="L")
+        pdf.set_xy(x0 + 5, y + (h - lbl_fs * 0.4) / 2)
+        pdf.set_font("Helvetica", "B", lbl_fs)
+        pdf.cell(W * 0.55, lbl_fs * 0.4, label, ln=0, align="L")
         pdf.set_xy(x0, y + 1)
-        pdf.set_font("Helvetica", "B", fs)
+        pdf.set_font("Helvetica", "B", val_fs)
         pdf.cell(W - 5, h - 2, _fmt(value), ln=0, align="R")
 
     y = pdf.get_y()
-    strip("PARCIAL (Transferencias + Salidas)", parcial, (240, 244, 255), (37, 99, 235), y, h=10, fs=13)
-    y += 11
-    strip("TARJETAS + LINK DE PAGO", tarjetas_link, (243, 240, 252), (110, 70, 200), y, h=10, fs=13)
-    y += 13
+    # PARCIAL y TOTAL SALIDAS — letra grande (lo que pidió la usuaria)
+    strip("PARCIAL DEL DIA  (Transferencias + Salidas)", parcial, (240, 244, 255), (37, 99, 235), y, h=15, val_fs=20, lbl_fs=11)
+    y += 17
+    strip("TOTAL SALIDAS  (Transferencias + Gastos)", total_salidas, (255, 240, 240), (200, 50, 50), y, h=15, val_fs=20, lbl_fs=11)
+    y += 17
+    # Tarjetas + Link — más chico
+    strip("TARJETAS + LINK DE PAGO", tarjetas_link, (243, 240, 252), (110, 70, 200), y, h=10, val_fs=13, lbl_fs=9)
+    y += 12
 
     # ── Total del Dia (banner navy, grande) ───────────────────────
     pdf.set_fill_color(NAVY_R, NAVY_G, NAVY_B)
