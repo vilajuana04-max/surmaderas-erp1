@@ -669,24 +669,16 @@ export default function CajaDiaria() {
                   onAdd={addMov} onChange={updateMov} onDelete={deleteMov} />
               </div>
 
-              {/* ── Parcial del día (cierre de la parte en efectivo) ── */}
+              {/* ── Resumen del día ── */}
               {(() => {
-                const parcial       = caja.total_transf + caja.total_salidas
-                const tarjetasLink  = caja.total_tarjetas + (caja.total_link ?? 0)
-                const totalDia      = parcial + tarjetasLink
+                const totalSalidas  = caja.total_transf + caja.total_gastos          // transf + gastos
+                const totalEfectivo = caja.total_retiros                              // retiros
+                const totalTarjetas = caja.total_tarjetas + (caja.total_link ?? 0)    // tarjetas + link
+                const parcial       = caja.total_transf + caja.total_salidas          // como estaba (transf + gastos + retiros)
+                const totalDia      = totalEfectivo + totalSalidas + totalTarjetas
                 return (
                 <>
-                  <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                    <div className="px-5 py-4 flex items-center justify-between" style={{ background: '#f0f4ff' }}>
-                      <div>
-                        <p className="font-bold text-blue-700 text-sm uppercase tracking-wide">Parcial del día</p>
-                        <p className="text-[10px] text-blue-400">Transferencias + Salidas</p>
-                      </div>
-                      <p className="text-2xl font-bold text-blue-700">{fmt$(parcial)}</p>
-                    </div>
-                  </div>
-
-                  {/* ── Sección virtual: Link de Pago + Tarjetas ── */}
+                  {/* ── Link de Pago + Tarjetas (editables) ── */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Section title="Link de Pago" icon={<Smartphone size={16}/>} color="#22c55e"
                       total={caja.total_link ?? 0} items={links} tipo="link" disabled={disabled}
@@ -723,21 +715,45 @@ export default function CajaDiaria() {
                     </div>
                   </div>
 
-                  {/* ── Tarjetas + Link ── */}
+                  {/* ── Desglose: Salidas · Efectivo · Tarjetas ── */}
                   <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                    <div className="px-5 py-4 flex items-center justify-between" style={{ background: '#f3f0fc' }}>
-                      <div>
-                        <p className="font-bold text-sm uppercase tracking-wide" style={{ color: '#8b5cf6' }}>Tarjetas + Link de Pago</p>
-                        <p className="text-[10px]" style={{ color: '#a78bda' }}>Tarjetas {fmt$(caja.total_tarjetas)} + Link {fmt$(caja.total_link ?? 0)}</p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-gray-100">
+                      <div className="px-5 py-4">
+                        <p className="text-xs text-gray-400 font-semibold mb-1">Total Salidas</p>
+                        <p className="text-[10px] text-gray-300 mb-1">Transferencias + Gastos</p>
+                        <p className="text-lg font-bold" style={{ color: '#ef4444' }}>{fmt$(totalSalidas)}</p>
                       </div>
-                      <p className="text-2xl font-bold" style={{ color: '#8b5cf6' }}>{fmt$(tarjetasLink)}</p>
+                      <div className="px-5 py-4">
+                        <p className="text-xs text-gray-400 font-semibold mb-1">Total Efectivo</p>
+                        <p className="text-[10px] text-gray-300 mb-1">Retiros de caja</p>
+                        <p className="text-lg font-bold" style={{ color: '#f59e0b' }}>{fmt$(totalEfectivo)}</p>
+                      </div>
+                      <div className="px-5 py-4">
+                        <p className="text-xs text-gray-400 font-semibold mb-1">Total Tarjetas</p>
+                        <p className="text-[10px] text-gray-300 mb-1">Tarjetas + Link de Pago</p>
+                        <p className="text-lg font-bold" style={{ color: '#8b5cf6' }}>{fmt$(totalTarjetas)}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ── Parcial del día (como estaba) ── */}
+                  <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                    <div className="px-5 py-4 flex items-center justify-between" style={{ background: '#f0f4ff' }}>
+                      <div>
+                        <p className="font-bold text-blue-700 text-sm uppercase tracking-wide">Parcial del día</p>
+                        <p className="text-[10px] text-blue-400">Transferencias + Salidas</p>
+                      </div>
+                      <p className="text-2xl font-bold text-blue-700">{fmt$(parcial)}</p>
                     </div>
                   </div>
 
                   {/* ── Total del día ── */}
                   <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
                     <div className="px-6 py-5 flex items-center justify-between" style={{ background: NAVY }}>
-                      <p className="font-bold text-white text-base uppercase tracking-wide">Total del día</p>
+                      <div>
+                        <p className="font-bold text-white text-base uppercase tracking-wide">Total del día</p>
+                        <p className="text-[10px] text-white/40">Efectivo + Salidas + Tarjetas</p>
+                      </div>
                       <p className="text-4xl font-bold" style={{ color: CORAL }}>{fmt$(totalDia)}</p>
                     </div>
                   </div>
