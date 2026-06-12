@@ -281,7 +281,7 @@ def _generate_caja_pdf(data: dict) -> bytes:
 
     # Agrupación nueva
     total_salidas  = data["total_transf"] + data["total_gastos"]      # transf + gastos
-    parcial        = data["total_transf"] + data["total_salidas"]     # como en la web
+    parcial        = data["total_retiros"] + total_salidas            # efectivo + salidas (excluye tarjetas)
     tarjetas_link  = data["total_tarjetas"] + data["total_link"]
     total_pdf      = data["total_retiros"] + total_salidas + tarjetas_link  # efectivo + salidas + tarjetas
 
@@ -298,7 +298,7 @@ def _generate_caja_pdf(data: dict) -> bytes:
 
     y = pdf.get_y()
     # PARCIAL y TOTAL SALIDAS — letra grande (lo que pidió la usuaria)
-    strip("PARCIAL DEL DIA  (Transferencias + Salidas)", parcial, (240, 244, 255), (37, 99, 235), y, h=15, val_fs=20, lbl_fs=11)
+    strip("PARCIAL DEL DIA  (Efectivo + Salidas)", parcial, (240, 244, 255), (37, 99, 235), y, h=15, val_fs=20, lbl_fs=11)
     y += 17
     strip("TOTAL SALIDAS  (Transferencias + Gastos)", total_salidas, (255, 240, 240), (200, 50, 50), y, h=15, val_fs=20, lbl_fs=11)
     y += 17

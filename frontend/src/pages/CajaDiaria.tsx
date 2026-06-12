@@ -674,7 +674,7 @@ export default function CajaDiaria() {
                 const totalSalidas  = caja.total_transf + caja.total_gastos          // transf + gastos
                 const totalEfectivo = caja.total_retiros                              // retiros
                 const totalTarjetas = caja.total_tarjetas + (caja.total_link ?? 0)    // tarjetas + link
-                const parcial       = caja.total_transf + caja.total_salidas          // como estaba (transf + gastos + retiros)
+                const parcial       = totalEfectivo + totalSalidas                    // efectivo + salidas (excluye tarjetas)
                 const totalDia      = totalEfectivo + totalSalidas + totalTarjetas
                 return (
                 <>
@@ -683,7 +683,7 @@ export default function CajaDiaria() {
                     <div className="px-5 py-4 flex items-center justify-between" style={{ background: '#f0f4ff' }}>
                       <div>
                         <p className="font-bold text-blue-700 text-sm uppercase tracking-wide">Parcial del día</p>
-                        <p className="text-[10px] text-blue-400">Transferencias + Salidas</p>
+                        <p className="text-[10px] text-blue-400">Total Efectivo + Total Salidas</p>
                       </div>
                       <p className="text-2xl font-bold text-blue-700">{fmt$(parcial)}</p>
                     </div>
