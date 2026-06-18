@@ -15,6 +15,7 @@ const RRHH_SUB = [
   { tab: 'sueldos',    label: 'Sueldos'    },
   { tab: 'recibos',    label: 'Recibos'    },
   { tab: 'dashboard',  label: 'Dashboard'  },
+  { tab: 'puestos',    label: 'Puestos'    },
   { tab: 'ajustes',    label: 'Ajustes'    },
 ]
 

@@ -16,7 +16,7 @@ const BRANCHES  = [
 ]
 
 /* ── Tipos ──────────────────────────────────────────────────── */
-type Tab = 'vacaciones' | 'sueldos' | 'recibos' | 'calendario' | 'dashboard' | 'ajustes'
+type Tab = 'vacaciones' | 'sueldos' | 'recibos' | 'calendario' | 'dashboard' | 'ajustes' | 'puestos'
 
 type VacRecord = {
   id: number; year: number; employee_id: number; employee_name: string
@@ -57,6 +57,7 @@ export default function RRHH() {
     { id: 'sueldos',    label: 'Sueldos',    subtitle: 'Liquidacion mensual'        },
     { id: 'recibos',    label: 'Recibos',    subtitle: 'PDFs por empleado'          },
     { id: 'dashboard',  label: 'Dashboard',  subtitle: 'Metricas de personal'       },
+    { id: 'puestos',    label: 'Puestos',    subtitle: 'Perfiles de cargo'          },
     { id: 'ajustes',    label: 'Ajustes',    subtitle: 'Empleados y configuracion'  },
   ]
   const current = TABS.find(t => t.id === tab) ?? TABS[0]
@@ -93,6 +94,7 @@ export default function RRHH() {
       {tab === 'sueldos'    && <SueldosTab />}
       {tab === 'recibos'    && <RecibosTab />}
       {tab === 'dashboard'  && <DashboardTab />}
+      {tab === 'puestos'    && <PuestosTab />}
       {tab === 'ajustes'    && <AjustesTab />}
     </div>
   )
@@ -2844,6 +2846,240 @@ function AjustesTab() {
           <p className="text-[11px] text-amber-800 font-body font-semibold">
             Formula convenio: &lt; 5 años = 14 días &nbsp;·&nbsp; 5 a 10 años = 21 días &nbsp;·&nbsp; &gt;= 10 años = 28 días
           </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────
+   PUESTOS — perfiles de cargo
+───────────────────────────────────────────────────────────── */
+interface Puesto {
+  id: number
+  titulo: string
+  empleado: string
+  info_empresa: string
+  resumen: string
+  responsabilidades: string[]
+  expectativas: string
+  requisitos: string
+  llamada_accion: string
+  contacto_nombre: string
+  contacto_email: string
+  orden: number
+}
+
+function PuestosTab() {
+  const [puestos, setPuestos] = useState<Puesto[]>([])
+  const [loading, setLoading] = useState(false)
+  const [sel, setSel] = useState<Puesto | null>(null)
+
+  const load = () => {
+    setLoading(true)
+    api.get<Puesto[]>('/puestos').then(setPuestos).catch(() => setPuestos([])).finally(() => setLoading(false))
+  }
+  useEffect(() => { load() }, [])
+
+  const nuevo = () => setSel({
+    id: 0, titulo: '', empleado: '', info_empresa: '', resumen: '',
+    responsabilidades: [], expectativas: '', requisitos: '', llamada_accion: '',
+    contacto_nombre: '', contacto_email: '', orden: puestos.length,
+  })
+
+  if (sel) return <PuestoEditor puesto={sel} onClose={() => setSel(null)} onSaved={() => { setSel(null); load() }} onDeleted={() => { setSel(null); load() }} />
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-brand-border overflow-hidden">
+      <div className="px-5 py-3 flex items-center justify-between" style={{ background: '#f0eeeb' }}>
+        <p className="text-sm font-bold font-head" style={{ color: NAVY }}>Perfiles de Puesto</p>
+        <button onClick={nuevo} className="text-xs font-bold text-white px-3 py-1.5 rounded-lg flex items-center gap-1" style={{ background: CORAL }}>
+          + Nuevo puesto
+        </button>
+      </div>
+      {loading && <p className="text-center py-10 text-gray-400 text-sm">Cargando…</p>}
+      {!loading && (
+        <div className="divide-y divide-gray-100">
+          {puestos.map(p => (
+            <button key={p.id} onClick={() => setSel(p)} className="w-full flex items-center gap-3 px-5 py-3 hover:bg-gray-50 text-left">
+              <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0" style={{ background: NAVY }}>
+                {p.titulo.charAt(0).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-800">{p.titulo}</p>
+                <p className="text-xs text-gray-400">{p.empleado || 'Sin asignar'} · {p.responsabilidades.length} responsabilidades</p>
+              </div>
+              <span className="text-xs text-gray-300">Editar →</span>
+            </button>
+          ))}
+          {puestos.length === 0 && <p className="text-center py-10 text-gray-300 text-sm">Sin puestos cargados</p>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PuestoEditor({ puesto, onClose, onSaved, onDeleted }: {
+  puesto: Puesto; onClose: () => void; onSaved: () => void; onDeleted: () => void
+}) {
+  const [f, setF] = useState<Puesto>({ ...puesto })
+  const [saving, setSaving] = useState(false)
+  const set = (k: keyof Puesto, v: unknown) => setF(prev => ({ ...prev, [k]: v }))
+  const editando = puesto.id > 0
+
+  const guardar = async () => {
+    if (!f.titulo.trim()) { alert('El título del puesto es obligatorio.'); return }
+    setSaving(true)
+    try {
+      const body = { ...f, responsabilidades: f.responsabilidades.filter(r => r.trim()) }
+      if (editando) await api.put(`/puestos/${puesto.id}`, body)
+      else          await api.post('/puestos', body)
+      onSaved()
+    } catch (err: unknown) {
+      alert(`Error: ${err instanceof Error ? err.message : String(err)}`)
+    } finally { setSaving(false) }
+  }
+
+  const eliminar = async () => {
+    if (!editando) { onClose(); return }
+    if (!window.confirm(`¿Eliminar el puesto "${f.titulo}"?`)) return
+    await api.delete(`/puestos/${puesto.id}`)
+    onDeleted()
+  }
+
+  const setResp = (i: number, v: string) => set('responsabilidades', f.responsabilidades.map((r, idx) => idx === i ? v : r))
+  const addResp = () => set('responsabilidades', [...f.responsabilidades, ''])
+  const delResp = (i: number) => set('responsabilidades', f.responsabilidades.filter((_, idx) => idx !== i))
+
+  const exportarPDF = () => {
+    const resp = f.responsabilidades.filter(r => r.trim())
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Perfil del Puesto — ${f.titulo}</title>
+<style>
+  @page { margin: 1.5cm; }
+  body { font-family: Arial, sans-serif; color: #1a1a1a; font-size: 11pt; line-height: 1.45; margin: 0; }
+  .hdr { border-bottom: 3px solid ${CORAL}; padding-bottom: 10px; margin-bottom: 6px; }
+  .company { font-size: 9pt; letter-spacing: 2px; text-transform: uppercase; color: ${CORAL}; font-weight: bold; }
+  h1 { font-size: 24pt; margin: 2px 0 0; color: ${NAVY}; }
+  .empleado { font-size: 11pt; color: #555; margin-top: 2px; }
+  h2 { font-size: 11pt; text-transform: uppercase; letter-spacing: 1px; color: ${NAVY}; margin: 18px 0 4px;
+       border-left: 4px solid ${CORAL}; padding-left: 8px; }
+  p { margin: 4px 0; }
+  ul { margin: 4px 0; padding-left: 20px; }
+  li { margin: 3px 0; }
+  .cta { background: ${NAVY}; color: #fff; padding: 12px 16px; border-radius: 6px; margin-top: 18px; }
+  .cta b { color: ${CORAL}; }
+  .foot { margin-top: 24px; border-top: 1px solid #ddd; padding-top: 6px; font-size: 8pt; color: #999; text-align: center; }
+</style></head><body>
+  <div class="hdr">
+    <div class="company">Sur Maderas · Mar del Plata</div>
+    <h1>${f.titulo}</h1>
+    ${f.empleado ? `<div class="empleado">Ocupado por: <b>${f.empleado}</b></div>` : ''}
+  </div>
+
+  ${f.info_empresa ? `<h2>La empresa</h2><p>${f.info_empresa}</p>` : ''}
+  ${f.resumen ? `<h2>Resumen del puesto</h2><p>${f.resumen}</p>` : ''}
+  ${resp.length ? `<h2>Responsabilidades</h2><ul>${resp.map(r => `<li>${r}</li>`).join('')}</ul>` : ''}
+  ${f.expectativas ? `<h2>Expectativas y compromisos</h2><p>${f.expectativas}</p>` : ''}
+  ${f.requisitos ? `<h2>Requisitos del candidato</h2><p>${f.requisitos}</p>` : ''}
+  ${(f.llamada_accion || f.contacto_email) ? `<div class="cta">${f.llamada_accion || '¿Te interesa este puesto? Envianos tu CV.'}${(f.contacto_nombre || f.contacto_email) ? `<br><br>Contacto: <b>${f.contacto_nombre}</b> ${f.contacto_email ? `· ${f.contacto_email}` : ''}` : ''}</div>` : ''}
+
+  <div class="foot">Sur Maderas · Perfil del Puesto · Documento interno</div>
+  <script>window.onload=function(){window.print()}</script>
+</body></html>`
+    const w = window.open('', '_blank', 'width=900,height=700')
+    if (w) { w.document.write(html); w.document.close() }
+  }
+
+  const input = "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400"
+  const lbl = "text-[11px] font-semibold text-gray-500 uppercase tracking-wide"
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-brand-border overflow-hidden">
+      <div className="px-5 py-3 flex items-center justify-between" style={{ background: NAVY }}>
+        <button onClick={onClose} className="text-white/60 hover:text-white text-xs">← Volver</button>
+        <p className="text-white font-bold text-sm">{editando ? f.titulo : 'Nuevo puesto'}</p>
+        <div className="flex gap-2">
+          <button onClick={exportarPDF} className="text-xs font-bold text-white px-3 py-1.5 rounded-lg" style={{ background: CORAL }}>
+            Exportar PDF
+          </button>
+        </div>
+      </div>
+
+      <div className="p-5 space-y-4 max-w-3xl">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={lbl}>Título del puesto *</label>
+            <input className={input} value={f.titulo} onChange={e => set('titulo', e.target.value)} placeholder="Ej: Vendedor de salón" />
+          </div>
+          <div>
+            <label className={lbl}>Ocupado por</label>
+            <input className={input} value={f.empleado} onChange={e => set('empleado', e.target.value)} placeholder="Ej: Ariel" />
+          </div>
+        </div>
+
+        <div>
+          <label className={lbl}>Información de la empresa</label>
+          <textarea className={input} rows={3} value={f.info_empresa} onChange={e => set('info_empresa', e.target.value)} />
+        </div>
+
+        <div>
+          <label className={lbl}>Resumen del puesto</label>
+          <textarea className={input} rows={3} value={f.resumen} onChange={e => set('resumen', e.target.value)}
+            placeholder="Propósito del puesto, cómo encaja en la operación y a quién reporta." />
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className={lbl}>Responsabilidades (6 a 10)</label>
+            <button onClick={addResp} className="text-xs font-semibold" style={{ color: CORAL }}>+ Agregar</button>
+          </div>
+          <div className="space-y-1.5">
+            {f.responsabilidades.map((r, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <span className="text-xs text-gray-400 w-5 text-right">{i + 1}.</span>
+                <input className={input} value={r} onChange={e => setResp(i, e.target.value)} />
+                <button onClick={() => delResp(i)} className="text-red-300 hover:text-red-600 shrink-0"><Trash2 size={14}/></button>
+              </div>
+            ))}
+            {f.responsabilidades.length === 0 && <p className="text-xs text-gray-300">Tocá "Agregar" para sumar responsabilidades.</p>}
+          </div>
+        </div>
+
+        <div>
+          <label className={lbl}>Expectativas y compromisos</label>
+          <textarea className={input} rows={2} value={f.expectativas} onChange={e => set('expectativas', e.target.value)}
+            placeholder="Horario, tipo de contrato, ubicación, viajes, fines de semana…" />
+        </div>
+
+        <div>
+          <label className={lbl}>Requisitos del candidato</label>
+          <textarea className={input} rows={2} value={f.requisitos} onChange={e => set('requisitos', e.target.value)}
+            placeholder="Habilidades técnicas y blandas, experiencia, formación." />
+        </div>
+
+        <div>
+          <label className={lbl}>Llamada a la acción</label>
+          <textarea className={input} rows={2} value={f.llamada_accion} onChange={e => set('llamada_accion', e.target.value)}
+            placeholder="Frase que invita a postularse." />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={lbl}>Contacto (nombre)</label>
+            <input className={input} value={f.contacto_nombre} onChange={e => set('contacto_nombre', e.target.value)} />
+          </div>
+          <div>
+            <label className={lbl}>Contacto (email)</label>
+            <input className={input} value={f.contacto_email} onChange={e => set('contacto_email', e.target.value)} />
+          </div>
+        </div>
+
+        <div className="flex gap-2 pt-2 border-t border-gray-100">
+          <button onClick={guardar} disabled={saving} className="flex-1 text-white py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50" style={{ background: NAVY }}>
+            {saving ? 'Guardando…' : editando ? 'Guardar cambios' : 'Crear puesto'}
+          </button>
+          <button onClick={eliminar} className="px-4 py-2.5 rounded-xl text-sm font-semibold border border-red-200 text-red-500 hover:bg-red-50">
+            {editando ? 'Eliminar' : 'Cancelar'}
+          </button>
         </div>
       </div>
     </div>

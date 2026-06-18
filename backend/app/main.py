@@ -10,6 +10,7 @@ from app.routers import (
     vacations_router, expenses_router, dashboard_router, employees_router,
     receipts_router, cashflow_router, vencimientos_router, gastos_personales_router,
     caja_diaria_router, cupones_router, clientes_router, marketing_router, contenido_router,
+    puestos_router,
 )
 
 Base.metadata.create_all(bind=engine)
@@ -135,6 +136,7 @@ app.include_router(cupones_router)
 app.include_router(clientes_router)
 app.include_router(marketing_router)
 app.include_router(contenido_router)
+app.include_router(puestos_router)
 
 
 @app.get("/")

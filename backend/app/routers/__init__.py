@@ -15,3 +15,4 @@ from .cupones import router as cupones_router
 from .clientes import router as clientes_router
 from .marketing import router as marketing_router
 from .contenido import router as contenido_router
+from .puestos import router as puestos_router

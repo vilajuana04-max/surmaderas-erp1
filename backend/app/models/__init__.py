@@ -14,6 +14,7 @@ from .gastos_personales import GastoPersonal
 from .clientes import Cliente, ClienteCompra, ClienteFeliz15
 from .marketing import MarketingEvent
 from .contenido import ContentEvent
+from .puestos import Puesto
 
 __all__ = [
     "User",
@@ -32,4 +33,5 @@ __all__ = [
     "Cliente", "ClienteCompra", "ClienteFeliz15",
     "MarketingEvent",
     "ContentEvent",
+    "Puesto",
 ]
