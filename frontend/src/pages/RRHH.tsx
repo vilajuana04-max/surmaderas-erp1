@@ -2855,19 +2855,29 @@ function AjustesTab() {
 /* ─────────────────────────────────────────────────────────────
    PUESTOS — perfiles de cargo
 ───────────────────────────────────────────────────────────── */
+interface Responsabilidades { diarias: string[]; semanales: string[]; quincenales: string[] }
 interface Puesto {
   id: number
   titulo: string
   empleado: string
   info_empresa: string
   resumen: string
-  responsabilidades: string[]
+  responsabilidades: Responsabilidades
   expectativas: string
   requisitos: string
   llamada_accion: string
   contacto_nombre: string
   contacto_email: string
   orden: number
+}
+
+const RESP_CATS: { key: keyof Responsabilidades; label: string }[] = [
+  { key: 'diarias',     label: 'Diarias'     },
+  { key: 'semanales',   label: 'Semanales'   },
+  { key: 'quincenales', label: 'Quincenales' },
+]
+function totalResp(r: Responsabilidades): number {
+  return (r.diarias?.length || 0) + (r.semanales?.length || 0) + (r.quincenales?.length || 0)
 }
 
 function PuestosTab() {
@@ -2883,7 +2893,8 @@ function PuestosTab() {
 
   const nuevo = () => setSel({
     id: 0, titulo: '', empleado: '', info_empresa: '', resumen: '',
-    responsabilidades: [], expectativas: '', requisitos: '', llamada_accion: '',
+    responsabilidades: { diarias: [], semanales: [], quincenales: [] },
+    expectativas: '', requisitos: '', llamada_accion: '',
     contacto_nombre: '', contacto_email: '', orden: puestos.length,
   })
 
@@ -2907,7 +2918,7 @@ function PuestosTab() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-gray-800">{p.titulo}</p>
-                <p className="text-xs text-gray-400">{p.empleado || 'Sin asignar'} · {p.responsabilidades.length} responsabilidades</p>
+                <p className="text-xs text-gray-400">{p.empleado || 'Sin asignar'} · {totalResp(p.responsabilidades)} responsabilidades</p>
               </div>
               <span className="text-xs text-gray-300">Editar →</span>
             </button>
@@ -2931,7 +2942,11 @@ function PuestoEditor({ puesto, onClose, onSaved, onDeleted }: {
     if (!f.titulo.trim()) { alert('El título del puesto es obligatorio.'); return }
     setSaving(true)
     try {
-      const body = { ...f, responsabilidades: f.responsabilidades.filter(r => r.trim()) }
+      const body = { ...f, responsabilidades: {
+        diarias:     f.responsabilidades.diarias.filter(r => r.trim()),
+        semanales:   f.responsabilidades.semanales.filter(r => r.trim()),
+        quincenales: f.responsabilidades.quincenales.filter(r => r.trim()),
+      } }
       if (editando) await api.put(`/puestos/${puesto.id}`, body)
       else          await api.post('/puestos', body)
       onSaved()
@@ -2947,12 +2962,19 @@ function PuestoEditor({ puesto, onClose, onSaved, onDeleted }: {
     onDeleted()
   }
 
-  const setResp = (i: number, v: string) => set('responsabilidades', f.responsabilidades.map((r, idx) => idx === i ? v : r))
-  const addResp = () => set('responsabilidades', [...f.responsabilidades, ''])
-  const delResp = (i: number) => set('responsabilidades', f.responsabilidades.filter((_, idx) => idx !== i))
+  const setResp = (cat: keyof Responsabilidades, i: number, v: string) =>
+    set('responsabilidades', { ...f.responsabilidades, [cat]: f.responsabilidades[cat].map((r, idx) => idx === i ? v : r) })
+  const addResp = (cat: keyof Responsabilidades) =>
+    set('responsabilidades', { ...f.responsabilidades, [cat]: [...f.responsabilidades[cat], ''] })
+  const delResp = (cat: keyof Responsabilidades, i: number) =>
+    set('responsabilidades', { ...f.responsabilidades, [cat]: f.responsabilidades[cat].filter((_, idx) => idx !== i) })
 
   const exportarPDF = () => {
-    const resp = f.responsabilidades.filter(r => r.trim())
+    const bloqueResp = RESP_CATS.map(({ key, label }) => {
+      const items = (f.responsabilidades[key] || []).filter(r => r.trim())
+      if (!items.length) return ''
+      return `<h3 class="rsub">${label}</h3><ul>${items.map(r => `<li>${r}</li>`).join('')}</ul>`
+    }).join('')
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Perfil del Puesto — ${f.titulo}</title>
 <style>
   @page { margin: 1.5cm; }
@@ -2963,6 +2985,7 @@ function PuestoEditor({ puesto, onClose, onSaved, onDeleted }: {
   .empleado { font-size: 11pt; color: #555; margin-top: 2px; }
   h2 { font-size: 11pt; text-transform: uppercase; letter-spacing: 1px; color: ${NAVY}; margin: 18px 0 4px;
        border-left: 4px solid ${CORAL}; padding-left: 8px; }
+  .rsub { font-size: 10pt; color: ${CORAL}; margin: 8px 0 2px; font-weight: bold; }
   p { margin: 4px 0; }
   ul { margin: 4px 0; padding-left: 20px; }
   li { margin: 3px 0; }
@@ -2978,7 +3001,7 @@ function PuestoEditor({ puesto, onClose, onSaved, onDeleted }: {
 
   ${f.info_empresa ? `<h2>La empresa</h2><p>${f.info_empresa}</p>` : ''}
   ${f.resumen ? `<h2>Resumen del puesto</h2><p>${f.resumen}</p>` : ''}
-  ${resp.length ? `<h2>Responsabilidades</h2><ul>${resp.map(r => `<li>${r}</li>`).join('')}</ul>` : ''}
+  ${bloqueResp ? `<h2>Responsabilidades</h2>${bloqueResp}` : ''}
   ${f.expectativas ? `<h2>Expectativas y compromisos</h2><p>${f.expectativas}</p>` : ''}
   ${f.requisitos ? `<h2>Requisitos del candidato</h2><p>${f.requisitos}</p>` : ''}
   ${(f.llamada_accion || f.contacto_email) ? `<div class="cta">${f.llamada_accion || '¿Te interesa este puesto? Envianos tu CV.'}${(f.contacto_nombre || f.contacto_email) ? `<br><br>Contacto: <b>${f.contacto_nombre}</b> ${f.contacto_email ? `· ${f.contacto_email}` : ''}` : ''}</div>` : ''}
@@ -3028,21 +3051,26 @@ function PuestoEditor({ puesto, onClose, onSaved, onDeleted }: {
             placeholder="Propósito del puesto, cómo encaja en la operación y a quién reporta." />
         </div>
 
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className={lbl}>Responsabilidades (6 a 10)</label>
-            <button onClick={addResp} className="text-xs font-semibold" style={{ color: CORAL }}>+ Agregar</button>
-          </div>
-          <div className="space-y-1.5">
-            {f.responsabilidades.map((r, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <span className="text-xs text-gray-400 w-5 text-right">{i + 1}.</span>
-                <input className={input} value={r} onChange={e => setResp(i, e.target.value)} />
-                <button onClick={() => delResp(i)} className="text-red-300 hover:text-red-600 shrink-0"><Trash2 size={14}/></button>
+        <div className="space-y-4">
+          <label className={lbl}>Responsabilidades</label>
+          {RESP_CATS.map(({ key, label }) => (
+            <div key={key} className="rounded-lg border border-gray-100 p-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-xs font-bold" style={{ color: NAVY }}>{label}</p>
+                <button onClick={() => addResp(key)} className="text-xs font-semibold" style={{ color: CORAL }}>+ Agregar</button>
               </div>
-            ))}
-            {f.responsabilidades.length === 0 && <p className="text-xs text-gray-300">Tocá "Agregar" para sumar responsabilidades.</p>}
-          </div>
+              <div className="space-y-1.5">
+                {f.responsabilidades[key].map((r, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400 w-5 text-right">{i + 1}.</span>
+                    <input className={input} value={r} onChange={e => setResp(key, i, e.target.value)} />
+                    <button onClick={() => delResp(key, i)} className="text-red-300 hover:text-red-600 shrink-0"><Trash2 size={14}/></button>
+                  </div>
+                ))}
+                {f.responsabilidades[key].length === 0 && <p className="text-xs text-gray-300">Sin responsabilidades {label.toLowerCase()}.</p>}
+              </div>
+            </div>
+          ))}
         </div>
 
         <div>

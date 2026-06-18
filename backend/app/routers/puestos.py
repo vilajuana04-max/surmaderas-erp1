@@ -25,7 +25,7 @@ class PuestoIn(BaseModel):
     empleado:          Optional[str] = ""
     info_empresa:      Optional[str] = ""
     resumen:           Optional[str] = ""
-    responsabilidades: list[Any] = []
+    responsabilidades: Any = None     # {diarias:[], semanales:[], quincenales:[]}
     expectativas:      Optional[str] = ""
     requisitos:        Optional[str] = ""
     llamada_accion:    Optional[str] = ""
@@ -39,7 +39,7 @@ class PuestoUpdate(BaseModel):
     empleado:          Optional[str] = None
     info_empresa:      Optional[str] = None
     resumen:           Optional[str] = None
-    responsabilidades: Optional[list[Any]] = None
+    responsabilidades: Optional[Any] = None
     expectativas:      Optional[str] = None
     requisitos:        Optional[str] = None
     llamada_accion:    Optional[str] = None
@@ -48,11 +48,25 @@ class PuestoUpdate(BaseModel):
     orden:             Optional[int] = None
 
 
+def _norm_resp(raw) -> dict:
+    """Normaliza a {diarias, semanales, quincenales}. Soporta el formato viejo (lista)."""
+    if isinstance(raw, list):
+        return {"diarias": raw, "semanales": [], "quincenales": []}
+    if isinstance(raw, dict):
+        return {
+            "diarias":     raw.get("diarias", []) or [],
+            "semanales":   raw.get("semanales", []) or [],
+            "quincenales": raw.get("quincenales", []) or [],
+        }
+    return {"diarias": [], "semanales": [], "quincenales": []}
+
+
 def _serialize(p: Puesto) -> dict:
     try:
-        resp = json.loads(p.responsabilidades) if p.responsabilidades else []
+        raw = json.loads(p.responsabilidades) if p.responsabilidades else {}
     except Exception:
-        resp = []
+        raw = {}
+    resp = _norm_resp(raw)
     return {
         "id":                p.id,
         "titulo":            p.titulo,
@@ -81,7 +95,7 @@ def list_puestos(db: Session = Depends(get_db)):
 @router.post("/", status_code=201)
 def create_puesto(data: PuestoIn, db: Session = Depends(get_db)):
     payload = data.model_dump()
-    payload["responsabilidades"] = json.dumps(payload.get("responsabilidades") or [])
+    payload["responsabilidades"] = json.dumps(_norm_resp(payload.get("responsabilidades")))
     if not payload.get("info_empresa"):
         payload["info_empresa"] = INFO_EMPRESA
     p = Puesto(**payload)
@@ -98,7 +112,7 @@ def update_puesto(puesto_id: int, data: PuestoUpdate, db: Session = Depends(get_
         raise HTTPException(404, "Puesto no encontrado")
     for k, v in data.model_dump(exclude_unset=True).items():
         if k == "responsabilidades":
-            v = json.dumps(v or [])
+            v = json.dumps(_norm_resp(v))
         setattr(p, k, v)
     db.commit()
     db.refresh(p)
@@ -131,7 +145,8 @@ def _seed_if_empty(db: Session):
     for i, (titulo, empleado, resumen) in enumerate(base):
         db.add(Puesto(
             titulo=titulo, empleado=empleado, resumen=resumen,
-            info_empresa=INFO_EMPRESA, responsabilidades="[]",
+            info_empresa=INFO_EMPRESA,
+            responsabilidades=json.dumps({"diarias": [], "semanales": [], "quincenales": []}),
             contacto_nombre="", contacto_email="rrhh@surmaderas.com.ar",
             orden=i,
         ))
