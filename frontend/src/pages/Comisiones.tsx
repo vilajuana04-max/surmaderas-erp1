@@ -9,7 +9,7 @@ const NAVY  = '#070614'
 const CORAL = '#C8603A'
 
 // ── Types ─────────────────────────────────────────────────────────
-type Turno = '6hs' | '8hs'
+type Turno = '6hs' | '7hs' | '8hs'
 
 type Vendedor = {
   id: number
@@ -62,6 +62,10 @@ type Config = {
   s6_e1_desde: number; s6_e1_pct: number
   s6_e2_desde: number; s6_e2_pct: number
   s6_e3_desde: number; s6_e3_pct: number
+  // 7hs
+  s7_e1_desde: number; s7_e1_pct: number
+  s7_e2_desde: number; s7_e2_pct: number
+  s7_e3_desde: number; s7_e3_pct: number
   // 8hs
   s8_e1_desde: number; s8_e1_pct: number
   s8_e2_desde: number; s8_e2_pct: number
@@ -80,6 +84,9 @@ const DEFAULT_CONFIG: Config = {
   s6_e1_desde: 4_000_000, s6_e1_pct: 0.5,
   s6_e2_desde: 5_000_000, s6_e2_pct: 1.0,
   s6_e3_desde: 7_000_000, s6_e3_pct: 1.5,
+  s7_e1_desde: 5_000_000, s7_e1_pct: 0.5,
+  s7_e2_desde: 6_500_000, s7_e2_pct: 1.0,
+  s7_e3_desde: 9_000_000, s7_e3_pct: 1.5,
   s8_e1_desde: 6_000_000, s8_e1_pct: 0.5,
   s8_e2_desde: 8_000_000, s8_e2_pct: 1.0,
   s8_e3_desde: 11_000_000, s8_e3_pct: 1.5,
@@ -99,17 +106,21 @@ const fmt  = (n: number) => '$' + Math.round(n).toLocaleString('es-AR')
 const fmtM = (n: number) => '$' + (n / 1_000_000).toFixed(1) + 'M'
 
 function getEscalas(turno: Turno, cfg: Config) {
-  return turno === '6hs'
-    ? [
-        { desde: cfg.s6_e1_desde, pct: cfg.s6_e1_pct },
-        { desde: cfg.s6_e2_desde, pct: cfg.s6_e2_pct },
-        { desde: cfg.s6_e3_desde, pct: cfg.s6_e3_pct },
-      ]
-    : [
-        { desde: cfg.s8_e1_desde, pct: cfg.s8_e1_pct },
-        { desde: cfg.s8_e2_desde, pct: cfg.s8_e2_pct },
-        { desde: cfg.s8_e3_desde, pct: cfg.s8_e3_pct },
-      ]
+  if (turno === '6hs') return [
+    { desde: cfg.s6_e1_desde, pct: cfg.s6_e1_pct },
+    { desde: cfg.s6_e2_desde, pct: cfg.s6_e2_pct },
+    { desde: cfg.s6_e3_desde, pct: cfg.s6_e3_pct },
+  ]
+  if (turno === '7hs') return [
+    { desde: cfg.s7_e1_desde, pct: cfg.s7_e1_pct },
+    { desde: cfg.s7_e2_desde, pct: cfg.s7_e2_pct },
+    { desde: cfg.s7_e3_desde, pct: cfg.s7_e3_pct },
+  ]
+  return [
+    { desde: cfg.s8_e1_desde, pct: cfg.s8_e1_pct },
+    { desde: cfg.s8_e2_desde, pct: cfg.s8_e2_pct },
+    { desde: cfg.s8_e3_desde, pct: cfg.s8_e3_pct },
+  ]
 }
 
 function calcComision(ventas: number, turno: Turno, cfg: Config) {
@@ -603,7 +614,7 @@ function TabVendedores({
           <div>
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Turno</p>
             <div className="flex gap-2">
-              {(['6hs', '8hs'] as Turno[]).map(t => (
+              {(['6hs', '7hs', '8hs'] as Turno[]).map(t => (
                 <button key={t} onClick={() => setTurno(t)}
                   className="flex-1 py-2 rounded-xl text-sm font-semibold border-2 transition-all"
                   style={turno === t ? { background: CORAL, color: 'white', borderColor: CORAL } : { borderColor: '#e5e7eb', color: '#6b7280' }}>
@@ -1031,22 +1042,21 @@ function TabConfig({ cfg, setCfg }: { cfg: Config; setCfg: (c: Config) => void }
 
   function save() { setCfg(local); setSaved(true); setTimeout(() => setSaved(false), 2000) }
 
-  function EscalaBlock({ turno, prefix }: { turno: string; prefix: 's6' | 's8' }) {
+  function EscalaBlock({ turno, prefix, horas }: { turno: string; prefix: 's6' | 's7' | 's8'; horas: string }) {
     const rows: { label: string; key: keyof Config }[] = [
-      { label: 'Piso minimo (E1 desde)',  key: `${prefix}_e1_desde` },
-      { label: '% Escala 1',              key: `${prefix}_e1_pct`   },
-      { label: 'Escala 2 desde',          key: `${prefix}_e2_desde` },
-      { label: '% Escala 2',              key: `${prefix}_e2_pct`   },
-      { label: 'Escala 3 desde',          key: `${prefix}_e3_desde` },
-      { label: '% Escala 3',              key: `${prefix}_e3_pct`   },
+      { label: 'Piso minimo (E1 desde)',  key: `${prefix}_e1_desde` as keyof Config },
+      { label: '% Escala 1',              key: `${prefix}_e1_pct`   as keyof Config },
+      { label: 'Escala 2 desde',          key: `${prefix}_e2_desde` as keyof Config },
+      { label: '% Escala 2',              key: `${prefix}_e2_pct`   as keyof Config },
+      { label: 'Escala 3 desde',          key: `${prefix}_e3_desde` as keyof Config },
+      { label: '% Escala 3',              key: `${prefix}_e3_pct`   as keyof Config },
     ]
+    const bg = prefix === 's6' ? CORAL : prefix === 's7' ? '#2D5A8E' : NAVY
     return (
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-100" style={{ background: prefix === 's6' ? CORAL : NAVY }}>
+        <div className="px-5 py-3 border-b border-gray-100" style={{ background: bg }}>
           <p className="text-white font-bold text-sm">Turno {turno}</p>
-          <p className="text-white/60 text-[11px]">
-            {prefix === 's6' ? 'Empleados de 6 horas' : 'Empleados de 8 horas'}
-          </p>
+          <p className="text-white/60 text-[11px]">Empleados de {horas}</p>
         </div>
         {rows.map(({ label, key }) => (
           <div key={key as string} className="flex items-center justify-between px-5 py-3 border-b border-gray-50 last:border-0">
@@ -1062,8 +1072,9 @@ function TabConfig({ cfg, setCfg }: { cfg: Config; setCfg: (c: Config) => void }
 
   return (
     <div className="space-y-4">
-      <EscalaBlock turno="6hs" prefix="s6" />
-      <EscalaBlock turno="8hs" prefix="s8" />
+      <EscalaBlock turno="6hs" prefix="s6" horas="6 horas" />
+      <EscalaBlock turno="7hs" prefix="s7" horas="7 horas" />
+      <EscalaBlock turno="8hs" prefix="s8" horas="8 horas" />
       <button onClick={save}
         className="w-full py-3 rounded-2xl text-sm font-bold text-white transition-all"
         style={{ background: saved ? '#16a34a' : CORAL }}>
@@ -1078,7 +1089,9 @@ function TabConfig({ cfg, setCfg }: { cfg: Config; setCfg: (c: Config) => void }
 // ═══════════════════════════════════════════════════════════════════
 export default function Comisiones() {
   const [activeTab, setActiveTab]       = useState<Tab>('calculadora')
-  const [cfg,         setCfg]           = useLocalState<Config>('com_cfg', DEFAULT_CONFIG)
+  const [cfgRaw,      setCfg]           = useLocalState<Config>('com_cfg', DEFAULT_CONFIG)
+  // Mezcla con defaults para que config vieja (sin 7hs) no rompa nada
+  const cfg = { ...DEFAULT_CONFIG, ...cfgRaw }
   const [vendedores,  setVendedores]    = useLocalState<Vendedor[]>('com_vendedores_v2', DEFAULT_VENDEDORES)
   const [registros,   setRegistros]     = useLocalState<RegistroQ[]>('com_registros', [])
   const [reuniones,   setReuniones]     = useLocalState<Reunion[]>('com_reuniones', [])

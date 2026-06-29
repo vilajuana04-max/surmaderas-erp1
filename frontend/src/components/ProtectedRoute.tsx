@@ -29,8 +29,8 @@ export default function ProtectedRoute({ children, requiredRole }: Props) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  // caja_diaria: solo puede estar en /caja-diaria y /cupones
-  const CAJA_DIARIA_ALLOWED = ['/caja-diaria', '/cupones']
+  // caja_diaria: caja diaria, cupones y base de datos de clientes
+  const CAJA_DIARIA_ALLOWED = ['/caja-diaria', '/cupones', '/clientes']
   if (user.role === 'caja_diaria' && !CAJA_DIARIA_ALLOWED.includes(location.pathname)) {
     return <Navigate to="/caja-diaria" replace />
   }
