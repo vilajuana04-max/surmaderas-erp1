@@ -2,8 +2,9 @@ import { useState } from 'react'
 import {
   Calculator, Users, ClipboardList, Settings2,
   TableProperties, ChevronDown, ChevronUp, Plus, Check, X, Trash2,
-  Briefcase, History, Save,
+  Briefcase, History, Save, RotateCcw, Calendar, Clock,
 } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 
 const NAVY  = '#070614'
 const CORAL = '#C8603A'
@@ -30,13 +31,44 @@ type RegistroQ = {
   pagada: boolean
 }
 
+type EstadoReunion = 'pendiente' | 'realizada' | 'reprogramada'
+type ReunionItem = { id: string; texto: string; hecho: boolean; nota: string }
 type Reunion = {
   id: number
   vendedorId: number
   quincena: string
-  checks: boolean[]
-  notas: string
-  realizada: boolean
+  fecha: string        // YYYY-MM-DD
+  hora: string         // HH:MM
+  estado: EstadoReunion
+  items: ReunionItem[] // checklist con nota por ítem
+  notas: string        // notas generales
+  // legacy (compat con datos viejos)
+  checks?: boolean[]
+  realizada?: boolean
+}
+
+const ESTADO_REUNION: Record<EstadoReunion, { label: string; bg: string; color: string }> = {
+  pendiente:    { label: 'Pendiente',    bg: '#fef9c3', color: '#854d0e' },
+  realizada:    { label: 'Realizada',    bg: '#dcfce7', color: '#16a34a' },
+  reprogramada: { label: 'Reprogramada', bg: '#e0e7ff', color: '#4338ca' },
+}
+
+let _ridSeq = 0
+const newRid = () => `r${Date.now()}_${_ridSeq++}`
+
+// Normaliza una reunión (soporta el formato viejo con checks/realizada)
+function normReunion(r: Reunion, template: string[]): Reunion {
+  if (r.items && Array.isArray(r.items)) {
+    return { ...r, estado: r.estado ?? 'pendiente', fecha: r.fecha ?? '', hora: r.hora ?? '', notas: r.notas ?? '' }
+  }
+  const items: ReunionItem[] = template.map((texto, i) => ({
+    id: newRid(), texto, hecho: r.checks?.[i] ?? false, nota: '',
+  }))
+  return {
+    ...r, items, notas: r.notas ?? '',
+    estado: r.realizada ? 'realizada' : 'pendiente',
+    fecha: r.fecha ?? '', hora: r.hora ?? '',
+  }
 }
 
 // Planilla de descripcion de puesto
@@ -81,15 +113,15 @@ const CHECKLIST_ITEMS = [
 ]
 
 const DEFAULT_CONFIG: Config = {
-  s6_e1_desde: 4_000_000, s6_e1_pct: 0.5,
-  s6_e2_desde: 5_000_000, s6_e2_pct: 1.0,
-  s6_e3_desde: 7_000_000, s6_e3_pct: 1.5,
-  s7_e1_desde: 5_000_000, s7_e1_pct: 0.5,
-  s7_e2_desde: 6_500_000, s7_e2_pct: 1.0,
-  s7_e3_desde: 9_000_000, s7_e3_pct: 1.5,
-  s8_e1_desde: 6_000_000, s8_e1_pct: 0.5,
-  s8_e2_desde: 8_000_000, s8_e2_pct: 1.0,
-  s8_e3_desde: 11_000_000, s8_e3_pct: 1.5,
+  s6_e1_desde: 3_400_000, s6_e1_pct: 0.5,
+  s6_e2_desde: 3_950_000, s6_e2_pct: 1.0,
+  s6_e3_desde: 4_750_000, s6_e3_pct: 1.5,
+  s7_e1_desde: 3_900_000, s7_e1_pct: 0.5,
+  s7_e2_desde: 4_550_000, s7_e2_pct: 1.0,
+  s7_e3_desde: 5_450_000, s7_e3_pct: 1.5,
+  s8_e1_desde: 4_300_000, s8_e1_pct: 0.5,
+  s8_e2_desde: 5_000_000, s8_e2_pct: 1.0,
+  s8_e3_desde: 6_000_000, s8_e3_pct: 1.5,
 }
 
 const DEFAULT_VENDEDORES: Vendedor[] = [
@@ -104,6 +136,14 @@ const DEFAULT_VENDEDORES: Vendedor[] = [
 // ── Helpers ───────────────────────────────────────────────────────
 const fmt  = (n: number) => '$' + Math.round(n).toLocaleString('es-AR')
 const fmtM = (n: number) => '$' + (n / 1_000_000).toFixed(1) + 'M'
+
+// Color distintivo por turno
+function turnoColor(t: Turno): string {
+  return t === '6hs' ? CORAL : t === '7hs' ? '#2D5A8E' : '#2D7A3A'
+}
+function turnoLabel(t: Turno): string {
+  return t === '8hs' ? '8-9hs' : t
+}
 
 function getEscalas(turno: Turno, cfg: Config) {
   if (turno === '6hs') return [
@@ -188,6 +228,16 @@ function TabCalculadora({ vendedores, cfg }: { vendedores: Vendedor[]; cfg: Conf
     : escala === 2 ? fmt(e3.desde - ventas) + ' para Escala 3'
     : '¡Maxima escala!'
 
+  // Próximo escalón (para mensaje motivador): desde y % objetivo
+  const prox =
+    escala === 0 ? { desde: e1.desde, pct: e1.pct } :
+    escala === 1 ? { desde: e2.desde, pct: e2.pct } :
+    escala === 2 ? { desde: e3.desde, pct: e3.pct } : null
+  const faltante = prox ? prox.desde - ventas : 0
+  // Cerca: dentro del 15% de diferencia respecto al próximo escalón
+  const cerca = !!prox && ventas > 0 && faltante > 0 && faltante <= prox.desde * 0.15
+  const col = turnoColor(turno)
+
   return (
     <div className="space-y-4">
       {/* Selector vendedor */}
@@ -211,9 +261,8 @@ function TabCalculadora({ vendedores, cfg }: { vendedores: Vendedor[]; cfg: Conf
       {vend && (
         <div className="flex items-center gap-2">
           <span className="text-xs px-3 py-1 rounded-full font-bold"
-            style={{ background: turno === '8hs' ? NAVY + '12' : CORAL + '18',
-                     color: turno === '8hs' ? NAVY : CORAL }}>
-            Turno {turno} — escala {turno === '6hs' ? 'estandar' : 'extendida'}
+            style={{ background: col + '18', color: col }}>
+            Turno {turnoLabel(turno)}
           </span>
           <span className="text-xs text-gray-400">
             Piso: {fmtM(e1.desde)}
@@ -257,6 +306,16 @@ function TabCalculadora({ vendedores, cfg }: { vendedores: Vendedor[]; cfg: Conf
           ))}
         </div>
       </div>
+
+      {/* Mensaje motivador: cerca del próximo escalón */}
+      {cerca && prox && (
+        <div className="rounded-2xl p-4 flex items-center gap-3" style={{ background: col + '12', border: `1px solid ${col}33` }}>
+          <span className="text-2xl">🔥</span>
+          <p className="text-sm font-semibold" style={{ color: col }}>
+            ¡Estás cerca! Te faltan <strong>{fmt(faltante)}</strong> para llegar a la escala de <strong>{prox.pct}%</strong>.
+          </p>
+        </div>
+      )}
 
       {ventas > 0 && escala === 0 && (
         <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
@@ -555,26 +614,37 @@ function TabVendedores({
   function toggle(id: number) {
     setVendedores(vendedores.map(v => v.id === id ? { ...v, activo: !v.activo } : v))
   }
+  function setVendTurno(id: number, t: Turno) {
+    setVendedores(vendedores.map(v => v.id === id ? { ...v, turno: t } : v))
+  }
 
   return (
     <div className="space-y-3">
       {vendedores.map(v => (
         <div key={v.id} className="bg-white rounded-2xl border border-gray-100 px-5 py-4 flex items-center gap-3">
           <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
-            style={{ background: v.activo ? NAVY : '#d1d5db' }}>
+            style={{ background: v.activo ? turnoColor(v.turno) : '#d1d5db' }}>
             {v.nombre.charAt(0)}
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-bold text-gray-800">{v.nombre}</p>
-            <div className="flex gap-2 mt-0.5 flex-wrap">
+            <div className="flex gap-2 mt-1 flex-wrap items-center">
               <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
                 style={{ background: CORAL + '18', color: CORAL }}>
                 {v.sucursal === 'luro' ? 'Luro' : 'Independencia'}
               </span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
-                style={{ background: NAVY + '12', color: NAVY }}>
-                Turno {v.turno}
-              </span>
+              {/* Turno editable */}
+              <div className="flex gap-1">
+                {(['6hs', '7hs', '8hs'] as Turno[]).map(t => (
+                  <button key={t} onClick={() => setVendTurno(v.id, t)}
+                    className="text-[10px] px-2 py-0.5 rounded-full font-bold transition-all border"
+                    style={v.turno === t
+                      ? { background: turnoColor(t), color: 'white', borderColor: turnoColor(t) }
+                      : { background: 'white', color: '#9ca3af', borderColor: '#e5e7eb' }}>
+                    {turnoLabel(t)}
+                  </button>
+                ))}
+              </div>
               {!v.activo && (
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 font-semibold">
                   Inactivo
@@ -646,255 +716,285 @@ function TabVendedores({
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// REUNIONES (quincena actual + historial)
+// REUNIONES (quincena actual + historial + plantilla)
 // ═══════════════════════════════════════════════════════════════════
 function TabReuniones({
-  vendedores, reuniones, setReuniones, registros, cfg,
+  vendedores, reuniones, setReuniones, registros, template, setTemplate,
 }: {
   vendedores: Vendedor[]
   reuniones: Reunion[]
   setReuniones: (r: Reunion[]) => void
   registros: RegistroQ[]
-  cfg: Config
+  template: string[]
+  setTemplate: (t: string[]) => void
 }) {
   const qActual = quincenaLabel()
-  const [vista, setVista] = useState<'actual' | 'historial'>('actual')
+  const [vista, setVista] = useState<'actual' | 'historial' | 'plantilla'>('actual')
   const [filtroVend, setFiltroVend] = useState<number | 'todos'>('todos')
   const [expandedId, setExpandedId] = useState<number | null>(null)
+  const hoyISO = new Date().toISOString().slice(0, 10)
 
-  function getOrCreate(vendId: number): Reunion {
+  function getReunion(vendId: number): Reunion {
     const ex = reuniones.find(r => r.vendedorId === vendId && r.quincena === qActual)
-    if (ex) return ex
-    const n: Reunion = {
+    if (ex) return normReunion(ex, template)
+    return {
       id: Date.now() + vendId, vendedorId: vendId, quincena: qActual,
-      checks: CHECKLIST_ITEMS.map(() => false), notas: '', realizada: false,
+      fecha: hoyISO, hora: '', estado: 'pendiente',
+      items: template.map(texto => ({ id: newRid(), texto, hecho: false, nota: '' })),
+      notas: '',
     }
-    setReuniones([...reuniones, n])
-    return n
   }
 
-  function update(updated: Reunion) {
-    setReuniones(reuniones.map(r =>
-      r.vendedorId === updated.vendedorId && r.quincena === updated.quincena ? updated : r
-    ))
+  function save(updated: Reunion) {
+    const exists = reuniones.some(r => r.vendedorId === updated.vendedorId && r.quincena === updated.quincena)
+    setReuniones(exists
+      ? reuniones.map(r => (r.vendedorId === updated.vendedorId && r.quincena === updated.quincena) ? updated : r)
+      : [...reuniones, updated])
   }
 
-  // Historial: todas las reuniones pasadas (no la actual)
   const historial = reuniones
+    .map(r => normReunion(r, template))
     .filter(r => r.quincena !== qActual)
     .filter(r => filtroVend === 'todos' || r.vendedorId === filtroVend)
-    .sort((a, b) => b.id - a.id)
-
-  // Quincenas unicas en historial
+    .sort((a, b) => (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : b.id - a.id))
   const quincenasUnicas = [...new Set(historial.map(r => r.quincena))]
 
   return (
     <div className="space-y-4">
-
-      {/* Selector vista */}
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
-        <button onClick={() => setVista('actual')}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all"
-          style={vista === 'actual' ? { background: NAVY, color: 'white' } : { color: '#6b7280' }}>
-          <ClipboardList size={12}/> Quincena Actual
-        </button>
-        <button onClick={() => setVista('historial')}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all"
-          style={vista === 'historial' ? { background: NAVY, color: 'white' } : { color: '#6b7280' }}>
-          <History size={12}/> Registro Historial
-        </button>
+        {([['actual', 'Quincena actual', <ClipboardList size={12}/>], ['historial', 'Historial', <History size={12}/>], ['plantilla', 'Plantilla', <Settings2 size={12}/>]] as const).map(([id, label, icon]) => (
+          <button key={id} onClick={() => setVista(id)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all"
+            style={vista === id ? { background: NAVY, color: 'white' } : { color: '#6b7280' }}>
+            {icon} {label}
+          </button>
+        ))}
       </div>
 
-      {/* ── VISTA: QUINCENA ACTUAL ── */}
       {vista === 'actual' && (
         <>
           <div className="bg-white rounded-2xl border border-gray-100 px-5 py-3">
             <p className="text-[10px] font-bold tracking-[1.5px] uppercase text-gray-400">Quincena actual</p>
             <p className="font-bold text-gray-700 mt-0.5">{qActual}</p>
           </div>
-
           {vendedores.filter(v => v.activo).map(v => {
-            const r   = reuniones.find(r => r.vendedorId === v.id && r.quincena === qActual)
             const reg = registros.find(r => r.vendedorId === v.id && r.quincena === qActual)
-            const done = r?.checks.filter(Boolean).length ?? 0
-
-            return (
-              <div key={v.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                <div className="px-5 py-4 flex items-center justify-between gap-3 border-b border-gray-100"
-                  style={{ background: r?.realizada ? '#f0fdf4' : 'white' }}>
-                  <div>
-                    <p className="font-bold text-gray-800">{v.nombre}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {reg
-                        ? <>Comision: <span className="font-bold" style={{ color: CORAL }}>{fmt(reg.comision)}</span> &middot; {reg.pct}% &middot; {fmt(reg.ventas)} en ventas</>
-                        : 'Sin ventas registradas esta quincena'}
-                    </p>
-                  </div>
-                  <span className="text-xs font-bold px-3 py-1 rounded-full shrink-0"
-                    style={r?.realizada
-                      ? { background: '#dcfce7', color: '#16a34a' }
-                      : { background: '#fef9c3', color: '#854d0e' }}>
-                    {r?.realizada ? 'Realizada' : 'Pendiente'}
-                  </span>
-                </div>
-
-                <div className="px-5 pb-4 pt-3 space-y-3">
-                  <div className="space-y-1.5">
-                    {CHECKLIST_ITEMS.map((item, i) => {
-                      const checked = r?.checks[i] ?? false
-                      return (
-                        <button key={i}
-                          onClick={() => {
-                            const reunion = r ?? getOrCreate(v.id)
-                            const nc = [...reunion.checks]; nc[i] = !nc[i]
-                            update({ ...reunion, checks: nc })
-                          }}
-                          className="w-full flex items-center gap-3 text-left py-1.5 border-b border-gray-50 last:border-0">
-                          <div className="w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all"
-                            style={checked ? { background: CORAL, borderColor: CORAL } : { borderColor: '#e5e7eb' }}>
-                            {checked && <Check size={11} color="white" strokeWidth={3}/>}
-                          </div>
-                          <span className={`text-sm ${checked ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{item}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full" style={{ width: `${done / CHECKLIST_ITEMS.length * 100}%`, background: CORAL }}/>
-                    </div>
-                    <span className="text-xs text-gray-400">{done}/{CHECKLIST_ITEMS.length}</span>
-                  </div>
-
-                  <textarea
-                    value={r?.notas ?? ''}
-                    onChange={e => { const reunion = r ?? getOrCreate(v.id); update({ ...reunion, notas: e.target.value }) }}
-                    placeholder="Notas de la reunion..."
-                    rows={2}
-                    className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 outline-none resize-none focus:border-gray-400 placeholder:text-gray-300" />
-
-                  <button
-                    onClick={() => { const reunion = r ?? getOrCreate(v.id); update({ ...reunion, realizada: !reunion.realizada }) }}
-                    className="w-full py-2.5 rounded-xl text-sm font-bold transition-all"
-                    style={r?.realizada
-                      ? { background: '#f3f4f6', color: '#374151', border: '2px solid #e5e7eb' }
-                      : { background: NAVY, color: 'white' }}>
-                    {r?.realizada ? 'Reabrir reunion' : 'Marcar como realizada'}
-                  </button>
-                </div>
-              </div>
-            )
+            return <ReunionCard key={v.id} vend={v} reunion={getReunion(v.id)} reg={reg} onSave={save} />
           })}
         </>
       )}
 
-      {/* ── VISTA: HISTORIAL ── */}
       {vista === 'historial' && (
         <div className="space-y-4">
-          {/* Filtro vendedor */}
           <div className="flex flex-wrap gap-2">
             <button onClick={() => setFiltroVend('todos')}
               className="px-3 py-1.5 rounded-full text-xs font-bold border-2 transition-all"
-              style={filtroVend === 'todos'
-                ? { background: NAVY, color: 'white', borderColor: NAVY }
-                : { borderColor: '#e5e7eb', color: '#6b7280' }}>
+              style={filtroVend === 'todos' ? { background: NAVY, color: 'white', borderColor: NAVY } : { borderColor: '#e5e7eb', color: '#6b7280' }}>
               Todos
             </button>
             {vendedores.filter(v => v.activo).map(v => (
               <button key={v.id} onClick={() => setFiltroVend(v.id)}
                 className="px-3 py-1.5 rounded-full text-xs font-bold border-2 transition-all"
-                style={filtroVend === v.id
-                  ? { background: NAVY, color: 'white', borderColor: NAVY }
-                  : { borderColor: '#e5e7eb', color: '#6b7280' }}>
+                style={filtroVend === v.id ? { background: NAVY, color: 'white', borderColor: NAVY } : { borderColor: '#e5e7eb', color: '#6b7280' }}>
                 {v.nombre}
               </button>
             ))}
           </div>
-
           {historial.length === 0 ? (
             <div className="text-center py-12 text-gray-300">
               <History size={32} className="mx-auto mb-2 opacity-40"/>
-              <p className="text-sm">Sin historial de reuniones todavia</p>
+              <p className="text-sm">Sin historial de reuniones todavía</p>
             </div>
-          ) : (
-            quincenasUnicas.map(q => {
-              const reusDQ = historial.filter(r => r.quincena === q)
-              return (
-                <div key={q}>
-                  {/* Separador quincena */}
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="h-px flex-1 bg-gray-200"/>
-                    <span className="text-[10px] font-bold tracking-widest uppercase text-gray-400 px-2">{q}</span>
-                    <div className="h-px flex-1 bg-gray-200"/>
-                  </div>
-
-                  <div className="space-y-2">
-                    {reusDQ.map(r => {
-                      const v    = vendedores.find(v => v.id === r.vendedorId)
-                      const done = r.checks.filter(Boolean).length
-                      const isOpen = expandedId === r.id
-
-                      return (
-                        <div key={r.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                          {/* Fila clickeable */}
-                          <button
-                            onClick={() => setExpandedId(isOpen ? null : r.id)}
-                            className="w-full flex items-center gap-3 px-5 py-3 text-left hover:bg-gray-50 transition-colors">
-                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
-                              style={{ background: r.realizada ? '#16a34a' : '#f59e0b' }}>
-                              {v?.nombre.charAt(0) ?? '?'}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-bold text-sm text-gray-800">{v?.nombre ?? '-'}</p>
-                              <p className="text-[10px] text-gray-400">
-                                {done}/{CHECKLIST_ITEMS.length} items &middot;{' '}
-                                {r.notas ? `"${r.notas.slice(0, 40)}${r.notas.length > 40 ? '...' : ''}"` : 'Sin notas'}
-                              </p>
-                            </div>
-                            <span className="text-xs font-bold px-2 py-0.5 rounded-full shrink-0"
-                              style={r.realizada
-                                ? { background: '#dcfce7', color: '#16a34a' }
-                                : { background: '#fef9c3', color: '#854d0e' }}>
-                              {r.realizada ? 'Realizada' : 'Pendiente'}
-                            </span>
-                            {isOpen ? <ChevronUp size={14} className="text-gray-400 shrink-0"/> : <ChevronDown size={14} className="text-gray-400 shrink-0"/>}
-                          </button>
-
-                          {/* Detalle expandido */}
-                          {isOpen && (
-                            <div className="px-5 pb-4 pt-1 space-y-3 border-t border-gray-50">
-                              <div className="space-y-1">
-                                {CHECKLIST_ITEMS.map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2 py-1">
-                                    <div className="w-4 h-4 rounded flex items-center justify-center shrink-0"
-                                      style={r.checks[i]
-                                        ? { background: CORAL }
-                                        : { background: '#f3f4f6' }}>
-                                      {r.checks[i] && <Check size={9} color="white" strokeWidth={3}/>}
-                                    </div>
-                                    <span className={`text-xs ${r.checks[i] ? 'text-gray-400 line-through' : 'text-gray-600'}`}>{item}</span>
-                                  </div>
-                                ))}
-                              </div>
-                              {r.notas && (
-                                <div className="bg-gray-50 rounded-xl px-4 py-3">
-                                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Notas</p>
-                                  <p className="text-sm text-gray-700 leading-relaxed">{r.notas}</p>
+          ) : quincenasUnicas.map(q => (
+            <div key={q}>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="h-px flex-1 bg-gray-200"/>
+                <span className="text-[10px] font-bold tracking-widest uppercase text-gray-400 px-2">{q}</span>
+                <div className="h-px flex-1 bg-gray-200"/>
+              </div>
+              <div className="space-y-2">
+                {historial.filter(r => r.quincena === q).map(r => {
+                  const v = vendedores.find(v => v.id === r.vendedorId)
+                  const done = r.items.filter(i => i.hecho).length
+                  const isOpen = expandedId === r.id
+                  const est = ESTADO_REUNION[r.estado]
+                  return (
+                    <div key={r.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                      <button onClick={() => setExpandedId(isOpen ? null : r.id)}
+                        className="w-full flex items-center gap-3 px-5 py-3 text-left hover:bg-gray-50">
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ background: est.color }}>{v?.nombre.charAt(0) ?? '?'}</div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-sm text-gray-800">{v?.nombre ?? '-'}</p>
+                          <p className="text-[10px] text-gray-400">{r.fecha ? fmtFechaCorta(r.fecha) : 's/fecha'}{r.hora ? ` ${r.hora}` : ''} · {done}/{r.items.length} ítems</p>
+                        </div>
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: est.bg, color: est.color }}>{est.label}</span>
+                        {isOpen ? <ChevronUp size={14} className="text-gray-400"/> : <ChevronDown size={14} className="text-gray-400"/>}
+                      </button>
+                      {isOpen && (
+                        <div className="px-5 pb-4 pt-1 space-y-2 border-t border-gray-50">
+                          {r.items.map(it => (
+                            <div key={it.id} className="py-1">
+                              <div className="flex items-center gap-2">
+                                <div className="w-4 h-4 rounded flex items-center justify-center shrink-0" style={it.hecho ? { background: CORAL } : { background: '#f3f4f6' }}>
+                                  {it.hecho && <Check size={9} color="white" strokeWidth={3}/>}
                                 </div>
-                              )}
+                                <span className={`text-xs font-semibold ${it.hecho ? 'text-gray-400' : 'text-gray-700'}`}>{it.texto}</span>
+                              </div>
+                              {it.nota && <p className="text-xs text-gray-500 ml-6 mt-0.5 leading-relaxed">{it.nota}</p>}
+                            </div>
+                          ))}
+                          {r.notas && (
+                            <div className="bg-gray-50 rounded-xl px-4 py-3 mt-2">
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Notas generales</p>
+                              <p className="text-sm text-gray-700 leading-relaxed">{r.notas}</p>
                             </div>
                           )}
                         </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )
-            })
-          )}
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
+
+      {vista === 'plantilla' && <PlantillaEditor template={template} setTemplate={setTemplate} />}
+    </div>
+  )
+}
+
+function fmtFechaCorta(iso: string): string {
+  const [y, m, d] = iso.split('-')
+  return `${d}/${m}/${y}`
+}
+
+function ReunionCard({ vend, reunion, reg, onSave }: {
+  vend: Vendedor; reunion: Reunion; reg?: RegistroQ; onSave: (r: Reunion) => void
+}) {
+  const est = ESTADO_REUNION[reunion.estado]
+  const done = reunion.items.filter(i => i.hecho).length
+  const set = (patch: Partial<Reunion>) => onSave({ ...reunion, ...patch })
+  const toggleItem  = (id: string) => set({ items: reunion.items.map(i => i.id === id ? { ...i, hecho: !i.hecho } : i) })
+  const setItemNota = (id: string, nota: string) => set({ items: reunion.items.map(i => i.id === id ? { ...i, nota } : i) })
+  const setItemTexto= (id: string, texto: string) => set({ items: reunion.items.map(i => i.id === id ? { ...i, texto } : i) })
+  const delItem     = (id: string) => set({ items: reunion.items.filter(i => i.id !== id) })
+  const addItem     = () => set({ items: [...reunion.items, { id: newRid(), texto: 'Ítem personalizado', hecho: false, nota: '' }] })
+  const inp = "border border-gray-200 rounded-lg px-2 py-1 text-sm outline-none focus:border-gray-400"
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      <div className="px-5 py-4 flex items-center justify-between gap-3 border-b border-gray-100"
+        style={{ background: reunion.estado === 'realizada' ? '#f0fdf4' : 'white' }}>
+        <div className="min-w-0">
+          <p className="font-bold text-gray-800">{vend.nombre} <span className="text-[10px] font-semibold" style={{ color: turnoColor(vend.turno) }}>({turnoLabel(vend.turno)})</span></p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {reg ? <>Comisión: <span className="font-bold" style={{ color: CORAL }}>{fmt(reg.comision)}</span> · {reg.pct}% · {fmt(reg.ventas)} en ventas</> : 'Sin ventas registradas esta quincena'}
+          </p>
+        </div>
+        <span className="text-xs font-bold px-3 py-1 rounded-full shrink-0" style={{ background: est.bg, color: est.color }}>{est.label}</span>
+      </div>
+
+      <div className="px-5 pb-4 pt-3 space-y-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+          <div>
+            <label className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1"><Calendar size={10}/> Fecha</label>
+            <input type="date" className={`${inp} w-full`} value={reunion.fecha} onChange={e => set({ fecha: e.target.value })} />
+          </div>
+          <div>
+            <label className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1"><Clock size={10}/> Hora</label>
+            <input type="time" className={`${inp} w-full`} value={reunion.hora} onChange={e => set({ hora: e.target.value })} />
+          </div>
+          <div>
+            <label className="text-[10px] font-bold text-gray-400 uppercase">Estado</label>
+            <select className={`${inp} w-full`} value={reunion.estado} onChange={e => set({ estado: e.target.value as EstadoReunion })}>
+              <option value="pendiente">Pendiente</option>
+              <option value="realizada">Realizada</option>
+              <option value="reprogramada">Reprogramada</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          {reunion.items.map(it => (
+            <div key={it.id} className="rounded-xl border border-gray-100 p-2.5">
+              <div className="flex items-center gap-2">
+                <button onClick={() => toggleItem(it.id)}
+                  className="w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0"
+                  style={it.hecho ? { background: CORAL, borderColor: CORAL } : { borderColor: '#e5e7eb' }}>
+                  {it.hecho && <Check size={11} color="white" strokeWidth={3}/>}
+                </button>
+                <input value={it.texto} onChange={e => setItemTexto(it.id, e.target.value)}
+                  className={`flex-1 text-sm font-semibold bg-transparent outline-none ${it.hecho ? 'text-gray-400 line-through' : 'text-gray-700'}`} />
+                <button onClick={() => delItem(it.id)} className="text-red-300 hover:text-red-500 shrink-0"><Trash2 size={13}/></button>
+              </div>
+              <textarea value={it.nota} onChange={e => setItemNota(it.id, e.target.value)}
+                placeholder="¿Qué se habló de este punto?" rows={1}
+                className="w-full mt-1.5 text-xs border-b border-gray-100 focus:border-gray-300 outline-none resize-none placeholder:text-gray-300 pl-7" />
+            </div>
+          ))}
+          <button onClick={addItem} className="text-xs font-semibold flex items-center gap-1" style={{ color: CORAL }}>
+            <Plus size={13}/> Agregar ítem personalizado
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-full rounded-full" style={{ width: `${reunion.items.length ? done / reunion.items.length * 100 : 0}%`, background: CORAL }}/>
+          </div>
+          <span className="text-xs text-gray-400">{done}/{reunion.items.length}</span>
+        </div>
+
+        <div>
+          <label className="text-[10px] font-bold text-gray-400 uppercase">Notas de la reunión (general)</label>
+          <textarea value={reunion.notas} onChange={e => set({ notas: e.target.value })}
+            placeholder="Notas adicionales…" rows={2}
+            className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 outline-none resize-none focus:border-gray-400 placeholder:text-gray-300" />
+        </div>
+
+        <button onClick={() => set({ estado: reunion.estado === 'realizada' ? 'pendiente' : 'realizada' })}
+          className="w-full py-2.5 rounded-xl text-sm font-bold transition-all"
+          style={reunion.estado === 'realizada' ? { background: '#f3f4f6', color: '#374151', border: '2px solid #e5e7eb' } : { background: NAVY, color: 'white' }}>
+          {reunion.estado === 'realizada' ? 'Reabrir reunión' : 'Marcar como realizada'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function PlantillaEditor({ template, setTemplate }: { template: string[]; setTemplate: (t: string[]) => void }) {
+  const [items, setItems] = useState<string[]>(template)
+  const [saved, setSaved] = useState(false)
+  const set = (i: number, v: string) => setItems(items.map((x, idx) => idx === i ? v : x))
+  const del = (i: number) => setItems(items.filter((_, idx) => idx !== i))
+  const add = () => setItems([...items, ''])
+  const guardar = () => { setTemplate(items.filter(x => x.trim())); setSaved(true); setTimeout(() => setSaved(false), 2000) }
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-3">
+      <div>
+        <p className="font-bold text-gray-800 text-sm">Plantilla de reunión</p>
+        <p className="text-xs text-gray-400 mt-0.5">Estos ítems aparecen por defecto en cada reunión nueva. No afecta reuniones ya creadas.</p>
+      </div>
+      <div className="space-y-1.5">
+        {items.map((it, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <span className="text-xs text-gray-400 w-5 text-right">{i + 1}.</span>
+            <input value={it} onChange={e => set(i, e.target.value)}
+              className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gray-400" />
+            <button onClick={() => del(i)} className="text-red-300 hover:text-red-500 shrink-0"><Trash2 size={14}/></button>
+          </div>
+        ))}
+      </div>
+      <button onClick={add} className="text-xs font-semibold flex items-center gap-1" style={{ color: CORAL }}>
+        <Plus size={13}/> Agregar ítem a la plantilla
+      </button>
+      <button onClick={guardar}
+        className="w-full py-2.5 rounded-xl text-sm font-bold text-white transition-all"
+        style={{ background: saved ? '#16a34a' : NAVY }}>
+        {saved ? '✓ Plantilla guardada' : 'Guardar plantilla'}
+      </button>
     </div>
   )
 }
@@ -1036,50 +1136,135 @@ function TabPuestos({
 // ═══════════════════════════════════════════════════════════════════
 // CONFIG
 // ═══════════════════════════════════════════════════════════════════
+type CfgMeta = Record<string, { by: string; at: string }>
+
 function TabConfig({ cfg, setCfg }: { cfg: Config; setCfg: (c: Config) => void }) {
-  const [local, setLocal] = useState(cfg)
-  const [saved, setSaved] = useState(false)
+  const { user } = useAuth()
+  const [meta, setMeta] = useLocalState<CfgMeta>('com_cfg_meta', {})
 
-  function save() { setCfg(local); setSaved(true); setTimeout(() => setSaved(false), 2000) }
-
-  function EscalaBlock({ turno, prefix, horas }: { turno: string; prefix: 's6' | 's7' | 's8'; horas: string }) {
-    const rows: { label: string; key: keyof Config }[] = [
-      { label: 'Piso minimo (E1 desde)',  key: `${prefix}_e1_desde` as keyof Config },
-      { label: '% Escala 1',              key: `${prefix}_e1_pct`   as keyof Config },
-      { label: 'Escala 2 desde',          key: `${prefix}_e2_desde` as keyof Config },
-      { label: '% Escala 2',              key: `${prefix}_e2_pct`   as keyof Config },
-      { label: 'Escala 3 desde',          key: `${prefix}_e3_desde` as keyof Config },
-      { label: '% Escala 3',              key: `${prefix}_e3_pct`   as keyof Config },
-    ]
-    const bg = prefix === 's6' ? CORAL : prefix === 's7' ? '#2D5A8E' : NAVY
-    return (
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-100" style={{ background: bg }}>
-          <p className="text-white font-bold text-sm">Turno {turno}</p>
-          <p className="text-white/60 text-[11px]">Empleados de {horas}</p>
-        </div>
-        {rows.map(({ label, key }) => (
-          <div key={key as string} className="flex items-center justify-between px-5 py-3 border-b border-gray-50 last:border-0">
-            <p className="text-sm text-gray-600">{label}</p>
-            <input type="number" value={local[key]}
-              onChange={e => setLocal({ ...local, [key]: parseFloat(e.target.value) || 0 })}
-              className="w-32 text-right text-sm font-bold border border-gray-200 rounded-xl px-3 py-1.5 outline-none focus:border-gray-400" />
-          </div>
-        ))}
-      </div>
-    )
-  }
+  const TURNOS: { prefix: 's6' | 's7' | 's8'; turno: Turno; horas: string }[] = [
+    { prefix: 's6', turno: '6hs', horas: '6 horas' },
+    { prefix: 's7', turno: '7hs', horas: '7 horas' },
+    { prefix: 's8', turno: '8hs', horas: '8 y 9 horas' },
+  ]
 
   return (
     <div className="space-y-4">
-      <EscalaBlock turno="6hs" prefix="s6" horas="6 horas" />
-      <EscalaBlock turno="7hs" prefix="s7" horas="7 horas" />
-      <EscalaBlock turno="8hs" prefix="s8" horas="8 horas" />
-      <button onClick={save}
-        className="w-full py-3 rounded-2xl text-sm font-bold text-white transition-all"
-        style={{ background: saved ? '#16a34a' : CORAL }}>
-        {saved ? 'Guardado' : 'Guardar configuracion'}
+      {TURNOS.map(t => (
+        <TurnoCard key={t.prefix} {...t} cfg={cfg} setCfg={setCfg}
+          meta={meta[t.prefix]} onMeta={m => setMeta({ ...meta, [t.prefix]: m })}
+          userName={user?.username ?? 'Usuario'} />
+      ))}
+    </div>
+  )
+}
+
+function TurnoCard({ prefix, turno, horas, cfg, setCfg, meta, onMeta, userName }: {
+  prefix: 's6' | 's7' | 's8'; turno: Turno; horas: string
+  cfg: Config; setCfg: (c: Config) => void
+  meta?: { by: string; at: string }; onMeta: (m: { by: string; at: string }) => void
+  userName: string
+}) {
+  const color = turnoColor(turno)
+  const k = (s: string) => `${prefix}_${s}` as keyof Config
+  // Estado local de los 4 valores editables de este turno
+  const pick = (c: Config) => ({
+    e1d: c[k('e1_desde')] as number, e1p: c[k('e1_pct')] as number,
+    e2d: c[k('e2_desde')] as number, e2p: c[k('e2_pct')] as number,
+    e3d: c[k('e3_desde')] as number, e3p: c[k('e3_pct')] as number,
+  })
+  const [open, setOpen]   = useState(false)
+  const [v, setV]         = useState(pick(cfg))
+  const [saved, setSaved] = useState(false)
+
+  const errE2 = v.e2d <= v.e1d
+  const errE3 = v.e3d <= v.e2d
+  const hayError = errE2 || errE3
+  const sucio = JSON.stringify(v) !== JSON.stringify(pick(cfg))
+
+  const guardar = () => {
+    if (hayError) return
+    setCfg({ ...cfg,
+      [k('e1_desde')]: v.e1d, [k('e1_pct')]: v.e1p,
+      [k('e2_desde')]: v.e2d, [k('e2_pct')]: v.e2p,
+      [k('e3_desde')]: v.e3d, [k('e3_pct')]: v.e3p,
+    })
+    onMeta({ by: userName, at: new Date().toISOString() })
+    setSaved(true); setTimeout(() => setSaved(false), 2000)
+  }
+  const restaurar = () => setV(pick(cfg))   // vuelve al último guardado
+
+  const fmtMeta = meta ? `por ${meta.by} · ${new Date(meta.at).toLocaleDateString('es-AR')} ${new Date(meta.at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}` : 'sin modificaciones'
+  const num = "w-28 text-right text-sm font-bold border rounded-lg px-2 py-1 outline-none"
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      {/* Header colapsable */}
+      <button onClick={() => setOpen(o => !o)} className="w-full px-5 py-3 flex items-center justify-between" style={{ background: color }}>
+        <div className="text-left">
+          <p className="text-white font-bold text-sm">Turno {turnoLabel(turno)}</p>
+          <p className="text-white/70 text-[11px]">Empleados de {horas}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-white/80 text-[11px]">Piso {fmtM(v.e1d)}</span>
+          {open ? <ChevronUp size={16} color="white"/> : <ChevronDown size={16} color="white"/>}
+        </div>
       </button>
+
+      {open && (
+        <div className="p-4 space-y-3">
+          {/* Mini-tabla */}
+          <div className="rounded-xl border border-gray-100 overflow-hidden">
+            <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-2 bg-gray-50 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+              <span>Escalón</span><span className="text-right w-28">Desde $</span><span className="text-right w-16">%</span>
+            </div>
+            {/* Piso */}
+            <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-2 items-center border-t border-gray-50">
+              <span className="text-xs text-gray-500">Sin comisión hasta acá</span>
+              <input type="number" className={`${num} border-gray-200`} value={v.e1d}
+                onChange={e => setV({ ...v, e1d: parseFloat(e.target.value) || 0 })} />
+              <input type="number" className="w-16 text-right text-sm font-bold border border-gray-200 rounded-lg px-2 py-1 outline-none" value={v.e1p}
+                onChange={e => setV({ ...v, e1p: parseFloat(e.target.value) || 0 })} />
+            </div>
+            {/* Escala 2 */}
+            <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-2 items-center border-t border-gray-50">
+              <span className="text-xs font-semibold" style={{ color }}>Escala 2</span>
+              <input type="number" className={`${num} ${errE2 ? 'border-red-400 bg-red-50' : 'border-gray-200'}`} value={v.e2d}
+                onChange={e => setV({ ...v, e2d: parseFloat(e.target.value) || 0 })} />
+              <input type="number" className="w-16 text-right text-sm font-bold border border-gray-200 rounded-lg px-2 py-1 outline-none" value={v.e2p}
+                onChange={e => setV({ ...v, e2p: parseFloat(e.target.value) || 0 })} />
+            </div>
+            {/* Escala 3 */}
+            <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-2 items-center border-t border-gray-50">
+              <span className="text-xs font-semibold" style={{ color }}>Escala 3</span>
+              <input type="number" className={`${num} ${errE3 ? 'border-red-400 bg-red-50' : 'border-gray-200'}`} value={v.e3d}
+                onChange={e => setV({ ...v, e3d: parseFloat(e.target.value) || 0 })} />
+              <input type="number" className="w-16 text-right text-sm font-bold border border-gray-200 rounded-lg px-2 py-1 outline-none" value={v.e3p}
+                onChange={e => setV({ ...v, e3p: parseFloat(e.target.value) || 0 })} />
+            </div>
+          </div>
+
+          {/* Errores de validación */}
+          {errE2 && <p className="text-xs text-red-500">Escala 2 debe ser mayor al piso mínimo.</p>}
+          {errE3 && <p className="text-xs text-red-500">Escala 3 debe ser mayor a Escala 2.</p>}
+
+          {/* Última modificación */}
+          <p className="text-[11px] text-gray-400">Última modificación: {fmtMeta}</p>
+
+          {/* Botones */}
+          <div className="flex gap-2">
+            <button onClick={guardar} disabled={hayError || !sucio}
+              className="flex-1 py-2 rounded-xl text-sm font-bold text-white disabled:opacity-40"
+              style={{ background: saved ? '#16a34a' : color }}>
+              {saved ? '✓ Guardado' : 'Guardar'}
+            </button>
+            <button onClick={restaurar} disabled={!sucio}
+              className="px-3 py-2 rounded-xl text-xs font-semibold border border-gray-200 text-gray-500 disabled:opacity-40 flex items-center gap-1">
+              <RotateCcw size={13}/> Restaurar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -1095,6 +1280,7 @@ export default function Comisiones() {
   const [vendedores,  setVendedores]    = useLocalState<Vendedor[]>('com_vendedores_v2', DEFAULT_VENDEDORES)
   const [registros,   setRegistros]     = useLocalState<RegistroQ[]>('com_registros', [])
   const [reuniones,   setReuniones]     = useLocalState<Reunion[]>('com_reuniones', [])
+  const [reuTemplate, setReuTemplate]   = useLocalState<string[]>('com_reuniones_template', CHECKLIST_ITEMS)
   const [puestos,     setPuestos]       = useLocalState<Puesto[]>('com_puestos_v2', PUESTOS_DEFAULT)
 
   const activos       = vendedores.filter(v => v.activo)
@@ -1146,7 +1332,7 @@ export default function Comisiones() {
       {activeTab === 'calculadora' && <TabCalculadora vendedores={vendedores} cfg={cfg} />}
       {activeTab === 'registro'    && <TabRegistro    vendedores={vendedores} registros={registros} setRegistros={setRegistros} cfg={cfg} />}
       {activeTab === 'vendedores'  && <TabVendedores  vendedores={vendedores} setVendedores={setVendedores} />}
-      {activeTab === 'reuniones'   && <TabReuniones   vendedores={vendedores} reuniones={reuniones} setReuniones={setReuniones} registros={registros} cfg={cfg} />}
+      {activeTab === 'reuniones'   && <TabReuniones   vendedores={vendedores} reuniones={reuniones} setReuniones={setReuniones} registros={registros} template={reuTemplate} setTemplate={setReuTemplate} />}
       {activeTab === 'puestos'     && <TabPuestos     puestos={puestos} setPuestos={setPuestos} />}
       {activeTab === 'config'      && <TabConfig      cfg={cfg} setCfg={setCfg} />}
     </div>
