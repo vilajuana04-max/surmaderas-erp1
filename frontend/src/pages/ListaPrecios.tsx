@@ -659,93 +659,126 @@ function exportarPDF(tipo: 'difusion' | 'caja', placas: Placa[], pct: number, cl
   const fechaFile = `${String(hoy.getDate()).padStart(2, '0')}_${String(hoy.getMonth() + 1).padStart(2, '0')}_${String(hoy.getFullYear()).slice(2)}`
   const money = (n: number) => `$ ${Number(n).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
+  const esMel = tipo === 'difusion' ? 'difusión' : 'caja'
   const grupos = agrupar(placas)
   const tablas = grupos.map(({ categoria, items }) => `
-    <table class="cat">
-      <tr class="cathead">
-        <td class="cnombre" colspan="3">${categoria}</td>
-        <td class="cprecio">Placa entera</td>
-        <td class="cprecio">1/2 placa</td>
-      </tr>
-      ${items.map(p => `
-        <tr>
-          <td class="nombre">${p.nombre}</td>
-          <td class="medida">${p.medida}</td>
-          <td class="espesor">${p.espesor}</td>
-          <td class="precio">${money(p.precio_placa_entera)}</td>
-          <td class="precio">${money(p.precio_media_placa)}</td>
-        </tr>`).join('')}
-    </table>`).join('')
+    <div class="cat">
+      <table>
+        <tr class="cathead">
+          <td class="cnombre" colspan="3">${categoria}</td>
+          <td class="cprecio">Placa entera</td>
+          <td class="cprecio">½ placa</td>
+        </tr>
+        ${items.map((p, i) => `
+          <tr class="${i % 2 ? 'odd' : ''}">
+            <td class="nombre">${p.nombre}</td>
+            <td class="medida">${p.medida}</td>
+            <td class="espesor">${p.espesor}</td>
+            <td class="precio entera">${money(p.precio_placa_entera)}</td>
+            <td class="precio media">${money(p.precio_media_placa)}</td>
+          </tr>`).join('')}
+      </table>
+    </div>`).join('')
 
   const bloqueDescuentos = (tipo === 'caja' && clientes.length > 0) ? `
     <div class="descuentos">
-      <table>
-        ${clientes.map(c => `<tr><td class="dnom">${c.nombre}</td><td class="ddesc">${c.porcentaje_descuento > 0 ? c.porcentaje_descuento + '%' : ''} ${c.notas || ''}</td></tr>`).join('')}
-      </table>
+      <div class="dtitulo">Descuentos especiales · uso interno</div>
+      <div class="dgrid">
+        ${clientes.map(c => `<div class="dcard"><span class="dnom">${c.nombre}</span><span class="ddesc">${c.porcentaje_descuento > 0 ? c.porcentaje_descuento + '%' : ''}${c.notas ? ' · ' + c.notas : ''}</span></div>`).join('')}
+      </div>
     </div>` : ''
 
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Lista ${tipo} — ${fechaFile}</title>
+  // Logo SVG on-brand: planchas apiladas (placas) en navy + coral
+  const logoSvg = `<svg viewBox="0 0 48 48" width="46" height="46" xmlns="http://www.w3.org/2000/svg">
+    <rect width="48" height="48" rx="13" fill="${NAVY}"/>
+    <rect x="11" y="13" width="26" height="6" rx="3" fill="${CORAL}"/>
+    <rect x="11" y="21.5" width="26" height="6" rx="3" fill="${CORAL}" opacity="0.72"/>
+    <rect x="11" y="30" width="26" height="6" rx="3" fill="${CORAL}" opacity="0.45"/>
+  </svg>`
+
+  const waSvg = `<svg width="13" height="13" viewBox="0 0 24 24" fill="#25D366"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.945C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.51 5.26l-.999 3.648 3.847-1.007z"/></svg>`
+  const webSvg = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${CORAL}" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 010 18M12 3a15 15 0 000 18"/></svg>`
+  const igSvg = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${CORAL}" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="${CORAL}" stroke="none"/></svg>`
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Lista ${esMel} — ${fechaFile}</title>
 <style>
-  @page { size: A4; margin: 1.2cm 1.4cm; }
+  @page { size: A4; margin: 1cm 1.2cm; }
   * { box-sizing: border-box; }
-  body { font-family: Arial, Helvetica, sans-serif; color: #111; font-size: 10pt; margin: 0; }
-  .top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
-  .brand { display: flex; align-items: center; gap: 14px; }
-  .logo { width: 58px; height: 58px; border: 1.5px solid #333;
-          display: grid; grid-template-columns: repeat(5,1fr); grid-template-rows: repeat(5,1fr); }
-  .logo span { border: 0.5px solid #d9d9d9; }
-  .logo .lbl { grid-column: 1/6; grid-row: 3/4; border: none; display: flex; align-items: center; justify-content: center;
-               font-weight: bold; font-size: 13pt; color: #333; letter-spacing: 1px; }
-  .contact { font-size: 9.5pt; line-height: 1.5; }
-  .contact a, .contact span.c { color: #2563eb; text-decoration: underline; }
-  .contact .row { display: flex; align-items: center; gap: 6px; }
-  .wa { color: #25D366; font-weight: bold; }
-  .fecha { font-size: 11pt; font-weight: bold; }
-  .diagramas { display: flex; gap: 40px; margin: 6px 0 16px; }
-  .diag { text-align: left; }
-  .diag p { margin: 0 0 4px; font-size: 9.5pt; }
-  .box { width: 70px; height: 52px; }
-  .box.entera { background: #000; }
-  .box.vert { background: linear-gradient(90deg, #fff 50%, #000 50%); border: 1px solid #000; }
-  .box.horiz { background: linear-gradient(180deg, #fff 55%, #000 55%); border: 1px solid #000; }
-  table.cat { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
-  table.cat td { border: 1px solid #000; padding: 3px 6px; font-size: 9.5pt; }
-  .cathead td { background: #d0d0d0; font-weight: bold; text-align: center; }
-  .cathead .cnombre { text-align: center; }
-  .cathead .cprecio { width: 130px; }
-  .nombre { width: auto; }
-  .medida { text-align: center; width: 120px; }
-  .espesor { text-align: center; width: 70px; }
-  .precio { text-align: right; width: 130px; white-space: nowrap; }
-  .pie { font-weight: bold; font-size: 10pt; margin-top: 10px; }
-  .descuentos { margin-top: 16px; }
-  .descuentos table { border-collapse: collapse; }
-  .descuentos td { padding: 2px 10px; font-size: 10pt; }
-  .dnom { border-left: 2px solid #000; }
-  .ddesc { font-weight: bold; }
+  html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: 'Segoe UI', Arial, Helvetica, sans-serif; color: #1a1a1a; font-size: 9.5pt; margin: 0; }
+
+  /* ── Header ── */
+  .hdr { display: flex; align-items: center; justify-content: space-between;
+         background: ${NAVY}; border-radius: 16px; padding: 14px 20px; margin-bottom: 8px; }
+  .brand { display: flex; align-items: center; gap: 13px; }
+  .wm1 { color: #fff; font-size: 17pt; font-weight: 800; letter-spacing: 1px; line-height: 1; }
+  .wm2 { color: rgba(255,255,255,.55); font-size: 7.5pt; letter-spacing: 1.5px; text-transform: uppercase; margin-top: 3px; }
+  .contact { display: flex; flex-direction: column; gap: 3px; }
+  .contact .row { display: flex; align-items: center; gap: 6px; font-size: 8.5pt; color: rgba(255,255,255,.85); }
+  .fechawrap { text-align: right; }
+  .fechalbl { color: rgba(255,255,255,.5); font-size: 7pt; text-transform: uppercase; letter-spacing: 1.5px; }
+  .fecha { display: inline-block; background: ${CORAL}; color: #fff; font-weight: 700; font-size: 12pt;
+           padding: 3px 12px; border-radius: 8px; margin-top: 3px; }
+
+  /* ── Diagramas ── */
+  .diagramas { display: flex; gap: 16px; margin: 12px 0 14px; }
+  .diag { border: 1px solid #ececec; border-radius: 10px; padding: 8px 10px; display: flex; align-items: center; gap: 10px; }
+  .diag p { margin: 0; font-size: 8.5pt; color: #555; font-weight: 600; }
+  .box { width: 42px; height: 32px; border-radius: 4px; flex: 0 0 auto; }
+  .box.entera { background: ${NAVY}; }
+  .box.vert { background: #fff; border: 1.5px solid ${NAVY}; position: relative; overflow: hidden; }
+  .box.vert::after { content: ''; position: absolute; right: 0; top: 0; width: 50%; height: 100%; background: ${NAVY}; }
+  .box.horiz { background: #fff; border: 1.5px solid ${NAVY}; position: relative; overflow: hidden; }
+  .box.horiz::after { content: ''; position: absolute; left: 0; bottom: 0; width: 100%; height: 50%; background: ${NAVY}; }
+
+  /* ── Tablas por categoría ── */
+  .cat { border-radius: 10px; overflow: hidden; border: 1px solid #ececec; margin-bottom: 9px; }
+  .cat table { width: 100%; border-collapse: collapse; }
+  .cat td { padding: 5px 10px; font-size: 9pt; border-bottom: 1px solid #f0f0f0; }
+  .cathead td { border-bottom: none; font-weight: 700; }
+  .cathead .cnombre { background: ${CORAL}; color: #fff; text-transform: uppercase; letter-spacing: .5px; font-size: 9pt; }
+  .cathead .cprecio { background: ${NAVY}; color: #fff; text-align: center; width: 120px; font-size: 8.5pt; }
+  tr.odd td { background: #faf7f5; }
+  .nombre { font-weight: 600; color: #222; }
+  .medida { text-align: center; color: #666; width: 110px; }
+  .espesor { text-align: center; color: #666; width: 64px; }
+  .precio { text-align: right; width: 120px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .precio.entera { font-weight: 700; color: ${NAVY}; }
+  .precio.media { color: #888; }
+
+  /* ── Pie ── */
+  .pie { margin-top: 12px; padding: 9px 14px; background: #faf7f5; border-left: 3px solid ${CORAL};
+         border-radius: 6px; font-size: 9pt; font-weight: 600; color: #444; }
+  .descuentos { margin-top: 14px; }
+  .dtitulo { font-size: 8pt; text-transform: uppercase; letter-spacing: 1.5px; color: ${CORAL}; font-weight: 700; margin-bottom: 6px; }
+  .dgrid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .dcard { border: 1px solid #ececec; border-radius: 8px; padding: 6px 12px; display: flex; flex-direction: column; }
+  .dnom { font-weight: 700; color: #222; font-size: 9.5pt; }
+  .ddesc { font-size: 8pt; color: ${CORAL}; font-weight: 600; }
 </style></head><body>
-  <div class="top">
+  <div class="hdr">
     <div class="brand">
-      <div class="logo">
-        <span></span><span></span><span></span><span></span><span></span>
-        <span></span><span></span><span></span><span></span><span></span>
-        <div class="lbl">Sur</div>
-        <span></span><span></span><span></span><span></span><span></span>
-        <span></span><span></span><span></span><span></span><span></span>
-      </div>
-      <div class="contact">
-        <div class="row"><span class="wa">✆</span> <span class="c">Contactar por whatsapp</span></div>
-        <div class="row">🌐 <span class="c">surmaderas.com.ar</span></div>
-        <div class="row">◎ <span class="c">Surmaderas.mdp</span></div>
+      ${logoSvg}
+      <div>
+        <div class="wm1">SUR MADERAS</div>
+        <div class="wm2">Mar del Plata · Placas a medida</div>
       </div>
     </div>
-    <div class="fecha">${fechaVig}</div>
+    <div class="contact">
+      <div class="row">${waSvg} Contactar por WhatsApp</div>
+      <div class="row">${webSvg} surmaderas.com.ar</div>
+      <div class="row">${igSvg} Surmaderas.mdp</div>
+    </div>
+    <div class="fechawrap">
+      <div class="fechalbl">Vigente</div>
+      <div class="fecha">${fechaVig}</div>
+    </div>
   </div>
 
   <div class="diagramas">
-    <div class="diag"><p>Placa entera</p><div class="box entera"></div></div>
-    <div class="diag"><p>1/2 Placa vertical</p><div class="box vert"></div></div>
-    <div class="diag"><p>1/2 placa horizontal</p><div class="box horiz"></div></div>
+    <div class="diag"><div class="box entera"></div><p>Placa entera</p></div>
+    <div class="diag"><div class="box vert"></div><p>½ placa vertical</p></div>
+    <div class="diag"><div class="box horiz"></div><p>½ placa horizontal</p></div>
   </div>
 
   ${tablas}
