@@ -2868,6 +2868,10 @@ interface Puesto {
   llamada_accion: string
   contacto_nombre: string
   contacto_email: string
+  reporta_a: string
+  interactua_con: string
+  ubicacion: string
+  horario: string
   orden: number
 }
 
@@ -2895,7 +2899,9 @@ function PuestosTab() {
     id: 0, titulo: '', empleado: '', info_empresa: '', resumen: '',
     responsabilidades: { diarias: [], semanales: [], quincenales: [] },
     expectativas: '', requisitos: '', llamada_accion: '',
-    contacto_nombre: '', contacto_email: '', orden: puestos.length,
+    contacto_nombre: '', contacto_email: '',
+    reporta_a: '', interactua_con: '', ubicacion: '', horario: '',
+    orden: puestos.length,
   })
 
   if (sel) return <PuestoEditor puesto={sel} onClose={() => setSel(null)} onSaved={() => { setSel(null); load() }} onDeleted={() => { setSel(null); load() }} />
@@ -2970,43 +2976,82 @@ function PuestoEditor({ puesto, onClose, onSaved, onDeleted }: {
     set('responsabilidades', { ...f.responsabilidades, [cat]: f.responsabilidades[cat].filter((_, idx) => idx !== i) })
 
   const exportarPDF = () => {
-    const bloqueResp = RESP_CATS.map(({ key, label }) => {
+    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    // Cada tarea puede llevar una descripción opcional después de " — " (queda en gris debajo)
+    const renderTarea = (raw: string, n: number, check: boolean) => {
+      const [titulo, ...restoParts] = raw.split(' — ')
+      const desc = restoParts.join(' — ').trim()
+      return `<li class="tarea">
+        ${check ? '<span class="box"></span>' : ''}
+        <span class="tnum">${n}.</span>
+        <span class="tbody"><span class="ttit">${esc(titulo.trim())}</span>${desc ? `<span class="tdesc">${esc(desc)}</span>` : ''}</span>
+      </li>`
+    }
+    const bloqueTareas = ([
+      { key: 'diarias' as const,     label: 'Tareas diarias',     check: true  },
+      { key: 'semanales' as const,   label: 'Tareas semanales',   check: false },
+      { key: 'quincenales' as const, label: 'Tareas quincenales', check: false },
+    ]).map(({ key, label, check }) => {
       const items = (f.responsabilidades[key] || []).filter(r => r.trim())
       if (!items.length) return ''
-      return `<h3 class="rsub">${label}</h3><ul>${items.map(r => `<li>${r}</li>`).join('')}</ul>`
+      return `<section class="tareas">
+        <h2>${label}</h2>
+        <ol class="tlist">${items.map((r, i) => renderTarea(r, i + 1, check)).join('')}</ol>
+      </section>`
     }).join('')
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Perfil del Puesto — ${f.titulo}</title>
+
+    const relacion = (f.reporta_a || f.interactua_con) ? `
+      <section>
+        <h2>A quién reporta / con quién interactúa</h2>
+        ${f.reporta_a ? `<p><b>Reporta a:</b> ${esc(f.reporta_a)}</p>` : ''}
+        ${f.interactua_con ? `<p><b>Interactúa con:</b> ${esc(f.interactua_con)}</p>` : ''}
+      </section>` : ''
+
+    const subtitulo = [f.empleado && `Ocupado por ${esc(f.empleado)}`, f.ubicacion && esc(f.ubicacion), f.horario && esc(f.horario)]
+      .filter(Boolean).join('  ·  ')
+    const hoy = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Descripción del Puesto — ${esc(f.titulo)}</title>
 <style>
-  @page { margin: 1.5cm; }
-  body { font-family: Arial, sans-serif; color: #1a1a1a; font-size: 11pt; line-height: 1.45; margin: 0; }
-  .hdr { border-bottom: 3px solid ${CORAL}; padding-bottom: 10px; margin-bottom: 6px; }
-  .company { font-size: 9pt; letter-spacing: 2px; text-transform: uppercase; color: ${CORAL}; font-weight: bold; }
-  h1 { font-size: 24pt; margin: 2px 0 0; color: ${NAVY}; }
-  .empleado { font-size: 11pt; color: #555; margin-top: 2px; }
-  h2 { font-size: 11pt; text-transform: uppercase; letter-spacing: 1px; color: ${NAVY}; margin: 18px 0 4px;
-       border-left: 4px solid ${CORAL}; padding-left: 8px; }
-  .rsub { font-size: 10pt; color: ${CORAL}; margin: 8px 0 2px; font-weight: bold; }
-  p { margin: 4px 0; }
-  ul { margin: 4px 0; padding-left: 20px; }
-  li { margin: 3px 0; }
-  .cta { background: ${NAVY}; color: #fff; padding: 12px 16px; border-radius: 6px; margin-top: 18px; }
-  .cta b { color: ${CORAL}; }
-  .foot { margin-top: 24px; border-top: 1px solid #ddd; padding-top: 6px; font-size: 8pt; color: #999; text-align: center; }
+  @page { margin: 1.6cm 1.8cm; }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #0A0A0A; font-size: 10.5pt; line-height: 1.5; margin: 0; }
+  .hdr { border-bottom: 3px solid ${CORAL}; padding-bottom: 12px; margin-bottom: 4px; }
+  .company { font-size: 9pt; letter-spacing: 3px; text-transform: uppercase; color: ${CORAL}; font-weight: bold; }
+  h1 { font-size: 27pt; margin: 4px 0 2px; color: #0A0A0A; letter-spacing: -0.5px; }
+  .sub { font-size: 11pt; color: #555; margin-top: 3px; }
+  h2 { font-size: 11pt; text-transform: uppercase; letter-spacing: 1.2px; color: #0A0A0A; font-weight: bold;
+       margin: 22px 0 6px; padding-bottom: 5px; border-bottom: 1px solid #ddd; }
+  p { margin: 5px 0; }
+  section { margin-bottom: 6px; }
+  /* — Tareas: lo más destacado del documento — */
+  .tareas h2 { color: ${CORAL}; border-bottom-color: ${CORAL}; }
+  ol.tlist { list-style: none; margin: 8px 0 0; padding: 0; }
+  li.tarea { display: flex; align-items: flex-start; gap: 9px; padding: 7px 0; border-bottom: 1px solid #f0f0f0; page-break-inside: avoid; }
+  li.tarea:last-child { border-bottom: none; }
+  .box { flex: 0 0 auto; width: 15px; height: 15px; border: 1.5px solid #999; border-radius: 3px; margin-top: 1px; }
+  .tnum { flex: 0 0 auto; font-weight: bold; color: ${CORAL}; font-size: 12pt; min-width: 18px; }
+  .tbody { display: flex; flex-direction: column; }
+  .ttit { font-size: 11.5pt; font-weight: 600; color: #0A0A0A; line-height: 1.35; }
+  .tdesc { font-size: 9.5pt; color: #888; margin-top: 2px; line-height: 1.4; }
+  .foot { margin-top: 28px; border-top: 1px solid #ddd; padding-top: 8px; font-size: 8pt; color: #999; text-align: center; }
+  .foot b { color: #666; }
 </style></head><body>
   <div class="hdr">
     <div class="company">Sur Maderas · Mar del Plata</div>
-    <h1>${f.titulo}</h1>
-    ${f.empleado ? `<div class="empleado">Ocupado por: <b>${f.empleado}</b></div>` : ''}
+    <h1>${esc(f.titulo)}</h1>
+    ${subtitulo ? `<div class="sub">${subtitulo}</div>` : ''}
   </div>
 
-  ${f.info_empresa ? `<h2>La empresa</h2><p>${f.info_empresa}</p>` : ''}
-  ${f.resumen ? `<h2>Resumen del puesto</h2><p>${f.resumen}</p>` : ''}
-  ${bloqueResp ? `<h2>Responsabilidades</h2>${bloqueResp}` : ''}
-  ${f.expectativas ? `<h2>Expectativas y compromisos</h2><p>${f.expectativas}</p>` : ''}
-  ${f.requisitos ? `<h2>Requisitos del candidato</h2><p>${f.requisitos}</p>` : ''}
-  ${(f.llamada_accion || f.contacto_email) ? `<div class="cta">${f.llamada_accion || '¿Te interesa este puesto? Envianos tu CV.'}${(f.contacto_nombre || f.contacto_email) ? `<br><br>Contacto: <b>${f.contacto_nombre}</b> ${f.contacto_email ? `· ${f.contacto_email}` : ''}` : ''}</div>` : ''}
+  ${f.resumen ? `<section><h2>Descripción general del puesto</h2><p>${esc(f.resumen)}</p></section>` : ''}
+  ${relacion}
+  ${bloqueTareas}
+  ${f.expectativas ? `<section><h2>Expectativas y compromisos</h2><p>${esc(f.expectativas)}</p></section>` : ''}
 
-  <div class="foot">Sur Maderas · Perfil del Puesto · Documento interno</div>
+  <div class="foot">
+    Sur Maderas · Documento interno · ${hoy}<br>
+    <b>Este documento es de uso exclusivo del empleado y la empresa.</b>
+  </div>
   <script>window.onload=function(){window.print()}</script>
 </body></html>`
     const w = window.open('', '_blank', 'width=900,height=700')
@@ -3029,30 +3074,51 @@ function PuestoEditor({ puesto, onClose, onSaved, onDeleted }: {
       </div>
 
       <div className="p-5 space-y-4 max-w-3xl">
+        {/* Ocupado por — bien visible al inicio */}
+        <div className="rounded-xl border-2 p-3" style={{ borderColor: CORAL + '55', background: CORAL + '0d' }}>
+          <label className={lbl} style={{ color: CORAL }}>Ocupado por</label>
+          <input className="w-full bg-transparent border-0 border-b border-gray-200 px-0 py-1 text-lg font-bold focus:outline-none focus:border-gray-400"
+            style={{ color: NAVY }} value={f.empleado} onChange={e => set('empleado', e.target.value)} placeholder="Nombre del empleado" />
+        </div>
+
+        <div>
+          <label className={lbl}>Título del puesto *</label>
+          <input className={input} value={f.titulo} onChange={e => set('titulo', e.target.value)} placeholder="Ej: Vendedor de salón" />
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className={lbl}>Título del puesto *</label>
-            <input className={input} value={f.titulo} onChange={e => set('titulo', e.target.value)} placeholder="Ej: Vendedor de salón" />
+            <label className={lbl}>Ubicación / Sector</label>
+            <input className={input} value={f.ubicacion} onChange={e => set('ubicacion', e.target.value)} placeholder="Ej: Tercer piso · Taller" />
           </div>
           <div>
-            <label className={lbl}>Ocupado por</label>
-            <input className={input} value={f.empleado} onChange={e => set('empleado', e.target.value)} placeholder="Ej: Ariel" />
+            <label className={lbl}>Horario</label>
+            <input className={input} value={f.horario} onChange={e => set('horario', e.target.value)} placeholder="Ej: Lun a Vie 8 a 16 hs" />
           </div>
         </div>
 
         <div>
-          <label className={lbl}>Información de la empresa</label>
-          <textarea className={input} rows={3} value={f.info_empresa} onChange={e => set('info_empresa', e.target.value)} />
+          <label className={lbl}>Descripción general del puesto</label>
+          <textarea className={input} rows={3} value={f.resumen} onChange={e => set('resumen', e.target.value)}
+            placeholder="Propósito del puesto y cómo encaja en la operación." />
         </div>
 
-        <div>
-          <label className={lbl}>Resumen del puesto</label>
-          <textarea className={input} rows={3} value={f.resumen} onChange={e => set('resumen', e.target.value)}
-            placeholder="Propósito del puesto, cómo encaja en la operación y a quién reporta." />
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={lbl}>Reporta a</label>
+            <input className={input} value={f.reporta_a} onChange={e => set('reporta_a', e.target.value)} placeholder="Ej: Martín (Encargado)" />
+          </div>
+          <div>
+            <label className={lbl}>Interactúa con</label>
+            <input className={input} value={f.interactua_con} onChange={e => set('interactua_con', e.target.value)} placeholder="Ej: Producción, Caja, Ventas online" />
+          </div>
         </div>
 
         <div className="space-y-4">
-          <label className={lbl}>Responsabilidades</label>
+          <div>
+            <label className={lbl}>Tareas / Responsabilidades</label>
+            <p className="text-[11px] text-gray-400 mt-0.5">Tip: agregá una descripción después de <b>" — "</b> y aparecerá en gris debajo de la tarea en el PDF.</p>
+          </div>
           {RESP_CATS.map(({ key, label }) => (
             <div key={key} className="rounded-lg border border-gray-100 p-3">
               <div className="flex items-center justify-between mb-1.5">
@@ -3067,7 +3133,7 @@ function PuestoEditor({ puesto, onClose, onSaved, onDeleted }: {
                     <button onClick={() => delResp(key, i)} className="text-red-300 hover:text-red-600 shrink-0"><Trash2 size={14}/></button>
                   </div>
                 ))}
-                {f.responsabilidades[key].length === 0 && <p className="text-xs text-gray-300">Sin responsabilidades {label.toLowerCase()}.</p>}
+                {f.responsabilidades[key].length === 0 && <p className="text-xs text-gray-300">Sin tareas {label.toLowerCase()}.</p>}
               </div>
             </div>
           ))}
@@ -3076,29 +3142,7 @@ function PuestoEditor({ puesto, onClose, onSaved, onDeleted }: {
         <div>
           <label className={lbl}>Expectativas y compromisos</label>
           <textarea className={input} rows={2} value={f.expectativas} onChange={e => set('expectativas', e.target.value)}
-            placeholder="Horario, tipo de contrato, ubicación, viajes, fines de semana…" />
-        </div>
-
-        <div>
-          <label className={lbl}>Requisitos del candidato</label>
-          <textarea className={input} rows={2} value={f.requisitos} onChange={e => set('requisitos', e.target.value)}
-            placeholder="Habilidades técnicas y blandas, experiencia, formación." />
-        </div>
-
-        <div>
-          <label className={lbl}>Llamada a la acción</label>
-          <textarea className={input} rows={2} value={f.llamada_accion} onChange={e => set('llamada_accion', e.target.value)}
-            placeholder="Frase que invita a postularse." />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className={lbl}>Contacto (nombre)</label>
-            <input className={input} value={f.contacto_nombre} onChange={e => set('contacto_nombre', e.target.value)} />
-          </div>
-          <div>
-            <label className={lbl}>Contacto (email)</label>
-            <input className={input} value={f.contacto_email} onChange={e => set('contacto_email', e.target.value)} />
-          </div>
+            placeholder="Compromisos del puesto, valores, cómo se espera que trabaje." />
         </div>
 
         <div className="flex gap-2 pt-2 border-t border-gray-100">

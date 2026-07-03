@@ -31,6 +31,10 @@ class PuestoIn(BaseModel):
     llamada_accion:    Optional[str] = ""
     contacto_nombre:   Optional[str] = ""
     contacto_email:    Optional[str] = ""
+    reporta_a:         Optional[str] = ""
+    interactua_con:    Optional[str] = ""
+    ubicacion:         Optional[str] = ""
+    horario:           Optional[str] = ""
     orden:             int = 0
 
 
@@ -45,6 +49,10 @@ class PuestoUpdate(BaseModel):
     llamada_accion:    Optional[str] = None
     contacto_nombre:   Optional[str] = None
     contacto_email:    Optional[str] = None
+    reporta_a:         Optional[str] = None
+    interactua_con:    Optional[str] = None
+    ubicacion:         Optional[str] = None
+    horario:           Optional[str] = None
     orden:             Optional[int] = None
 
 
@@ -79,6 +87,10 @@ def _serialize(p: Puesto) -> dict:
         "llamada_accion":    p.llamada_accion or "",
         "contacto_nombre":   p.contacto_nombre or "",
         "contacto_email":    p.contacto_email or "",
+        "reporta_a":         p.reporta_a or "",
+        "interactua_con":    p.interactua_con or "",
+        "ubicacion":         p.ubicacion or "",
+        "horario":           p.horario or "",
         "orden":             p.orden or 0,
     }
 

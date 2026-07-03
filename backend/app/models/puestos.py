@@ -17,6 +17,10 @@ class Puesto(Base):
     llamada_accion  = Column(Text, default="")
     contacto_nombre = Column(String(150), default="")
     contacto_email  = Column(String(150), default="")
+    reporta_a       = Column(String(200), default="")   # a quién le rinde cuentas
+    interactua_con  = Column(String(300), default="")   # puestos/personas con quien coordina
+    ubicacion       = Column(String(200), default="")   # sector / ubicación física
+    horario         = Column(String(200), default="")   # texto libre
     orden           = Column(Integer, default=0)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())

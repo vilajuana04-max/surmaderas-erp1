@@ -52,6 +52,10 @@ def _run_migrations():
         "ALTER TABLE marketing_calendar ADD COLUMN IF NOT EXISTS tareas TEXT DEFAULT '[]';",
         "ALTER TABLE marketing_calendar ADD COLUMN IF NOT EXISTS dias_preparacion INTEGER DEFAULT 0;",
         "ALTER TABLE marketing_calendar ADD COLUMN IF NOT EXISTS color VARCHAR(20) DEFAULT '';",
+        "ALTER TABLE puestos ADD COLUMN IF NOT EXISTS reporta_a VARCHAR(200) DEFAULT '';",
+        "ALTER TABLE puestos ADD COLUMN IF NOT EXISTS interactua_con VARCHAR(300) DEFAULT '';",
+        "ALTER TABLE puestos ADD COLUMN IF NOT EXISTS ubicacion VARCHAR(200) DEFAULT '';",
+        "ALTER TABLE puestos ADD COLUMN IF NOT EXISTS horario VARCHAR(200) DEFAULT '';",
         "UPDATE users SET username = 'CAJA', role = 'caja_diaria' WHERE username IN ('Caja', 'caja') AND role != 'admin';",
     ]
     for sql in statements:
