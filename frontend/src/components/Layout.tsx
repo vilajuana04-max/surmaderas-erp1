@@ -29,7 +29,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
   const canSeeCupones = isAdmin || isCajaDiaria
 
   const p = location.pathname
-  const isFinanzas = ['/ventas','/compras','/gastos','/flujocaja','/punto-equilibrio'].some(x => p === x || p.startsWith(x))
+  const isFinanzas = ['/ventas','/compras','/gastos','/flujocaja','/punto-equilibrio','/lista-precios'].some(x => p === x || p.startsWith(x))
   const isRRHH     = p.startsWith('/rrhh') || p.startsWith('/comisiones')
   const isClientes = p.startsWith('/cupones') || p.startsWith('/clientes')
 
@@ -152,6 +152,8 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
                     style={{ borderLeftColor: p.startsWith('/flujocaja') ? CORAL : 'transparent' }}><span>Flujo de Caja</span></NavLink>
                   <NavLink to="/punto-equilibrio" onClick={onClose} className={subLinkClass(p.startsWith('/punto-equilibrio'))}
                     style={{ borderLeftColor: p.startsWith('/punto-equilibrio') ? CORAL : 'transparent' }}><span>Punto de Equilibrio</span></NavLink>
+                  <NavLink to="/lista-precios" onClick={onClose} className={subLinkClass(p.startsWith('/lista-precios'))}
+                    style={{ borderLeftColor: p.startsWith('/lista-precios') ? CORAL : 'transparent' }}><span>Lista de Precios</span></NavLink>
                 </>}
               </div>
             )}

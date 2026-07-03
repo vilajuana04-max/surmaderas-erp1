@@ -15,6 +15,7 @@ from .clientes import Cliente, ClienteCompra, ClienteFeliz15
 from .marketing import MarketingEvent
 from .contenido import ContentEvent
 from .puestos import Puesto
+from .placas import Placa, PlacaHistorial, ClienteDescuento, PlacaConfig
 
 __all__ = [
     "User",
@@ -34,4 +35,5 @@ __all__ = [
     "MarketingEvent",
     "ContentEvent",
     "Puesto",
+    "Placa", "PlacaHistorial", "ClienteDescuento", "PlacaConfig",
 ]

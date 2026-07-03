@@ -19,6 +19,7 @@ import Cupones          from './pages/Cupones'
 import Clientes         from './pages/Clientes'
 import Marketing        from './pages/Marketing'
 import Contenido        from './pages/Contenido'
+import ListaPrecios     from './pages/ListaPrecios'
 
 export default function App() {
   return (
@@ -98,6 +99,16 @@ export default function App() {
             <ProtectedRoute requiredRole="admin">
               <Layout>
                 <FlujoCaja />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/lista-precios"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <Layout>
+                <ListaPrecios />
               </Layout>
             </ProtectedRoute>
           }
