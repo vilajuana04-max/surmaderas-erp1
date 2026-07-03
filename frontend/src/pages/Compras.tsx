@@ -168,8 +168,8 @@ export default function Compras() {
     return list
   }, [purchases, filterProvider, filterDateFrom, filterDateTo, filterMinAmt, filterMaxAmt, sortField, sortAsc])
 
-  const totalMes      = purchases.reduce((a, p) => a + p.total_amount, 0)
-  const totalFiltered = filtered.reduce((a, p) => a + p.total_amount, 0)
+  const totalMes      = purchases.reduce((a, p) => a + (Number(p.total_amount) || 0), 0)
+  const totalFiltered = filtered.reduce((a, p) => a + (Number(p.total_amount) || 0), 0)
   const isClosed      = purchases.length > 0 && purchases.every(p => p.closed)
   const hasFilters    = !!(filterProvider || filterDateFrom || filterDateTo || filterMinAmt || filterMaxAmt)
 
@@ -259,7 +259,7 @@ export default function Compras() {
     )
   }
 
-  const histTotal = histPurchases.reduce((a, p) => a + p.total_amount, 0)
+  const histTotal = histPurchases.reduce((a, p) => a + (Number(p.total_amount) || 0), 0)
 
   /* ── Render ─────────────────────────────────────────────────────── */
   return (

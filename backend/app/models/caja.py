@@ -21,6 +21,7 @@ class CajaDiaria(Base):
     tarjeta_comafi    = Column(Numeric(15, 2), default=0, nullable=False)
 
     observaciones     = Column(String(500), default='')
+    cantidad_tickets  = Column(Integer, default=0)   # nº de tickets del día → Ventas.ticket_count
     cerrada           = Column(Boolean, default=False)
     created_at        = Column(DateTime(timezone=True), server_default=func.now())
 

@@ -25,7 +25,7 @@ type Caja = {
   efectivo_del_dia: number   // = total_link (compat)
   tarjeta_provincia: number; tarjeta_nave: number
   tarjeta_frances: number;  tarjeta_comafi: number
-  observaciones: string; cerrada: boolean
+  observaciones: string; cantidad_tickets: number; cerrada: boolean
   movimientos: Mov[]
   total_gastos: number; total_transf: number
   total_retiros: number; total_link: number; total_tarjetas: number
@@ -772,6 +772,26 @@ export default function CajaDiaria() {
 
               {/* ── Cupones ── */}
               <CuponPanel />
+
+              {/* ── Cantidad de tickets del día → Ventas ── */}
+              <div className="bg-white rounded-2xl border border-gray-100 px-5 py-4 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Cantidad de tickets del día</p>
+                  <p className="text-[11px] text-gray-300 mt-0.5">Al cerrar la caja se carga en Ventas · Total Tickets</p>
+                </div>
+                <input
+                  key={caja.id + '-tickets'}
+                  type="number" min={0} inputMode="numeric"
+                  defaultValue={caja.cantidad_tickets || ''}
+                  disabled={disabled}
+                  onBlur={e => {
+                    const n = parseInt(e.target.value, 10)
+                    const val = isNaN(n) || n < 0 ? 0 : n
+                    if (val !== (caja.cantidad_tickets || 0)) patchCaja({ cantidad_tickets: val })
+                  }}
+                  placeholder="0"
+                  className="w-28 text-right text-2xl font-bold text-gray-800 bg-gray-50 rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-[#C8603A]/30 disabled:opacity-50" />
+              </div>
 
               {/* ── Acciones: Cerrar + PDF ── */}
               <div className="flex gap-3">

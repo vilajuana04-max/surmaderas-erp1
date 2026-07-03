@@ -56,6 +56,7 @@ def _run_migrations():
         "ALTER TABLE puestos ADD COLUMN IF NOT EXISTS interactua_con VARCHAR(300) DEFAULT '';",
         "ALTER TABLE puestos ADD COLUMN IF NOT EXISTS ubicacion VARCHAR(200) DEFAULT '';",
         "ALTER TABLE puestos ADD COLUMN IF NOT EXISTS horario VARCHAR(200) DEFAULT '';",
+        "ALTER TABLE caja_diaria ADD COLUMN IF NOT EXISTS cantidad_tickets INTEGER DEFAULT 0;",
         "UPDATE users SET username = 'CAJA', role = 'caja_diaria' WHERE username IN ('Caja', 'caja') AND role != 'admin';",
     ]
     for sql in statements:

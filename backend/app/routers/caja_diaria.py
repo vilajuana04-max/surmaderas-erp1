@@ -34,6 +34,7 @@ class CajaUpdate(BaseModel):
     tarjeta_frances:   Optional[float] = None
     tarjeta_comafi:    Optional[float] = None
     observaciones:     Optional[str]   = None
+    cantidad_tickets:  Optional[int]   = None
     cerrada:           Optional[bool]  = None
 
 
@@ -98,6 +99,7 @@ def _serialize_caja(c: CajaDiaria) -> dict:
         "tarjeta_frances":    float(c.tarjeta_frances),
         "tarjeta_comafi":     float(c.tarjeta_comafi),
         "observaciones":      c.observaciones or '',
+        "cantidad_tickets":   c.cantidad_tickets or 0,
         "cerrada":            c.cerrada,
         "movimientos":        movs,
         "total_gastos":       total_gastos,
@@ -496,6 +498,7 @@ def update_caja(caja_id: int, body: CajaUpdate, db: Session = Depends(get_db)):
     if body.tarjeta_frances   is not None: caja.tarjeta_frances   = body.tarjeta_frances
     if body.tarjeta_comafi    is not None: caja.tarjeta_comafi    = body.tarjeta_comafi
     if body.observaciones     is not None: caja.observaciones     = body.observaciones
+    if body.cantidad_tickets  is not None: caja.cantidad_tickets  = body.cantidad_tickets
     if body.cerrada           is not None: caja.cerrada           = body.cerrada
 
     # Guardar el estado de la caja PRIMERO (el cierre nunca debe fallar
@@ -548,16 +551,20 @@ def _sync_cierre(caja, caja_id: int, db: Session) -> list:
         d = _serialize_caja(caja)
         total_tarjetas = d["total_tarjetas"]
         total_dia = d["total_transf"] + d["total_salidas"] + d["total_tarjetas"] + d["total_link"]
+        tickets = int(d.get("cantidad_tickets") or 0)
         venta = db.query(DailySales).filter(
             DailySales.sale_date == fecha, DailySales.branch_id == branch_id,
         ).first()
         if venta:
             venta.card_payments = total_tarjetas
             venta.total_amount  = total_dia
+            if tickets > 0:
+                venta.ticket_count = tickets
         else:
             db.add(DailySales(
                 sale_date=fecha, branch_id=branch_id,
                 total_amount=total_dia, card_payments=total_tarjetas,
+                ticket_count=tickets if tickets > 0 else None,
                 month_label=MESES_ES[fecha.month - 1].upper(), year=fecha.year,
             ))
         db.commit()
