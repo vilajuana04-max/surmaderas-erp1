@@ -584,6 +584,13 @@ const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                      'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const DAY_NAMES   = ['D','L','M','X','J','V','S']
 
+// Meses de sueldos + planillas de aguinaldo (Junio 2 y Diciembre 2).
+// Son períodos independientes: seleccionarlos crea una planilla aparte.
+const PAYROLL_MONTHS = MONTHS.flatMap(m =>
+  m === 'JUNIO'     ? ['JUNIO', 'JUNIO 2'] :
+  m === 'DICIEMBRE' ? ['DICIEMBRE', 'DICIEMBRE 2'] : [m]
+)
+
 // Paleta determinista por empleado (misma lógica que proveedores en Compras)
 function empColor(name: string): string {
   const PALETTE = [
@@ -1655,7 +1662,7 @@ ${cards}
       <div className="flex flex-wrap items-center gap-3">
         <select value={month} onChange={e => setMonth(e.target.value)}
           className="border border-gray-200 rounded-lg px-3 py-2 text-sm font-body focus:outline-none bg-white shadow-sm">
-          {MONTHS.map(m => <option key={m}>{m}</option>)}
+          {PAYROLL_MONTHS.map(m => <option key={m}>{m}</option>)}
         </select>
         <span className="text-sm text-gray-500 font-body">{year}</span>
 
@@ -2068,7 +2075,7 @@ function RecibosTab() {
         </select>
         <select value={month} onChange={e => setMonth(e.target.value)}
           className="border border-brand-border rounded-lg px-3 py-2 text-sm font-body focus:outline-none">
-          {MONTHS.map(m => <option key={m}>{m}</option>)}
+          {PAYROLL_MONTHS.map(m => <option key={m}>{m}</option>)}
         </select>
 
         {/* Progress badge */}
