@@ -982,7 +982,8 @@ function SueldosTab() {
     } else if (isManual) {
       incomeRows += ln('Sueldo', $(bm))
     } else {
-      incomeRows += ln('Sueldo', $(dep * 2))
+      // Depósito ×1 (es_base) o ×2 (estándar) — igual que calcBruto
+      incomeRows += ln('Sueldo', $(dep * (m.es_base ? 1 : 2)))
     }
     if (com > 0)  incomeRows += ln(comLabel, $(com))
     if (plusP > 0) incomeRows += ln('Plus', $(plusP))
