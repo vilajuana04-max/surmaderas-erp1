@@ -69,7 +69,7 @@ export default function Login() {
               onChange={e => setUsername(e.target.value)}
               autoComplete="username"
               autoFocus
-              placeholder="Ej: Gustavo"
+              placeholder=""
               className="w-full rounded-xl px-4 py-3 text-white text-sm font-medium placeholder:text-white/20
                          outline-none transition-all duration-200
                          focus:ring-2"
