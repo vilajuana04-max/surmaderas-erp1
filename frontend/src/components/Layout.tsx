@@ -26,7 +26,8 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
   const { user, logout } = useAuth()
   const isAdmin      = user?.role === 'admin'
   const isCajaDiaria = user?.role === 'caja_diaria'
-  const canSeeCupones = isAdmin || isCajaDiaria
+  const isCupones    = user?.role === 'cupones'
+  const canSeeCupones = isAdmin || isCajaDiaria || isCupones
 
   const p = location.pathname
   const isFinanzas = ['/ventas','/compras','/gastos','/flujocaja','/punto-equilibrio','/lista-precios'].some(x => p === x || p.startsWith(x))
@@ -95,7 +96,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
                 {user.username}
               </p>
               <p className="text-white/30 text-[10px] tracking-wide uppercase mt-0.5">
-                {user.role === 'admin' ? 'Administrador' : user.role === 'caja_diaria' ? 'Caja Diaria' : 'Acceso Caja'}
+                {user.role === 'admin' ? 'Administrador' : user.role === 'caja_diaria' ? 'Caja Diaria' : user.role === 'cupones' ? 'Cupones' : 'Acceso Caja'}
               </p>
             </div>
           </div>
@@ -105,7 +106,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
       {/* Nav */}
       <nav className="flex-1 py-6 overflow-y-auto">
         {/* ── Dashboard ── */}
-        {!isCajaDiaria && (
+        {!isCajaDiaria && !isCupones && (
           <NavLink to="/" end onClick={onClose}
             className={({ isActive }) => navLinkClass(isActive)}
             style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
@@ -115,17 +116,19 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
           </NavLink>
         )}
 
-        {/* ── Caja Diaria — todos ── */}
-        <NavLink to="/caja-diaria" onClick={onClose}
-          className={({ isActive }) => navLinkClass(isActive)}
-          style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
-          <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>02</span>
-          <BookOpen size={16} strokeWidth={2} />
-          <span className="tracking-[1px] uppercase text-[12px]">Caja Diaria</span>
-        </NavLink>
+        {/* ── Caja Diaria — todos menos cupones ── */}
+        {!isCupones && (
+          <NavLink to="/caja-diaria" onClick={onClose}
+            className={({ isActive }) => navLinkClass(isActive)}
+            style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
+            <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>02</span>
+            <BookOpen size={16} strokeWidth={2} />
+            <span className="tracking-[1px] uppercase text-[12px]">Caja Diaria</span>
+          </NavLink>
+        )}
 
         {/* ── FINANZAS (grupo) ── */}
-        {!isCajaDiaria && (
+        {!isCajaDiaria && !isCupones && (
           <>
             <button onClick={() => setFinanzasOpen(o => !o)} className={groupBtnClass(isFinanzas)}
               style={{ borderLeftColor: isFinanzas ? CORAL : 'transparent' }}>
@@ -223,9 +226,11 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
                 <NavLink to="/cupones" onClick={onClose} className={subLinkClass(p.startsWith('/cupones'))}
                   style={{ borderLeftColor: p.startsWith('/cupones') ? CORAL : 'transparent' }}>
                   <Ticket size={13} /> <span>Cupones</span></NavLink>
-                <NavLink to="/clientes" onClick={onClose} className={subLinkClass(p.startsWith('/clientes'))}
-                  style={{ borderLeftColor: p.startsWith('/clientes') ? CORAL : 'transparent' }}>
-                  <Contact size={13} /> <span>Base de datos</span></NavLink>
+                {!isCupones && (
+                  <NavLink to="/clientes" onClick={onClose} className={subLinkClass(p.startsWith('/clientes'))}
+                    style={{ borderLeftColor: p.startsWith('/clientes') ? CORAL : 'transparent' }}>
+                    <Contact size={13} /> <span>Base de datos</span></NavLink>
+                )}
               </div>
             )}
           </>

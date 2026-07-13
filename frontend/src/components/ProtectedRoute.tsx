@@ -35,6 +35,11 @@ export default function ProtectedRoute({ children, requiredRole }: Props) {
     return <Navigate to="/caja-diaria" replace />
   }
 
+  // cupones: acceso exclusivo a la sección de Cupones
+  if (user.role === 'cupones' && location.pathname !== '/cupones') {
+    return <Navigate to="/cupones" replace />
+  }
+
   // Logged in but not enough permissions → send to /
   if (requiredRole && user.role !== requiredRole) {
     return <Navigate to="/" replace />
