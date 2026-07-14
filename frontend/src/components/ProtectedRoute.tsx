@@ -35,8 +35,9 @@ export default function ProtectedRoute({ children, requiredRole }: Props) {
     return <Navigate to="/caja-diaria" replace />
   }
 
-  // cupones: acceso exclusivo a la sección de Cupones
-  if (user.role === 'cupones' && location.pathname !== '/cupones') {
+  // cupones: acceso a Cupones y base de datos de clientes
+  const CUPONES_ALLOWED = ['/cupones', '/clientes']
+  if (user.role === 'cupones' && !CUPONES_ALLOWED.includes(location.pathname)) {
     return <Navigate to="/cupones" replace />
   }
 

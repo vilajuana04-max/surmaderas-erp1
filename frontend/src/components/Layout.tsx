@@ -226,11 +226,9 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
                 <NavLink to="/cupones" onClick={onClose} className={subLinkClass(p.startsWith('/cupones'))}
                   style={{ borderLeftColor: p.startsWith('/cupones') ? CORAL : 'transparent' }}>
                   <Ticket size={13} /> <span>Cupones</span></NavLink>
-                {!isCupones && (
-                  <NavLink to="/clientes" onClick={onClose} className={subLinkClass(p.startsWith('/clientes'))}
-                    style={{ borderLeftColor: p.startsWith('/clientes') ? CORAL : 'transparent' }}>
-                    <Contact size={13} /> <span>Base de datos</span></NavLink>
-                )}
+                <NavLink to="/clientes" onClick={onClose} className={subLinkClass(p.startsWith('/clientes'))}
+                  style={{ borderLeftColor: p.startsWith('/clientes') ? CORAL : 'transparent' }}>
+                  <Contact size={13} /> <span>Base de datos</span></NavLink>
               </div>
             )}
           </>
