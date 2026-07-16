@@ -60,6 +60,20 @@ def _get_or_create_period(month: str, year: int, branch_id: int, db):
         PayrollPeriod.branch_id == branch_id
     ).first()
     if existing:
+        # Backfill: si se agregaron empleados nuevos después de crear el período,
+        # sumar sus filas (solo si el período no está cerrado).
+        if (existing.status or "OPEN") != "CLOSED":
+            ya_tienen = {it.employee_id for it in existing.items}
+            faltan = db.query(Employee).filter(
+                Employee.branch_id == branch_id,
+                Employee.is_active  == True,
+                ~Employee.id.in_(ya_tienen) if ya_tienen else True,
+            ).all()
+            if faltan:
+                for emp in faltan:
+                    db.add(PayrollItem(period_id=existing.id, employee_id=emp.id))
+                db.commit()
+                db.refresh(existing)
         return _enrich_period(existing)
 
     period = PayrollPeriod(month=month.upper(), year=year, branch_id=branch_id)
