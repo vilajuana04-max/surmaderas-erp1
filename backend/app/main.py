@@ -105,6 +105,37 @@ def _seed_users():
 
 _seed_users()
 
+
+def _seed_employees():
+    """Alta de empleados puntuales si no existen. Se ejecuta al arrancar."""
+    from datetime import date
+    from app.database import SessionLocal
+    from app.models.employees import Employee
+    from app.models.core import Branch
+
+    db = SessionLocal()
+    try:
+        # Sucursal Luro: por nombre (case-insensitive), fallback a id=1
+        luro = db.query(Branch).filter(Branch.name.ilike("%luro%")).first()
+        luro_id = luro.id if luro else 1
+
+        NUEVOS = ["Matias", "Valentina"]
+        for name in NUEVOS:
+            existe = db.query(Employee).filter(Employee.name == name, Employee.branch_id == luro_id).first()
+            if not existe:
+                db.add(Employee(
+                    name=name, branch_id=luro_id, hire_date=date.today(),
+                    is_active=True, payroll_type="standard",
+                ))
+                print(f"[seed] Empleado '{name}' (Luro) creado.")
+        db.commit()
+    except Exception as e:
+        print(f"[seed] Error empleados: {e}")
+    finally:
+        db.close()
+
+_seed_employees()
+
 # ── CORS ────────────────────────────────────────────────────────
 # App interna de Sur Maderas — aceptamos cualquier origen para
 # evitar conflictos de preflight con URLs de preview de Vercel.
