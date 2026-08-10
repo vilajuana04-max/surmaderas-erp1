@@ -29,6 +29,16 @@ class VacationLogCreate(BaseModel):
     notes:          Optional[str] = None
 
 
+class VacationLogUpdate(BaseModel):
+    employee_id:    Optional[int]  = None
+    date_from:      Optional[date] = None
+    date_to:        Optional[date] = None
+    days:           Optional[int]  = None
+    status:         Optional[str]  = None
+    approved_by:    Optional[str]  = None
+    notes:          Optional[str]  = None
+
+
 class VacationLogOut(BaseModel):
     id:             int
     registered_date: Optional[date]

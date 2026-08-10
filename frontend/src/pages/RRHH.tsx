@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
-  FileDown, RefreshCw, Plus, Lock, Trash2,
+  FileDown, RefreshCw, Plus, Lock, Trash2, Pencil,
   Upload, CheckCircle, Clock, X, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { api, fmt$, MONTHS, CURRENT_YEAR, CURRENT_MONTH_IDX } from '../api'
@@ -112,8 +112,9 @@ function VacacionesTab() {
   const [saving,    setSaving]    = useState<number | null>(null)
   const [showLogForm, setShowLogForm] = useState(false)
 
-  const emptyLog = { employee_id: '', date_from: '', date_to: '', days: '', notes: '', approved_by: '' }
+  const emptyLog = { employee_id: '', date_from: '', date_to: '', days: '', notes: '', approved_by: '', estado: 'Pendiente' }
   const [logForm, setLogForm] = useState(emptyLog)
+  const [editLogId, setEditLogId] = useState<number | null>(null)
 
   const load = useCallback(() => {
     api.get<VacRecord[]>(`/vacations/?year=${year}`).then(setRecords).catch(() => setRecords([]))
@@ -151,14 +152,48 @@ function VacacionesTab() {
     e.preventDefault()
     if (!logForm.employee_id || !logForm.date_from || !logForm.date_to) return
     try {
-      await api.post('/vacations/log', {
-        year, employee_id: parseInt(logForm.employee_id),
-        date_from: logForm.date_from, date_to: logForm.date_to,
-        days: parseInt(logForm.days) || 0,
-        notes: logForm.notes || null, approved_by: logForm.approved_by || null,
-      })
-      setLogForm(emptyLog); setShowLogForm(false); load()
+      if (editLogId != null) {
+        // Editar solicitud existente (incluye aprobadas)
+        await api.put(`/vacations/log/${editLogId}`, {
+          employee_id: parseInt(logForm.employee_id),
+          date_from: logForm.date_from, date_to: logForm.date_to,
+          days: parseInt(logForm.days) || 0,
+          status: logForm.estado,
+          notes: logForm.notes || null,
+          approved_by: logForm.estado === 'Aprobado' ? (logForm.approved_by || 'Administración') : null,
+        })
+      } else {
+        await api.post('/vacations/log', {
+          year, employee_id: parseInt(logForm.employee_id),
+          date_from: logForm.date_from, date_to: logForm.date_to,
+          days: parseInt(logForm.days) || 0,
+          notes: logForm.notes || null, approved_by: logForm.approved_by || null,
+        })
+      }
+      setLogForm(emptyLog); setEditLogId(null); setShowLogForm(false); load()
     } catch (err: any) { alert('Error: ' + err.message) }
+  }
+
+  const editLog = (l: VacLog) => {
+    setLogForm({
+      employee_id: String(l.employee_id ?? ''),
+      date_from:   l.date_from?.slice(0, 10) ?? '',
+      date_to:     l.date_to?.slice(0, 10) ?? '',
+      days:        String(l.days ?? ''),
+      notes:       l.notes ?? '',
+      approved_by: l.approved_by ?? '',
+      estado:      l.status ?? 'Pendiente',
+    })
+    setEditLogId(l.id)
+    setShowLogForm(true)
+  }
+
+  const cancelLogForm = () => { setLogForm(emptyLog); setEditLogId(null); setShowLogForm(false) }
+
+  const deleteLog = async (id: number) => {
+    if (!confirm('¿Eliminar esta solicitud de vacaciones? Esta acción no se puede deshacer.')) return
+    try { await api.delete(`/vacations/log/${id}`); load() }
+    catch (err: any) { alert('Error: ' + err.message) }
   }
 
   const approveLog = async (id: number) => {
@@ -454,7 +489,7 @@ function VacacionesTab() {
               <p className="text-white text-sm font-bold tracking-wide font-head">
                 DETALLE DE SOLICITUDES Y VACACIONES APROBADAS — {year}
               </p>
-              <button onClick={() => setShowLogForm(!showLogForm)}
+              <button onClick={() => { if (showLogForm) cancelLogForm(); else { setEditLogId(null); setLogForm(emptyLog); setShowLogForm(true) } }}
                 style={{ background: CORAL }}
                 className="flex items-center gap-2 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:opacity-90">
                 <Plus size={13} /> Nueva solicitud
@@ -503,13 +538,26 @@ function VacacionesTab() {
                     value={logForm.notes}
                     onChange={e => setLogForm(f => ({ ...f, notes: e.target.value }))} />
                 </div>
+                {editLogId != null && (
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-brand-muted block mb-1 font-body">Estado</label>
+                    <select
+                      className="w-full border border-brand-border rounded-lg px-2 py-1.5 text-xs font-body focus:outline-none"
+                      value={logForm.estado}
+                      onChange={e => setLogForm(f => ({ ...f, estado: e.target.value }))}>
+                      <option value="Pendiente">Pendiente</option>
+                      <option value="Aprobado">Aprobado</option>
+                      <option value="Cancelado">Cancelado</option>
+                    </select>
+                  </div>
+                )}
                 <div className="flex items-end gap-2">
                   <button type="submit"
                     style={{ background: CORAL }}
                     className="text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:opacity-90 h-fit">
-                    Guardar
+                    {editLogId != null ? 'Guardar cambios' : 'Guardar'}
                   </button>
-                  <button type="button" onClick={() => setShowLogForm(false)}
+                  <button type="button" onClick={cancelLogForm}
                     className="text-brand-muted px-3 py-1.5 rounded-lg text-xs border border-brand-border hover:bg-gray-50 h-fit">
                     Cancelar
                   </button>
@@ -543,20 +591,30 @@ function VacacionesTab() {
                       <td className="px-4 py-2 text-xs font-body text-gray-600">{l.date_to?.slice(0, 10) ?? '—'}</td>
                       <td className="px-4 py-2 text-xs text-center font-body font-bold">{l.days}</td>
                       <td className="px-4 py-2 text-xs"
-                        style={{ background: l.status === 'Aprobado' ? '#dcfce7' : '#fef3c7' }}>
+                        style={{ background: l.status === 'Aprobado' ? '#dcfce7' : l.status === 'Cancelado' ? '#f1f1f1' : '#fef3c7' }}>
                         <span className={`text-[10px] font-bold font-body ${
-                          l.status === 'Aprobado' ? 'text-green-800' : 'text-amber-800'
+                          l.status === 'Aprobado' ? 'text-green-800' : l.status === 'Cancelado' ? 'text-gray-500' : 'text-amber-800'
                         }`}>{l.status}</span>
                       </td>
                       <td className="px-4 py-2 text-xs text-brand-muted font-body">{l.approved_by ?? '—'}</td>
                       <td className="px-4 py-2 text-xs text-brand-muted font-body">{l.notes ?? '—'}</td>
-                      <td className="px-2 py-2 text-right">
-                        {l.status !== 'Aprobado' && (
-                          <button onClick={() => approveLog(l.id)}
-                            className="text-green-600 hover:text-green-800 text-[10px] font-semibold font-body px-2 py-1 rounded border border-green-200 hover:bg-green-50">
-                            Aprobar
+                      <td className="px-2 py-2 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {l.status !== 'Aprobado' && (
+                            <button onClick={() => approveLog(l.id)} title="Aprobar"
+                              className="text-green-600 hover:text-green-800 text-[10px] font-semibold font-body px-2 py-1 rounded border border-green-200 hover:bg-green-50">
+                              Aprobar
+                            </button>
+                          )}
+                          <button onClick={() => editLog(l)} title="Editar"
+                            className="text-gray-400 hover:text-gray-700 p-1 rounded hover:bg-gray-100">
+                            <Pencil size={13} />
                           </button>
-                        )}
+                          <button onClick={() => deleteLog(l.id)} title="Eliminar"
+                            className="text-red-300 hover:text-red-600 p-1 rounded hover:bg-red-50">
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

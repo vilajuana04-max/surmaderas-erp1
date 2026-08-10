@@ -6,7 +6,7 @@ from datetime import date
 
 from app.database import get_db
 from app.models import VacationRecord, VacationLog, Employee
-from app.schemas import VacationRecordOut, VacationLogCreate, VacationLogOut
+from app.schemas import VacationRecordOut, VacationLogCreate, VacationLogOut, VacationLogUpdate
 from app.services.calculations import vacation_days_by_seniority
 from app.services.pdf_generator import generate_vacations_pdf
 
@@ -120,6 +120,33 @@ def approve_log(log_id: int, approved_by: str, db: Session = Depends(get_db)):
     log.approved_by = approved_by
     db.commit()
     return {"status": "Aprobado"}
+
+
+@router.put("/log/{log_id}", response_model=VacationLogOut)
+def update_log(log_id: int, data: VacationLogUpdate, db: Session = Depends(get_db)):
+    """Edita una solicitud existente (fechas, días, estado, notas). Permite
+    corregir o revertir aprobaciones — ej: una solicitud cancelada."""
+    log = db.query(VacationLog).filter(VacationLog.id == log_id).first()
+    if not log:
+        raise HTTPException(404, "Registro no encontrado")
+    payload = data.model_dump(exclude_unset=True)
+    # Si vuelve a Pendiente, se limpia el aprobador salvo que se especifique
+    if payload.get("status") == "Pendiente" and "approved_by" not in payload:
+        log.approved_by = None
+    for k, v in payload.items():
+        setattr(log, k, v)
+    db.commit()
+    db.refresh(log)
+    return _enrich_log(log)
+
+
+@router.delete("/log/{log_id}", status_code=204)
+def delete_log(log_id: int, db: Session = Depends(get_db)):
+    log = db.query(VacationLog).filter(VacationLog.id == log_id).first()
+    if not log:
+        raise HTTPException(404, "Registro no encontrado")
+    db.delete(log)
+    db.commit()
 
 
 @router.get("/pdf/{year}")
