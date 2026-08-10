@@ -25,6 +25,22 @@ def list_vacation_records(year: Optional[int] = None, db: Session = Depends(get_
     if year:
         q = q.filter(VacationRecord.year == year)
     records = q.order_by(VacationRecord.employee_id).all()
+
+    # Sincroniza "Pend. Año Ant." en vivo con lo pendiente del año anterior.
+    # (Antes era un snapshot fijo al inicializar el año, que quedaba viejo si
+    # después se editaban las vacaciones del año previo — ej: Cecilia.)
+    changed = False
+    for r in records:
+        prev = db.query(VacationRecord).filter(
+            VacationRecord.year == r.year - 1,
+            VacationRecord.employee_id == r.employee_id,
+        ).first()
+        if prev is not None and r.pending_prev_year != prev.pending_current:
+            r.pending_prev_year = prev.pending_current
+            changed = True
+    if changed:
+        db.commit()
+
     return [_enrich_record(r) for r in records]
 
 
