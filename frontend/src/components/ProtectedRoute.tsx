@@ -1,9 +1,11 @@
 import { Navigate, useLocation } from 'react-router-dom'
-import { useAuth, UserRole } from '../context/AuthContext'
+import { useAuth } from '../context/AuthContext'
+import { can, firstAllowedPath, Level } from '../permissions'
 
 interface Props {
-  children:      React.ReactNode
-  requiredRole?: UserRole   // if omitted, any logged-in user can access
+  children: React.ReactNode
+  module?:  string   // módulo requerido; si se omite, cualquier usuario logueado
+  level?:   Level    // nivel mínimo (default 'view')
 }
 
 function SessionLoader() {
@@ -17,33 +19,22 @@ function SessionLoader() {
   )
 }
 
-export default function ProtectedRoute({ children, requiredRole }: Props) {
+export default function ProtectedRoute({ children, module, level = 'view' }: Props) {
   const { user, loading } = useAuth()
   const location = useLocation()
 
-  // Restoring session from localStorage → show spinner instead of blank screen
   if (loading) return <SessionLoader />
 
-  // Not logged in → send to /login
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  // caja_diaria: caja diaria, cupones y base de datos de clientes
-  const CAJA_DIARIA_ALLOWED = ['/caja-diaria', '/cupones', '/clientes']
-  if (user.role === 'caja_diaria' && !CAJA_DIARIA_ALLOWED.includes(location.pathname)) {
-    return <Navigate to="/caja-diaria" replace />
-  }
+  // Sin módulo requerido → cualquier usuario autenticado (ej: Mi cuenta)
+  if (!module) return <>{children}</>
 
-  // cupones: acceso a Cupones y base de datos de clientes
-  const CUPONES_ALLOWED = ['/cupones', '/clientes']
-  if (user.role === 'cupones' && !CUPONES_ALLOWED.includes(location.pathname)) {
-    return <Navigate to="/cupones" replace />
-  }
-
-  // Logged in but not enough permissions → send to /
-  if (requiredRole && user.role !== requiredRole) {
-    return <Navigate to="/" replace />
+  // Verificación por permiso de módulo
+  if (!can(user.permissions, module, level)) {
+    return <Navigate to={firstAllowedPath(user.permissions)} replace />
   }
 
   return <>{children}</>

@@ -21,201 +21,45 @@ import Marketing        from './pages/Marketing'
 import Contenido        from './pages/Contenido'
 import ListaPrecios     from './pages/ListaPrecios'
 import VentaOnline      from './pages/VentaOnline'
+import Usuarios         from './pages/Usuarios'
+import MiCuenta         from './pages/MiCuenta'
+
+const page = (module: string | undefined, el: React.ReactNode) => (
+  <ProtectedRoute module={module}>
+    <Layout>{el}</Layout>
+  </ProtectedRoute>
+)
 
 export default function App() {
   return (
     <AuthProvider>
       <Routes>
-        {/* ── Public ── */}
         <Route path="/login" element={<Login />} />
 
-        {/* ── Protected (any logged-in user) ── */}
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <Dashboard />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/ventas"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <Ventas />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/compras"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <Compras />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/"                  element={page('dashboard', <Dashboard />)} />
+        <Route path="/ventas"            element={page('finanzas', <Ventas />)} />
+        <Route path="/compras"           element={page('finanzas', <Compras />)} />
+        <Route path="/gastos"            element={page('finanzas', <Gastos />)} />
+        <Route path="/flujocaja"         element={page('finanzas', <FlujoCaja />)} />
+        <Route path="/lista-precios"     element={page('finanzas', <ListaPrecios />)} />
+        <Route path="/punto-equilibrio"  element={page('finanzas', <PuntoEquilibrio />)} />
+        <Route path="/caja-diaria"       element={page('caja_diaria', <CajaDiaria />)} />
+        <Route path="/venta-online"      element={page('venta_online', <VentaOnline />)} />
+        <Route path="/rrhh"              element={page('rrhh', <RRHH />)} />
+        <Route path="/comisiones"        element={page('rrhh', <Comisiones />)} />
+        <Route path="/vencimientos"      element={page('vencimientos', <Vencimientos />)} />
+        <Route path="/gastos-personales" element={page('gastos_personales', <GastosPersonales />)} />
+        <Route path="/cupones"           element={page('clientes', <Cupones />)} />
+        <Route path="/clientes"          element={page('clientes', <Clientes />)} />
+        <Route path="/marketing"         element={page('marketing', <Marketing />)} />
+        <Route path="/contenido"         element={page('contenido', <Contenido />)} />
+        <Route path="/usuarios"          element={page('usuarios', <Usuarios />)} />
+        <Route path="/mi-cuenta"         element={page(undefined, <MiCuenta />)} />
 
-        {/* ── Caja Diaria — todos los roles ── */}
-        <Route
-          path="/caja-diaria"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <CajaDiaria />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-
-        {/* ── Admin only ── */}
-        <Route
-          path="/rrhh"
-          element={
-            <ProtectedRoute requiredRole="admin">
-              <Layout>
-                <RRHH />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/gastos"
-          element={
-            <ProtectedRoute requiredRole="admin">
-              <Layout>
-                <Gastos />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/flujocaja"
-          element={
-            <ProtectedRoute requiredRole="admin">
-              <Layout>
-                <FlujoCaja />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/lista-precios"
-          element={
-            <ProtectedRoute requiredRole="admin">
-              <Layout>
-                <ListaPrecios />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/venta-online"
-          element={
-            <ProtectedRoute requiredRole="admin">
-              <Layout>
-                <VentaOnline />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/vencimientos"
-          element={
-            <ProtectedRoute requiredRole="admin">
-              <Layout>
-                <Vencimientos />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/gastos-personales"
-          element={
-            <ProtectedRoute requiredRole="admin">
-              <Layout>
-                <GastosPersonales />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/comisiones"
-          element={
-            <ProtectedRoute requiredRole="admin">
-              <Layout>
-                <Comisiones />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/punto-equilibrio"
-          element={
-            <ProtectedRoute requiredRole="admin">
-              <Layout>
-                <PuntoEquilibrio />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/cupones"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <Cupones />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/clientes"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <Clientes />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/marketing"
-          element={
-            <ProtectedRoute requiredRole="admin">
-              <Layout>
-                <Marketing />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/contenido"
-          element={
-            <ProtectedRoute requiredRole="admin">
-              <Layout>
-                <Contenido />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-
-        {/* ── Legacy redirects ── */}
+        {/* Legacy redirects */}
         <Route path="/sueldos"    element={<Navigate to="/rrhh" replace />} />
         <Route path="/vacaciones" element={<Navigate to="/rrhh" replace />} />
 
-        {/* ── Catch-all ── */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AuthProvider>

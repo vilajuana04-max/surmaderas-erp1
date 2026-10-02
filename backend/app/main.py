@@ -2,15 +2,17 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from fastapi import Depends
 from app.database import engine, Base
 from app import models  # noqa: registers all ORM models
+from app.permissions import enforce
 from app.routers import (
     auth_router,
     sales_router, purchases_router, payroll_router,
     vacations_router, expenses_router, dashboard_router, employees_router,
     receipts_router, cashflow_router, vencimientos_router, gastos_personales_router,
     caja_diaria_router, cupones_router, clientes_router, marketing_router, contenido_router,
-    puestos_router, placas_router, online_sales_router,
+    puestos_router, placas_router, online_sales_router, users_router,
 )
 
 Base.metadata.create_all(bind=engine)
@@ -57,6 +59,11 @@ def _run_migrations():
         "ALTER TABLE puestos ADD COLUMN IF NOT EXISTS ubicacion VARCHAR(200) DEFAULT '';",
         "ALTER TABLE puestos ADD COLUMN IF NOT EXISTS horario VARCHAR(200) DEFAULT '';",
         "ALTER TABLE caja_diaria ADD COLUMN IF NOT EXISTS cantidad_tickets INTEGER DEFAULT 0;",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS name VARCHAR(120) DEFAULT '';",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_primary_admin BOOLEAN DEFAULT FALSE;",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;",
+        "ALTER TABLE users ALTER COLUMN role TYPE VARCHAR(30);",
         "UPDATE users SET username = 'CAJA', role = 'caja_diaria' WHERE username IN ('Caja', 'caja') AND role != 'admin';",
     ]
     for sql in statements:
@@ -136,6 +143,47 @@ def _seed_employees():
 
 _seed_employees()
 
+
+def _seed_user_admin():
+    """Marca el admin principal (Gustavo) y crea permisos iniciales para los
+    usuarios existentes que todavía no tengan filas de permisos. Idempotente."""
+    from app.database import SessionLocal
+    from app.models.users import User, UserPermission
+    from app.permissions import MODULES, LEGACY_ROLE_PERMS, ROLE_TEMPLATES
+
+    db = SessionLocal()
+    try:
+        # Nombres visibles + admin principal
+        names = {"Gustavo": "Gustavo", "Personal": "Personal", "CAJA": "Caja", "independencia": "Independencia"}
+        for uname, display in names.items():
+            u = db.query(User).filter(User.username == uname).first()
+            if u and not (u.name or "").strip():
+                u.name = display
+        gus = db.query(User).filter(User.username == "Gustavo").first()
+        if gus and not gus.is_primary_admin:
+            gus.is_primary_admin = True
+            gus.role = "Administrador"
+        db.commit()
+
+        # Permisos iniciales derivados del rol legacy (solo si no tiene filas)
+        for u in db.query(User).all():
+            if db.query(UserPermission).filter(UserPermission.user_id == u.id).first():
+                continue
+            if u.is_primary_admin:
+                base = {m: "admin" for m in MODULES}
+            else:
+                base = dict(LEGACY_ROLE_PERMS.get((u.role or "").lower(), {})) \
+                    or dict(ROLE_TEMPLATES.get(u.role, {}))
+            for m in MODULES:
+                db.add(UserPermission(user_id=u.id, module=m, level=base.get(m, "none")))
+        db.commit()
+    except Exception as e:
+        print(f"[seed] Error permisos usuarios: {e}")
+    finally:
+        db.close()
+
+_seed_user_admin()
+
 # ── CORS ────────────────────────────────────────────────────────
 # App interna de Sur Maderas — aceptamos cualquier origen para
 # evitar conflictos de preflight con URLs de preview de Vercel.
@@ -157,26 +205,31 @@ app.add_middleware(
     allow_headers     = ["*"],
 )
 
-app.include_router(auth_router)
-app.include_router(sales_router)
-app.include_router(purchases_router)
-app.include_router(payroll_router)
-app.include_router(vacations_router)
-app.include_router(expenses_router)
-app.include_router(dashboard_router)
-app.include_router(employees_router)
-app.include_router(receipts_router)
-app.include_router(cashflow_router)
-app.include_router(vencimientos_router)
-app.include_router(gastos_personales_router)
-app.include_router(caja_diaria_router)
-app.include_router(cupones_router)
-app.include_router(clientes_router)
-app.include_router(marketing_router)
-app.include_router(contenido_router)
-app.include_router(puestos_router)
-app.include_router(placas_router)
-app.include_router(online_sales_router)
+# Dependencia global de permisos (CORS-safe: las HTTPException pasan por CORS).
+# fail-safe: admins pasan todo, rutas sin mapeo no bloquean, sin token = legacy.
+_dep = [Depends(enforce)]
+
+app.include_router(auth_router,             dependencies=_dep)
+app.include_router(sales_router,            dependencies=_dep)
+app.include_router(purchases_router,        dependencies=_dep)
+app.include_router(payroll_router,          dependencies=_dep)
+app.include_router(vacations_router,        dependencies=_dep)
+app.include_router(expenses_router,         dependencies=_dep)
+app.include_router(dashboard_router,        dependencies=_dep)
+app.include_router(employees_router,        dependencies=_dep)
+app.include_router(receipts_router,         dependencies=_dep)
+app.include_router(cashflow_router,         dependencies=_dep)
+app.include_router(vencimientos_router,     dependencies=_dep)
+app.include_router(gastos_personales_router, dependencies=_dep)
+app.include_router(caja_diaria_router,      dependencies=_dep)
+app.include_router(cupones_router,          dependencies=_dep)
+app.include_router(clientes_router,         dependencies=_dep)
+app.include_router(marketing_router,        dependencies=_dep)
+app.include_router(contenido_router,        dependencies=_dep)
+app.include_router(puestos_router,          dependencies=_dep)
+app.include_router(placas_router,           dependencies=_dep)
+app.include_router(online_sales_router,     dependencies=_dep)
+app.include_router(users_router,            dependencies=_dep)
 
 
 @app.get("/")

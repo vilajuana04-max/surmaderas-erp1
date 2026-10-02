@@ -2,9 +2,10 @@ import React, { useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Receipt, Menu, X, ChevronDown, Bell, Wallet, LogOut,
-  BookOpen, Ticket, Contact, CalendarRange, ImagePlay, ShoppingCart,
+  BookOpen, Ticket, Contact, CalendarRange, ImagePlay, ShoppingCart, UserCog, UserCircle,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { can } from '../permissions'
 
 const NAVY  = '#070614'
 const CORAL = '#C8603A'
@@ -24,10 +25,8 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
   const location   = useLocation()
   const navigate   = useNavigate()
   const { user, logout } = useAuth()
-  const isAdmin      = user?.role === 'admin'
-  const isCajaDiaria = user?.role === 'caja_diaria'
-  const isCupones    = user?.role === 'cupones'
-  const canSeeCupones = isAdmin || isCajaDiaria || isCupones
+  const perms = user?.permissions
+  const show = (m: string) => can(perms, m, 'view')
 
   const p = location.pathname
   const isFinanzas = ['/ventas','/compras','/gastos','/flujocaja','/punto-equilibrio','/lista-precios'].some(x => p === x || p.startsWith(x))
@@ -103,7 +102,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
                 {user.username}
               </p>
               <p className="text-white/30 text-[10px] tracking-wide uppercase mt-0.5">
-                {user.role === 'admin' ? 'Administrador' : user.role === 'caja_diaria' ? 'Caja Diaria' : user.role === 'cupones' ? 'Cupones' : 'Acceso Caja'}
+                {user.is_primary_admin ? 'Admin principal' : (user.role || 'Usuario')}
               </p>
             </div>
           </div>
@@ -113,7 +112,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
       {/* Nav */}
       <nav className="flex-1 py-6 overflow-y-auto">
         {/* ── Dashboard ── */}
-        {!isCajaDiaria && !isCupones && (
+        {show('dashboard') && (
           <NavLink to="/" end onClick={onClose}
             className={({ isActive }) => navLinkClass(isActive)}
             style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
@@ -123,8 +122,8 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
           </NavLink>
         )}
 
-        {/* ── Caja Diaria — todos menos cupones ── */}
-        {!isCupones && (
+        {/* ── Caja Diaria ── */}
+        {show('caja_diaria') && (
           <NavLink to="/caja-diaria" onClick={onClose}
             className={({ isActive }) => navLinkClass(isActive)}
             style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
@@ -135,7 +134,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
         )}
 
         {/* ── FINANZAS (grupo) ── */}
-        {!isCajaDiaria && !isCupones && (
+        {show('finanzas') && (
           <>
             <button onClick={() => setFinanzasOpen(o => !o)} className={groupBtnClass(isFinanzas)}
               style={{ borderLeftColor: isFinanzas ? CORAL : 'transparent' }}>
@@ -151,7 +150,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
                   style={{ borderLeftColor: p === '/ventas' ? CORAL : 'transparent' }}><span>Ventas</span></NavLink>
                 <NavLink to="/compras" onClick={onClose} className={subLinkClass(p === '/compras')}
                   style={{ borderLeftColor: p === '/compras' ? CORAL : 'transparent' }}><span>Compras</span></NavLink>
-                {isAdmin && <>
+                <>
                   <NavLink to="/gastos?tab=compartidos" onClick={onClose}
                     className={subLinkClass(p.startsWith('/gastos') && activeGastosTab === 'compartidos')}
                     style={{ borderLeftColor: p.startsWith('/gastos') && activeGastosTab === 'compartidos' ? CORAL : 'transparent' }}><span>Gastos Compartidos</span></NavLink>
@@ -164,14 +163,14 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
                     style={{ borderLeftColor: p.startsWith('/punto-equilibrio') ? CORAL : 'transparent' }}><span>Punto de Equilibrio</span></NavLink>
                   <NavLink to="/lista-precios" onClick={onClose} className={subLinkClass(p.startsWith('/lista-precios'))}
                     style={{ borderLeftColor: p.startsWith('/lista-precios') ? CORAL : 'transparent' }}><span>Lista de Precios</span></NavLink>
-                </>}
+                </>
               </div>
             )}
           </>
         )}
 
-        {/* ── VENTA ONLINE (grupo) — admin ── */}
-        {isAdmin && (
+        {/* ── VENTA ONLINE (grupo) ── */}
+        {show('venta_online') && (
           <>
             <button onClick={() => setVentaOnlineOpen(o => !o)} className={groupBtnClass(isVentaOnline)}
               style={{ borderLeftColor: isVentaOnline ? CORAL : 'transparent' }}>
@@ -196,8 +195,8 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
           </>
         )}
 
-        {/* ── RECURSOS HUMANOS (grupo) — admin ── */}
-        {isAdmin && (
+        {/* ── RECURSOS HUMANOS (grupo) ── */}
+        {show('rrhh') && (
           <>
             <button onClick={() => setRrhhOpen(o => !o)} className={groupBtnClass(isRRHH)}
               style={{ borderLeftColor: isRRHH ? CORAL : 'transparent' }}>
@@ -223,8 +222,8 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
           </>
         )}
 
-        {/* ── Vencimientos — admin ── */}
-        {isAdmin && (
+        {/* ── Vencimientos ── */}
+        {show('vencimientos') && (
           <NavLink to="/vencimientos" onClick={onClose} className={({ isActive }) => navLinkClass(isActive)}
             style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
             <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>05</span>
@@ -233,8 +232,8 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
           </NavLink>
         )}
 
-        {/* ── Gastos Personales — admin ── */}
-        {isAdmin && (
+        {/* ── Gastos Personales ── */}
+        {show('gastos_personales') && (
           <NavLink to="/gastos-personales" onClick={onClose} className={({ isActive }) => navLinkClass(isActive)}
             style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
             <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>06</span>
@@ -243,8 +242,8 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
           </NavLink>
         )}
 
-        {/* ── CLIENTES (grupo) — admin y caja_diaria ── */}
-        {canSeeCupones && (
+        {/* ── CLIENTES (grupo) ── */}
+        {show('clientes') && (
           <>
             <button onClick={() => setClientesOpen(o => !o)} className={groupBtnClass(isClientes)}
               style={{ borderLeftColor: isClientes ? CORAL : 'transparent' }}>
@@ -267,8 +266,8 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
           </>
         )}
 
-        {/* ── Marketing — admin ── */}
-        {isAdmin && (
+        {/* ── Marketing ── */}
+        {show('marketing') && (
           <NavLink to="/marketing" onClick={onClose} className={({ isActive }) => navLinkClass(isActive)}
             style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
             <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>08</span>
@@ -277,8 +276,8 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
           </NavLink>
         )}
 
-        {/* ── Contenido — admin ── */}
-        {isAdmin && (
+        {/* ── Contenido ── */}
+        {show('contenido') && (
           <NavLink to="/contenido" onClick={onClose} className={({ isActive }) => navLinkClass(isActive)}
             style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
             <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>09</span>
@@ -286,6 +285,24 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
             <span className="tracking-[1px] uppercase text-[12px]">Contenido</span>
           </NavLink>
         )}
+
+        {/* ── Configuración → Usuarios ── */}
+        {show('usuarios') && (
+          <NavLink to="/usuarios" onClick={onClose} className={({ isActive }) => navLinkClass(isActive)}
+            style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
+            <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>⚙</span>
+            <UserCog size={16} strokeWidth={2} />
+            <span className="tracking-[1px] uppercase text-[12px]">Usuarios</span>
+          </NavLink>
+        )}
+
+        {/* ── Mi cuenta — todos ── */}
+        <NavLink to="/mi-cuenta" onClick={onClose} className={({ isActive }) => navLinkClass(isActive)}
+          style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
+          <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>◦</span>
+          <UserCircle size={16} strokeWidth={2} />
+          <span className="tracking-[1px] uppercase text-[12px]">Mi cuenta</span>
+        </NavLink>
       </nav>
 
 

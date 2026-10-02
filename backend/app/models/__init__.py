@@ -1,4 +1,4 @@
-from .users import User
+from .users import User, UserPermission, UserAudit
 from .caja import CajaDiaria, CajaMovimiento
 from .core import Branch, AppConfig
 from .employees import Employee
@@ -19,7 +19,7 @@ from .placas import Placa, PlacaHistorial, ClienteDescuento, PlacaConfig
 from .online_sales import OnlineSale, OnlineCustomer, OnlineSaleCategory, OnlineTransfer
 
 __all__ = [
-    "User",
+    "User", "UserPermission", "UserAudit",
     "CajaDiaria", "CajaMovimiento",
     "Branch", "AppConfig",
     "Employee",

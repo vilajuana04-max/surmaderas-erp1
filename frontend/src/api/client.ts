@@ -30,6 +30,14 @@ async function req<T>(path: string, opts?: RequestInit): Promise<T> {
     throw new Error(`${msg} [URL: ${url}]`)
   }
   if (!res.ok) {
+    // Token vencido o usuario pausado → cerrar sesión y volver al login
+    if (res.status === 401 && !path.startsWith('/auth/login')) {
+      try {
+        localStorage.removeItem('erp_token')
+        localStorage.removeItem('erp_user')
+        if (!location.pathname.startsWith('/login')) location.assign('/login')
+      } catch { /* ignore */ }
+    }
     const text = await res.text().catch(() => res.statusText)
     throw new Error(`${res.status}: ${text.slice(0, 300)}`)
   }
