@@ -7,7 +7,7 @@ export const LEVEL_RANK: Record<Level, number> = { none: 0, view: 1, edit: 2, ad
 export const MODULES = [
   'dashboard', 'caja_diaria', 'finanzas', 'rrhh', 'vencimientos',
   'gastos_personales', 'clientes', 'marketing', 'contenido',
-  'venta_online', 'usuarios',
+  'venta_online', 'presupuestos', 'usuarios',
 ] as const
 
 export const MODULE_LABELS: Record<string, string> = {
@@ -21,6 +21,7 @@ export const MODULE_LABELS: Record<string, string> = {
   marketing: 'Marketing',
   contenido: 'Contenido',
   venta_online: 'Venta Online',
+  presupuestos: 'Presupuestos (Ver=Cargar · Editar=Gestionar)',
   usuarios: 'Usuarios (Configuración)',
 }
 
@@ -35,6 +36,7 @@ export const MODULE_HOME: Record<string, string> = {
   marketing: '/marketing',
   contenido: '/contenido',
   venta_online: '/venta-online',
+  presupuestos: '/presupuestos',
   usuarios: '/usuarios',
 }
 

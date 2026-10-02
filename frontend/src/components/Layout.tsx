@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Receipt, Menu, X, ChevronDown, Bell, Wallet, LogOut,
-  BookOpen, Ticket, Contact, CalendarRange, ImagePlay, ShoppingCart, UserCog, UserCircle,
+  BookOpen, Ticket, Contact, CalendarRange, ImagePlay, ShoppingCart, UserCog, UserCircle, ClipboardList,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { can } from '../permissions'
@@ -33,11 +33,13 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
   const isRRHH     = p.startsWith('/rrhh') || p.startsWith('/comisiones')
   const isClientes = p.startsWith('/cupones') || p.startsWith('/clientes')
   const isVentaOnline = p.startsWith('/venta-online')
+  const isPresupuestos = p.startsWith('/presupuestos')
 
   const [finanzasOpen, setFinanzasOpen] = useState(isFinanzas)
   const [rrhhOpen,     setRrhhOpen]     = useState(isRRHH)
   const [clientesOpen, setClientesOpen] = useState(isClientes)
   const [ventaOnlineOpen, setVentaOnlineOpen] = useState(isVentaOnline)
+  const [presupuestosOpen, setPresupuestosOpen] = useState(isPresupuestos)
 
   const activeTab = new URLSearchParams(location.search).get('tab') ?? 'vacaciones'
   const voTab = new URLSearchParams(location.search).get('tab') ?? 'resumen'
@@ -190,6 +192,40 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
                       style={{ borderLeftColor: active ? CORAL : 'transparent' }}><span>{label}</span></NavLink>
                   )
                 })}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── PRESUPUESTOS (grupo) ── */}
+        {show('presupuestos') && (
+          <>
+            <button onClick={() => setPresupuestosOpen(o => !o)} className={groupBtnClass(isPresupuestos)}
+              style={{ borderLeftColor: isPresupuestos ? CORAL : 'transparent' }}>
+              <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>▸</span>
+              <ClipboardList size={16} strokeWidth={2} />
+              <span className="tracking-[1px] uppercase text-[12px] flex-1 text-left">Presupuestos</span>
+              <ChevronDown size={14} className="shrink-0 transition-transform duration-200"
+                style={{ transform: presupuestosOpen ? 'rotate(180deg)' : 'rotate(0deg)', opacity: 0.6 }} />
+            </button>
+            {presupuestosOpen && (
+              <div className="pb-1" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                {(() => {
+                  const pt = new URLSearchParams(location.search).get('tab') ?? 'nueva'
+                  const links: [string, string, boolean][] = [
+                    ['nueva', 'Nueva carga', true],
+                    ['pendientes', 'Pendientes', can(perms, 'presupuestos', 'edit')],
+                    ['todos', 'Todos', can(perms, 'presupuestos', 'edit')],
+                  ]
+                  return links.filter(([, , ok]) => ok).map(([t, label]) => {
+                    const active = isPresupuestos && pt === t
+                    return (
+                      <NavLink key={t} to={t === 'nueva' ? '/presupuestos' : `/presupuestos?tab=${t}`} onClick={onClose}
+                        className={subLinkClass(active)}
+                        style={{ borderLeftColor: active ? CORAL : 'transparent' }}><span>{label}</span></NavLink>
+                    )
+                  })
+                })()}
               </div>
             )}
           </>

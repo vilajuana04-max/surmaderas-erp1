@@ -13,6 +13,7 @@ from app.routers import (
     receipts_router, cashflow_router, vencimientos_router, gastos_personales_router,
     caja_diaria_router, cupones_router, clientes_router, marketing_router, contenido_router,
     puestos_router, placas_router, online_sales_router, users_router,
+    presupuestos_router,
 )
 
 Base.metadata.create_all(bind=engine)
@@ -246,6 +247,7 @@ app.include_router(puestos_router,          dependencies=_dep)
 app.include_router(placas_router,           dependencies=_dep)
 app.include_router(online_sales_router,     dependencies=_dep)
 app.include_router(users_router,            dependencies=_dep)
+app.include_router(presupuestos_router,     dependencies=_dep)
 
 
 @app.get("/")

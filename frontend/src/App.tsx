@@ -23,6 +23,7 @@ import ListaPrecios     from './pages/ListaPrecios'
 import VentaOnline      from './pages/VentaOnline'
 import Usuarios         from './pages/Usuarios'
 import MiCuenta         from './pages/MiCuenta'
+import Presupuestos     from './pages/Presupuestos'
 
 const page = (module: string | undefined, el: React.ReactNode) => (
   <ProtectedRoute module={module}>
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="/punto-equilibrio"  element={page('finanzas', <PuntoEquilibrio />)} />
         <Route path="/caja-diaria"       element={page('caja_diaria', <CajaDiaria />)} />
         <Route path="/venta-online"      element={page('venta_online', <VentaOnline />)} />
+        <Route path="/presupuestos"      element={page('presupuestos', <Presupuestos />)} />
         <Route path="/rrhh"              element={page('rrhh', <RRHH />)} />
         <Route path="/comisiones"        element={page('rrhh', <Comisiones />)} />
         <Route path="/vencimientos"      element={page('vencimientos', <Vencimientos />)} />

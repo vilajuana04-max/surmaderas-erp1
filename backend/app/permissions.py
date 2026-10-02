@@ -22,7 +22,7 @@ from app.models.users import User, UserPermission
 MODULES = [
     "dashboard", "caja_diaria", "finanzas", "rrhh", "vencimientos",
     "gastos_personales", "clientes", "marketing", "contenido",
-    "venta_online", "usuarios",
+    "venta_online", "presupuestos", "usuarios",
 ]
 MODULE_LABELS = {
     "dashboard": "Dashboard",
@@ -35,6 +35,7 @@ MODULE_LABELS = {
     "marketing": "Marketing",
     "contenido": "Contenido",
     "venta_online": "Venta Online",
+    "presupuestos": "Presupuestos (Ver=Cargar · Editar=Gestionar)",
     "usuarios": "Usuarios (Configuración)",
 }
 
@@ -50,7 +51,7 @@ def _all(level: str) -> dict:
 ROLE_TEMPLATES = {
     "Administrador": _all("admin"),
     "Caja": {"dashboard": "view", "caja_diaria": "edit", "clientes": "edit", "venta_online": "edit"},
-    "Ventas": {"dashboard": "view", "venta_online": "edit", "clientes": "edit"},
+    "Ventas": {"dashboard": "view", "venta_online": "edit", "clientes": "edit", "presupuestos": "view"},
     "Personalizado": {},
 }
 
@@ -78,6 +79,7 @@ PATH_MODULE = [
     ("/marketing", "marketing"),
     ("/contenido", "contenido"),
     ("/online", "venta_online"),
+    ("/presupuestos", "presupuestos"),
     ("/users", "usuarios"),
 ]
 
@@ -153,6 +155,10 @@ async def enforce(request: Request, db: Session = Depends(get_db)):
     level = perms.get(module, "none")
     if module == "usuarios":
         required = "admin"
+    elif module == "presupuestos":
+        # El gate global exige solo 'view' (cargar); la gestión/gestión fina
+        # se valida dentro del router con require_manage.
+        required = "view"
     else:
         required = "view" if method == "GET" else "edit"
 
