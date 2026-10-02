@@ -560,12 +560,18 @@ function TabTransferencias() {
   const [rows, setRows] = useState<Transfer[]>([])
   const [loading, setLoading] = useState(true)
   const [filtro, setFiltro] = useState('')
+  const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10))
+  const [todas, setTodas] = useState(false)   // false = filtrar por el día elegido
+
   const load = () => {
     setLoading(true)
-    const q = filtro ? `?reconciliation_status=${filtro}` : ''
-    api.get<Transfer[]>(`/online/transfers${q}`).then(setRows).catch(() => setRows([])).finally(() => setLoading(false))
+    const p = new URLSearchParams()
+    if (filtro) p.set('reconciliation_status', filtro)
+    if (!todas) { p.set('date_from', fecha); p.set('date_to', fecha) }
+    const q = p.toString()
+    api.get<Transfer[]>(`/online/transfers${q ? '?' + q : ''}`).then(setRows).catch(() => setRows([])).finally(() => setLoading(false))
   }
-  useEffect(() => { load() }, [filtro])
+  useEffect(() => { load() }, [filtro, fecha, todas])
 
   const controlar = async (t: Transfer) => {
     await api.put(`/online/transfers/${t.id}/reconcile`, { usuario: user?.username || '' }); load()
@@ -573,18 +579,61 @@ function TabTransferencias() {
   const descontrolar = async (t: Transfer) => {
     await api.put(`/online/transfers/${t.id}/unreconcile`, {}); load()
   }
+
+  // Totales del conjunto mostrado (día o todas)
+  const totalImporte = rows.reduce((a, r) => a + r.amount, 0)
+  const totalPago = rows.filter(r => r.type !== 'sena').reduce((a, r) => a + r.amount, 0)
+  const totalSena = rows.filter(r => r.type === 'sena').reduce((a, r) => a + r.amount, 0)
+  const totalCtrl = rows.filter(r => r.reconciliation_status === 'controlada').reduce((a, r) => a + r.amount, 0)
   const totalPend = rows.filter(r => r.reconciliation_status === 'pendiente').reduce((a, r) => a + r.amount, 0)
+
+  const diaLabel = () => {
+    const [y, m, d] = fecha.split('-')
+    return `${d}/${m}/${y}`
+  }
 
   return (
     <div className="space-y-3">
       <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-2.5 text-xs text-amber-700">
-        Control interno de transferencias. <b>No</b> genera ingresos en Caja Diaria (se evita duplicar). Pendiente de controlar: <b>{fmt$(totalPend)}</b>
+        Control interno de transferencias para cotejar con la caja del día. <b>No</b> genera ingresos en Caja Diaria (se evita duplicar).
       </div>
-      <div className="flex gap-2">
-        {[['', 'Todas'], ['pendiente', 'Pendientes de controlar'], ['controlada', 'Controladas']].map(([v, l]) => (
-          <button key={v} onClick={() => setFiltro(v)}
-            className={`text-xs font-semibold px-3 py-1.5 rounded-lg ${filtro === v ? 'text-white' : 'bg-gray-100 text-gray-500'}`}
-            style={filtro === v ? { background: CORAL } : {}}>{l}</button>
+
+      {/* Controles: día + estado + PDF */}
+      <div className="bg-white rounded-xl border border-gray-100 p-3 flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-gray-400 uppercase">Día</span>
+          <input type="date" className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm" value={fecha}
+            disabled={todas} onChange={e => setFecha(e.target.value)} />
+        </div>
+        <label className="flex items-center gap-1.5 text-xs text-gray-500">
+          <input type="checkbox" checked={todas} onChange={e => setTodas(e.target.checked)} /> Ver todas las fechas
+        </label>
+        <div className="flex gap-1 ml-auto">
+          {[['', 'Todas'], ['pendiente', 'Pendientes'], ['controlada', 'Controladas']].map(([v, l]) => (
+            <button key={v} onClick={() => setFiltro(v)}
+              className={`text-xs font-semibold px-3 py-1.5 rounded-lg ${filtro === v ? 'text-white' : 'bg-gray-100 text-gray-500'}`}
+              style={filtro === v ? { background: CORAL } : {}}>{l}</button>
+          ))}
+          <button onClick={() => pdfTransferencias(rows, todas ? 'Todas las fechas' : diaLabel())}
+            className="flex items-center gap-1 text-xs font-semibold text-white px-3 py-1.5 rounded-lg" style={{ background: NAVY }}>
+            <FileDown size={13} /> PDF
+          </button>
+        </div>
+      </div>
+
+      {/* Totales del día */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+        {[
+          ['Total transferido', totalImporte, NAVY],
+          ['Pagos', totalPago, '#166534'],
+          ['Señas', totalSena, '#1e40af'],
+          ['Controladas', totalCtrl, '#166534'],
+          ['Pendientes', totalPend, '#b91c1c'],
+        ].map(([l, v, c]) => (
+          <div key={l as string} className="bg-white rounded-xl border border-gray-100 px-3 py-2">
+            <p className="text-[10px] uppercase tracking-wide text-gray-400">{l as string}</p>
+            <p className="text-base font-bold tabular-nums" style={{ color: c as string }}>{fmt$(v as number)}</p>
+          </div>
         ))}
       </div>
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
@@ -832,6 +881,31 @@ function resumenCards(t: any) {
     <div class="rcard"><div class="rlbl">Efectivo</div><div class="rval">${pdfMoney(t.efectivo)}</div></div>
     <div class="rcard"><div class="rlbl">Señas</div><div class="rval">${pdfMoney(t.senas)}</div></div>
   </div>`
+}
+function pdfTransferencias(rows: Transfer[], periodo: string) {
+  if (rows.length === 0) { alert('No hay transferencias para el PDF.'); return }
+  const total = rows.reduce((a, r) => a + r.amount, 0)
+  const pago = rows.filter(r => r.type !== 'sena').reduce((a, r) => a + r.amount, 0)
+  const sena = rows.filter(r => r.type === 'sena').reduce((a, r) => a + r.amount, 0)
+  const ctrl = rows.filter(r => r.reconciliation_status === 'controlada').reduce((a, r) => a + r.amount, 0)
+  const pend = rows.filter(r => r.reconciliation_status === 'pendiente').reduce((a, r) => a + r.amount, 0)
+  const tr = rows.map(r => `<tr>
+    <td>${r.sale_number}</td><td>${r.customer_name || '—'}</td><td>${r.category_name || '—'}</td>
+    <td>${r.type === 'sena' ? 'Seña' : 'Pago'}</td>
+    <td class="r">${pdfMoney(r.amount)}</td>
+    <td>${r.reconciliation_status === 'controlada' ? 'Controlada' : 'Pendiente'}</td>
+  </tr>`).join('')
+  const resumen = `<div class="resumen">
+    <div class="rcard"><div class="rlbl">Total transferido</div><div class="rval">${pdfMoney(total)}</div></div>
+    <div class="rcard"><div class="rlbl">Pagos</div><div class="rval">${pdfMoney(pago)}</div></div>
+    <div class="rcard"><div class="rlbl">Señas</div><div class="rval">${pdfMoney(sena)}</div></div>
+    <div class="rcard"><div class="rlbl">Controladas</div><div class="rval">${pdfMoney(ctrl)}</div></div>
+    <div class="rcard"><div class="rlbl">Pendientes</div><div class="rval">${pdfMoney(pend)}</div></div>
+  </div>`
+  const html = `${pdfHeader(`Transferencias · ${periodo}`)}
+    <table><thead><tr><th>N° Venta</th><th>Cliente</th><th>Categoría</th><th>Tipo</th><th class="r">Importe</th><th>Control</th></tr></thead>
+    <tbody>${tr}</tbody></table>${resumen}`
+  openPdf(html, `Transferencias ${periodo}`)
 }
 function pdfDiario(sales: Sale[]) {
   if (sales.length === 0) { alert('No hay ventas para el PDF.'); return }
