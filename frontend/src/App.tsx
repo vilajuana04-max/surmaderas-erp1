@@ -20,6 +20,7 @@ import Clientes         from './pages/Clientes'
 import Marketing        from './pages/Marketing'
 import Contenido        from './pages/Contenido'
 import ListaPrecios     from './pages/ListaPrecios'
+import VentaOnline      from './pages/VentaOnline'
 
 export default function App() {
   return (
@@ -109,6 +110,16 @@ export default function App() {
             <ProtectedRoute requiredRole="admin">
               <Layout>
                 <ListaPrecios />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/venta-online"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <Layout>
+                <VentaOnline />
               </Layout>
             </ProtectedRoute>
           }

@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Receipt, Menu, X, ChevronDown, Bell, Wallet, LogOut,
-  BookOpen, Ticket, Contact, CalendarRange, ImagePlay,
+  BookOpen, Ticket, Contact, CalendarRange, ImagePlay, ShoppingCart,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
@@ -33,12 +33,19 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
   const isFinanzas = ['/ventas','/compras','/gastos','/flujocaja','/punto-equilibrio','/lista-precios'].some(x => p === x || p.startsWith(x))
   const isRRHH     = p.startsWith('/rrhh') || p.startsWith('/comisiones')
   const isClientes = p.startsWith('/cupones') || p.startsWith('/clientes')
+  const isVentaOnline = p.startsWith('/venta-online')
 
   const [finanzasOpen, setFinanzasOpen] = useState(isFinanzas)
   const [rrhhOpen,     setRrhhOpen]     = useState(isRRHH)
   const [clientesOpen, setClientesOpen] = useState(isClientes)
+  const [ventaOnlineOpen, setVentaOnlineOpen] = useState(isVentaOnline)
 
   const activeTab = new URLSearchParams(location.search).get('tab') ?? 'vacaciones'
+  const voTab = new URLSearchParams(location.search).get('tab') ?? 'resumen'
+  const VO_SUB: [string, string][] = [
+    ['resumen', 'Resumen'], ['nueva', 'Nueva venta'], ['ventas', 'Ventas'],
+    ['transferencias', 'Transferencias'], ['clientes', 'Clientes'], ['categorias', 'Categorías'],
+  ]
 
   const navLinkClass = (isActive: boolean) => [
     'flex items-center gap-3 px-7 py-3 text-sm font-semibold font-body',
@@ -158,6 +165,32 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
                   <NavLink to="/lista-precios" onClick={onClose} className={subLinkClass(p.startsWith('/lista-precios'))}
                     style={{ borderLeftColor: p.startsWith('/lista-precios') ? CORAL : 'transparent' }}><span>Lista de Precios</span></NavLink>
                 </>}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── VENTA ONLINE (grupo) — admin ── */}
+        {isAdmin && (
+          <>
+            <button onClick={() => setVentaOnlineOpen(o => !o)} className={groupBtnClass(isVentaOnline)}
+              style={{ borderLeftColor: isVentaOnline ? CORAL : 'transparent' }}>
+              <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>▸</span>
+              <ShoppingCart size={16} strokeWidth={2} />
+              <span className="tracking-[1px] uppercase text-[12px] flex-1 text-left">Venta Online</span>
+              <ChevronDown size={14} className="shrink-0 transition-transform duration-200"
+                style={{ transform: ventaOnlineOpen ? 'rotate(180deg)' : 'rotate(0deg)', opacity: 0.6 }} />
+            </button>
+            {ventaOnlineOpen && (
+              <div className="pb-1" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                {VO_SUB.map(([t, label]) => {
+                  const active = isVentaOnline && voTab === t
+                  return (
+                    <NavLink key={t} to={t === 'resumen' ? '/venta-online' : `/venta-online?tab=${t}`} onClick={onClose}
+                      className={subLinkClass(active)}
+                      style={{ borderLeftColor: active ? CORAL : 'transparent' }}><span>{label}</span></NavLink>
+                  )
+                })}
               </div>
             )}
           </>

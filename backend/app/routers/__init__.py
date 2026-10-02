@@ -17,3 +17,4 @@ from .marketing import router as marketing_router
 from .contenido import router as contenido_router
 from .puestos import router as puestos_router
 from .placas import router as placas_router
+from .online_sales import router as online_sales_router

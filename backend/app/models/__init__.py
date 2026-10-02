@@ -16,6 +16,7 @@ from .marketing import MarketingEvent
 from .contenido import ContentEvent
 from .puestos import Puesto
 from .placas import Placa, PlacaHistorial, ClienteDescuento, PlacaConfig
+from .online_sales import OnlineSale, OnlineCustomer, OnlineSaleCategory, OnlineTransfer
 
 __all__ = [
     "User",
@@ -36,4 +37,5 @@ __all__ = [
     "ContentEvent",
     "Puesto",
     "Placa", "PlacaHistorial", "ClienteDescuento", "PlacaConfig",
+    "OnlineSale", "OnlineCustomer", "OnlineSaleCategory", "OnlineTransfer",
 ]
