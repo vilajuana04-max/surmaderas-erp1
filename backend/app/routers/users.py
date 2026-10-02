@@ -27,6 +27,7 @@ class UserCreate(BaseModel):
     username: str
     password: str
     role: str = "Personalizado"
+    branch: Optional[str] = None            # luro | independencia | None (todas)
     permissions: Optional[Dict[str, str]] = None
 
 
@@ -34,6 +35,7 @@ class UserUpdate(BaseModel):
     name: Optional[str] = None
     role: Optional[str] = None
     active: Optional[bool] = None
+    branch: Optional[str] = None
     permissions: Optional[Dict[str, str]] = None
 
 
@@ -52,6 +54,7 @@ def _serialize(u: User, db: Session) -> dict:
         "name": u.name or u.username,
         "username": u.username,
         "role": u.role or "Personalizado",
+        "branch": u.branch or "",
         "active": bool(u.active),
         "is_primary_admin": bool(u.is_primary_admin),
         "is_admin": is_admin_user(u, db),
@@ -126,6 +129,7 @@ def create_user(data: UserCreate, db: Session = Depends(get_db), actor: User = D
         username=uname, name=data.name.strip() or uname,
         password_hash=hash_password(data.password),
         role=data.role or "Personalizado", active=True, is_primary_admin=False,
+        branch=(data.branch or None),
     )
     db.add(u); db.flush()
     perms = data.permissions if data.permissions is not None else ROLE_TEMPLATES.get(data.role, {})
@@ -163,6 +167,8 @@ def update_user(user_id: int, data: UserUpdate, db: Session = Depends(get_db), a
         u.name = data.name.strip() or u.username; detalles.append("nombre")
     if data.role is not None:
         u.role = data.role; detalles.append(f"rol {data.role}")
+    if data.branch is not None:
+        u.branch = data.branch or None; detalles.append(f"sucursal {data.branch or 'todas'}")
     if data.active is not None:
         u.active = data.active; detalles.append("activo" if data.active else "pausado")
     if data.permissions is not None:

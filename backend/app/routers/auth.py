@@ -28,6 +28,7 @@ def _user_payload(user: User, db: Session) -> dict:
         "username":         user.username,
         "name":             user.name or user.username,
         "role":             user.role,
+        "branch":           user.branch or None,
         "is_primary_admin": bool(user.is_primary_admin),
         "permissions":      effective_permissions(user, db),
     }

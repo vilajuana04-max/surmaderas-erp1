@@ -10,7 +10,7 @@ const NAVY  = '#070614'
 const CORAL = '#C8603A'
 
 interface UserRow {
-  id: number; name: string; username: string; role: string; active: boolean
+  id: number; name: string; username: string; role: string; branch?: string; active: boolean
   is_primary_admin: boolean; is_admin: boolean
   last_login_at: string | null; created_at: string | null
   permissions: Record<string, Level>
@@ -163,6 +163,7 @@ function UserEditor({ user, meta, onClose, onSaved }: { user: UserRow | null; me
   const [username, setUsername] = useState(user?.username || '')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState(user?.role || 'Personalizado')
+  const [branch, setBranch] = useState<string>(user?.branch || '')
   const [active, setActive] = useState(user?.active ?? true)
   const [perms, setPerms] = useState<Record<string, Level>>(() => {
     if (user) return { ...user.permissions }
@@ -184,9 +185,9 @@ function UserEditor({ user, meta, onClose, onSaved }: { user: UserRow | null; me
     setSaving(true)
     try {
       if (editando) {
-        await api.put(`/users/${user!.id}`, { name: name.trim(), role, active, permissions: perms })
+        await api.put(`/users/${user!.id}`, { name: name.trim(), role, branch: branch || null, active, permissions: perms })
       } else {
-        await api.post('/users', { name: name.trim(), username: username.trim(), password, role, permissions: perms })
+        await api.post('/users', { name: name.trim(), username: username.trim(), password, role, branch: branch || null, permissions: perms })
       }
       onSaved()
     } catch (e: any) { alert('Error: ' + (e?.message || e)); setSaving(false) }
@@ -240,6 +241,16 @@ function UserEditor({ user, meta, onClose, onSaved }: { user: UserRow | null; me
                 </div>
               </div>
             )}
+          </div>
+
+          <div>
+            <label className={lbl}>Sucursal (para Caja Diaria)</label>
+            <select className={inp} value={branch} onChange={e => setBranch(e.target.value)}>
+              <option value="">Todas las sucursales</option>
+              <option value="luro">Solo Luro</option>
+              <option value="independencia">Solo Independencia</option>
+            </select>
+            <p className="text-[11px] text-gray-400 mt-0.5">Si elegís una sucursal, el usuario solo ve/usa la caja de esa sucursal.</p>
           </div>
 
           <div>

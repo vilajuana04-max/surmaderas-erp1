@@ -529,17 +529,19 @@ def _sync_cierre(caja, caja_id: int, db: Session) -> list:
     # La planilla de Gastos Luro filtra por mes en MAYÚSCULAS (ej: "JUNIO")
     month_name = MESES_ES[fecha.month - 1].upper()
 
-    # 1) Gastos → Gastos Luro (idempotente)
+    # 1) Gastos → Gastos Luro — SOLO para la caja de Luro.
+    #    Independencia mantiene sus gastos en su propia caja (no se mezclan).
     try:
         db.query(LuroExpense).filter(LuroExpense.caja_id == caja_id).delete()
-        for mov in [m for m in caja.movimientos if m.tipo == 'gasto']:
-            db.add(LuroExpense(
-                caja_id=caja_id, month=month_name, year=fecha.year, expense_date=fecha,
-                categoria=mov.categoria or 'Gastos Caja',
-                subcategoria=mov.descripcion or '', detail=mov.descripcion or '',
-                amount=mov.monto, payment_method='efectivo', tipo_costo='variable',
-                pagado='SI', paid_status=True,
-            ))
+        if caja.sucursal == 'luro':
+            for mov in [m for m in caja.movimientos if m.tipo == 'gasto']:
+                db.add(LuroExpense(
+                    caja_id=caja_id, month=month_name, year=fecha.year, expense_date=fecha,
+                    categoria=mov.categoria or 'Gastos Caja',
+                    subcategoria=mov.descripcion or '', detail=mov.descripcion or '',
+                    amount=mov.monto, payment_method='efectivo', tipo_costo='variable',
+                    pagado='SI', paid_status=True,
+                ))
         db.commit()
     except Exception as e:
         db.rollback()

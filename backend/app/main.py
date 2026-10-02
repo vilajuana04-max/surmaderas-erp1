@@ -61,6 +61,7 @@ def _run_migrations():
         "ALTER TABLE caja_diaria ADD COLUMN IF NOT EXISTS cantidad_tickets INTEGER DEFAULT 0;",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS name VARCHAR(120) DEFAULT '';",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_primary_admin BOOLEAN DEFAULT FALSE;",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS branch VARCHAR(20);",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;",
         "ALTER TABLE users ALTER COLUMN role TYPE VARCHAR(30);",
@@ -177,6 +178,21 @@ def _seed_user_admin():
             for m in MODULES:
                 db.add(UserPermission(user_id=u.id, module=m, level=base.get(m, "none")))
         db.commit()
+
+        # Usuario 'independencia': caja diaria propia, bloqueada a su sucursal
+        ind = db.query(User).filter(User.username == "independencia").first()
+        if ind:
+            if ind.branch != "independencia":
+                ind.branch = "independencia"
+            cd = db.query(UserPermission).filter(
+                UserPermission.user_id == ind.id, UserPermission.module == "caja_diaria"
+            ).first()
+            if cd:
+                if cd.level in (None, "", "none"):
+                    cd.level = "edit"
+            else:
+                db.add(UserPermission(user_id=ind.id, module="caja_diaria", level="edit"))
+            db.commit()
     except Exception as e:
         print(f"[seed] Error permisos usuarios: {e}")
     finally:

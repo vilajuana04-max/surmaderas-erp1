@@ -9,6 +9,7 @@ export interface AuthUser {
   username: string
   name?:    string
   role:     UserRole
+  branch?:  string | null
   is_primary_admin?: boolean
   permissions?: Permissions
 }

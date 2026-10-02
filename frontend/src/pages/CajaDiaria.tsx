@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api, fmt$ } from '../api'
 import { reqWithRetry } from '../api/client'
+import { useAuth } from '../context/AuthContext'
 import {
   Plus, Trash2, Lock, Unlock,
   ArrowDownCircle, ArrowUpCircle, CreditCard, Banknote, Smartphone,
@@ -449,9 +450,12 @@ function CuponPanel() {
 
 // ── Main page ─────────────────────────────────────────────────────
 export default function CajaDiaria() {
+  const { user } = useAuth()
+  // Si el usuario está restringido a una sucursal, la caja queda fija a esa.
+  const lockedBranch = user?.branch || null
   const [tab,      setTab]      = useState<'caja'|'historial'>('caja')
   const [fecha,    setFecha]    = useState(today())
-  const [sucursal, setSucursal] = useState<string>('luro')
+  const [sucursal, setSucursal] = useState<string>(lockedBranch || 'luro')
   const [caja,     setCaja]     = useState<Caja | null>(null)
   const [loading,  setLoading]  = useState(false)
   const [closing,  setClosing]  = useState(false)
@@ -628,15 +632,23 @@ export default function CajaDiaria() {
               className="text-sm font-semibold text-gray-700 outline-none bg-transparent" />
           </div>
         )}
-        <div className="flex rounded-xl overflow-hidden border border-gray-200 bg-white">
-          {SUCURSALES.map(s => (
-            <button key={s.key} onClick={() => setSucursal(s.key)}
-              className="px-4 py-2 text-sm font-semibold transition-all"
-              style={sucursal === s.key ? { background: NAVY, color: 'white' } : { color: '#9ca3af' }}>
-              {s.label}
-            </button>
-          ))}
-        </div>
+        {lockedBranch ? (
+          <div className="flex items-center rounded-xl border border-gray-200 bg-white px-4 py-2">
+            <span className="text-sm font-bold" style={{ color: NAVY }}>
+              Sucursal {lockedBranch === 'luro' ? 'Luro' : 'Independencia'}
+            </span>
+          </div>
+        ) : (
+          <div className="flex rounded-xl overflow-hidden border border-gray-200 bg-white">
+            {SUCURSALES.map(s => (
+              <button key={s.key} onClick={() => setSucursal(s.key)}
+                className="px-4 py-2 text-sm font-semibold transition-all"
+                style={sucursal === s.key ? { background: NAVY, color: 'white' } : { color: '#9ca3af' }}>
+                {s.label}
+              </button>
+            ))}
+          </div>
+        )}
         {tab === 'caja' && caja && (
           <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold"
                style={caja.cerrada
@@ -835,6 +847,7 @@ export default function CajaDiaria() {
             <p className="text-white/60 text-[11px] font-bold tracking-[2px] uppercase">
               Últimos 60 días — {sucursal === 'luro' ? 'Sucursal Luro' : 'Sucursal Independencia'}
             </p>
+            {!lockedBranch && (
             <button
               onClick={async () => {
                 if (!window.confirm('¿Re-sincronizar todas las cajas cerradas con Gastos Luro y Ventas?')) return
@@ -852,6 +865,7 @@ export default function CajaDiaria() {
               className="text-[10px] font-bold text-white bg-white/15 hover:bg-white/25 px-3 py-1.5 rounded-lg whitespace-nowrap">
               Re-sincronizar cierres
             </button>
+            )}
           </div>
 
           {histLoading && <div className="text-center py-10 text-gray-400">Cargando historial…</div>}

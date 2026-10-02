@@ -143,6 +143,12 @@ async def enforce(request: Request, db: Session = Depends(get_db)):
     if is_me or module is None:
         return
 
+    # Restricción por sucursal (ej: usuario de Independencia no ve Luro)
+    if module == "caja_diaria" and user.branch:
+        for seg in path.strip("/").split("/"):
+            if seg in ("luro", "independencia") and seg != user.branch:
+                raise HTTPException(403, "Sin acceso a la caja de otra sucursal")
+
     perms = effective_permissions(user, db)
     level = perms.get(module, "none")
     if module == "usuarios":

@@ -12,6 +12,7 @@ class User(Base):
     role          = Column(String(30), default='caja')   # plantilla: Administrador | Caja | Ventas | Personalizado (+ legacy)
     active        = Column(Boolean, default=True)
     name          = Column(String(120), default='')       # nombre visible
+    branch        = Column(String(20), nullable=True)      # sucursal: luro | independencia | NULL (todas)
     is_primary_admin = Column(Boolean, default=False)      # Gustavo — protegido
     last_login_at = Column(DateTime(timezone=True), nullable=True)
     created_at    = Column(DateTime(timezone=True), server_default=func.now())
