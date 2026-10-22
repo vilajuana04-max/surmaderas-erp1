@@ -26,6 +26,8 @@ import MiCuenta         from './pages/MiCuenta'
 import Presupuestos     from './pages/Presupuestos'
 import CotizadorListones from './pages/CotizadorListones'
 import CotizadorMarcos   from './pages/CotizadorMarcos'
+import Campanias        from './pages/Campanias'
+import CampaignForm     from './pages/CampaignForm'
 
 const page = (module: string | undefined, el: React.ReactNode) => (
   <ProtectedRoute module={module}>
@@ -38,6 +40,8 @@ export default function App() {
     <AuthProvider>
       <Routes>
         <Route path="/login" element={<Login />} />
+        {/* Formulario público de campañas (QR) — sin login ni layout */}
+        <Route path="/c/:slug" element={<CampaignForm />} />
 
         <Route path="/"                  element={page('dashboard', <Dashboard />)} />
         <Route path="/ventas"            element={page('finanzas', <Ventas />)} />
@@ -56,6 +60,7 @@ export default function App() {
         <Route path="/vencimientos"      element={page('vencimientos', <Vencimientos />)} />
         <Route path="/gastos-personales" element={page('gastos_personales', <GastosPersonales />)} />
         <Route path="/cupones"           element={page('clientes', <Cupones />)} />
+        <Route path="/campanias"         element={page('clientes', <Campanias />)} />
         <Route path="/clientes"          element={page('clientes', <Clientes />)} />
         <Route path="/marketing"         element={page('marketing', <Marketing />)} />
         <Route path="/contenido"         element={page('contenido', <Contenido />)} />

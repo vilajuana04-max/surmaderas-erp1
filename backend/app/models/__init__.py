@@ -19,6 +19,7 @@ from .placas import Placa, PlacaHistorial, ClienteDescuento, PlacaConfig
 from .online_sales import OnlineSale, OnlineCustomer, OnlineSaleCategory, OnlineTransfer
 from .presupuestos import QuoteRequest, QuoteAttachment, QuoteHistory
 from .cotizadores import CotizadorConfig
+from .campaigns import CouponCampaign, CampaignResponse
 
 __all__ = [
     "User", "UserPermission", "UserAudit",
@@ -42,4 +43,5 @@ __all__ = [
     "OnlineSale", "OnlineCustomer", "OnlineSaleCategory", "OnlineTransfer",
     "QuoteRequest", "QuoteAttachment", "QuoteHistory",
     "CotizadorConfig",
+    "CouponCampaign", "CampaignResponse",
 ]

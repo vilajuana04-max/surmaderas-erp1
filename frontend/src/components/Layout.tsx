@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Receipt, Menu, X, ChevronDown, Bell, Wallet, LogOut,
-  BookOpen, Ticket, Contact, CalendarRange, ImagePlay, ShoppingCart, UserCog, UserCircle, ClipboardList, Calculator,
+  BookOpen, Ticket, Contact, CalendarRange, ImagePlay, ShoppingCart, UserCog, UserCircle, ClipboardList, Calculator, Megaphone,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { can } from '../permissions'
@@ -322,6 +322,9 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
                 <NavLink to="/clientes" onClick={onClose} className={subLinkClass(p.startsWith('/clientes'))}
                   style={{ borderLeftColor: p.startsWith('/clientes') ? CORAL : 'transparent' }}>
                   <Contact size={13} /> <span>Base de datos</span></NavLink>
+                <NavLink to="/campanias" onClick={onClose} className={subLinkClass(p.startsWith('/campanias'))}
+                  style={{ borderLeftColor: p.startsWith('/campanias') ? CORAL : 'transparent' }}>
+                  <Megaphone size={13} /> <span>Campañas</span></NavLink>
               </div>
             )}
           </>
