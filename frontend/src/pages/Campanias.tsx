@@ -28,16 +28,23 @@ export default function Campanias() {
   const [editor, setEditor] = useState<Campaign | 'nuevo' | null>(null)
   const [respOf, setRespOf] = useState<Campaign | null>(null)
   const [qrOf, setQrOf] = useState<Campaign | null>(null)
-  const [valCode, setValCode] = useState('')
-  const [valRes, setValRes] = useState<any>(null)
+  const [valQ, setValQ] = useState('')
+  const [valRows, setValRows] = useState<(Resp & { campaign?: string; discount_pct?: number; scope_text?: string })[] | null>(null)
+  const [valBusy, setValBusy] = useState(false)
 
   const load = () => { setLoading(true); api.get<Campaign[]>('/campaigns').then(setRows).catch(() => setRows([])).finally(() => setLoading(false)) }
   useEffect(() => { load() }, [])
 
   const validar = async () => {
-    if (!valCode.trim()) return
-    try { setValRes(await api.post('/campaigns/validate', { code: valCode.trim() })) } catch (e: any) { setValRes({ ok: false, message: e?.message }) }
+    const q = valQ.trim()
+    if (!q) return
+    setValBusy(true)
+    try { setValRows(await api.get<any[]>(`/campaigns/search?q=${encodeURIComponent(q)}`)) }
+    catch { setValRows([]) }
+    finally { setValBusy(false) }
   }
+  const bajaResp = async (id: number) => { await api.post(`/campaigns/responses/${id}/toggle-active`, {}); validar(); load() }
+  const usarResp = async (id: number) => { await api.post(`/campaigns/responses/${id}/toggle-used`, {}); validar(); load() }
 
   return (
     <div className="max-w-5xl mx-auto pb-16">
@@ -50,13 +57,39 @@ export default function Campanias() {
         <button onClick={() => setEditor('nuevo')} className="flex items-center gap-2 text-white px-4 py-2 rounded-xl text-sm font-bold" style={{ background: CORAL }}><Plus size={16} /> Nueva campaña</button>
       </div>
 
-      {/* Validador */}
-      <div className="bg-white rounded-xl border border-gray-100 p-3 flex flex-wrap items-center gap-2 mb-4">
-        <Search size={15} className="text-gray-300" />
-        <input className="flex-1 min-w-[160px] text-sm outline-none" placeholder="Validar cupón (ej: SURBATATA1)" value={valCode} onChange={(e) => setValCode(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && validar()} />
-        <button onClick={validar} className="text-xs font-semibold text-white px-3 py-1.5 rounded-lg" style={{ background: NAVY }}>Validar</button>
-        {valRes && (
-          <span className="text-xs font-bold px-2 py-1 rounded-full" style={{ background: valRes.ok ? '#dcfce7' : '#fee2e2', color: valRes.ok ? '#166534' : '#b91c1c' }}>{valRes.message}</span>
+      {/* Validador / buscador de cupones */}
+      <div className="bg-white rounded-xl border border-gray-100 p-3 mb-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <Search size={15} className="text-gray-300" />
+          <input className="flex-1 min-w-[160px] text-sm outline-none" placeholder="Buscar por cupón o nombre (ej: SURBATATA111 o Juan)" value={valQ} onChange={(e) => setValQ(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && validar()} />
+          <button onClick={validar} disabled={valBusy} className="text-xs font-semibold text-white px-3 py-1.5 rounded-lg disabled:opacity-50" style={{ background: NAVY }}>{valBusy ? '…' : 'Buscar'}</button>
+          {valRows !== null && <button onClick={() => { setValRows(null); setValQ('') }} className="text-xs font-semibold text-gray-400 px-2 py-1.5">Limpiar</button>}
+        </div>
+        {valRows !== null && (
+          <div className="mt-3 space-y-2">
+            {valRows.length === 0 && <p className="text-xs text-gray-400 py-2">Sin resultados para "{valQ}".</p>}
+            {valRows.map((r) => {
+              const estilo = !r.active ? { bg: '#f1f1f1', col: '#6b7280', txt: 'De baja' }
+                : r.used ? { bg: '#dbeafe', col: '#1e40af', txt: 'Canjeado' }
+                : { bg: '#dcfce7', col: '#166534', txt: 'Vigente' }
+              return (
+                <div key={r.id} className="border border-gray-100 rounded-lg p-3 flex items-start justify-between gap-3 flex-wrap">
+                  <div className="min-w-0">
+                    <p className="font-mono font-bold text-base" style={{ color: CORAL }}>{r.coupon_code}</p>
+                    <p className="text-sm font-semibold text-gray-700">{r.customer_name || '—'} <span className="text-gray-400 font-normal text-xs">{r.phone ? `· ${r.phone}` : ''}{r.email ? ` · ${r.email}` : ''}</span></p>
+                    <p className="text-[11px] text-gray-400">{r.campaign}{r.discount_pct ? ` · ${r.discount_pct}% OFF` : ''}{r.scope_text ? ` · ${r.scope_text}` : ''}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: estilo.bg, color: estilo.col }}>{estilo.txt}</span>
+                    <div className="flex gap-1">
+                      <button onClick={() => usarResp(r.id)} className="text-[10px] font-semibold border border-gray-200 rounded px-2 py-1 hover:bg-gray-50">{r.used ? 'Desmarcar' : 'Marcar usado'}</button>
+                      <button onClick={() => bajaResp(r.id)} className="text-[10px] font-semibold border border-gray-200 rounded px-2 py-1 hover:bg-gray-50">{r.active ? 'Dar de baja' : 'Reactivar'}</button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         )}
       </div>
 

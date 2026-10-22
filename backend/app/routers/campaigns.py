@@ -249,6 +249,38 @@ def toggle_used(rid: int, user: User = Depends(get_current_user), db: Session = 
     return _resp(r)
 
 
+# ── Búsqueda de cupones por código o nombre (mostrador) ───────────
+@router.get("/search")
+def search_responses(q: str = "", user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Busca respuestas/cupones por código, nombre del cliente o teléfono,
+    en todas las campañas. Para el validador del mostrador."""
+    _admin(user, db)
+    term = (q or "").strip()
+    if not term:
+        return []
+    like = f"%{term}%"
+    rows = (
+        db.query(CampaignResponse)
+        .filter(
+            CampaignResponse.coupon_code.ilike(like)
+            | CampaignResponse.customer_name.ilike(like)
+            | CampaignResponse.phone.ilike(like)
+        )
+        .order_by(CampaignResponse.id.desc())
+        .limit(50)
+        .all()
+    )
+    out = []
+    for r in rows:
+        c = r.campaign
+        d = _resp(r)
+        d["campaign"] = c.name if c else ""
+        d["discount_pct"] = float(c.discount_pct or 0) if c else 0
+        d["scope_text"] = (c.scope_text or "") if c else ""
+        out.append(d)
+    return out
+
+
 # ── Validación de cupón (para el mostrador) ───────────────────────
 @router.post("/validate")
 def validate(body: ValidateIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):

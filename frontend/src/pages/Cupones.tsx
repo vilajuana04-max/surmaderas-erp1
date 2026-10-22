@@ -95,47 +95,56 @@ interface FelizResult {
 }
 
 // ── Componente de búsqueda rápida (inline en la tabla) ────────────
-function BusquedaRapida({ onValidar }: { onValidar: () => void }) {
-  const [code,      setCode]      = useState('')
-  const [cupon,     setCupon]     = useState<Encuesta | null>(null)
+function BusquedaRapida({ items, onValidar }: { items: Encuesta[]; onValidar: () => void }) {
+  const [q,         setQ]         = useState('')
+  const [results,   setResults]   = useState<Encuesta[] | null>(null)
   const [feliz,     setFeliz]     = useState<FelizResult | null>(null)
   const [msg,       setMsg]       = useState<{ text: string; ok: boolean } | null>(null)
   const [searching, setSearching] = useState(false)
-  const [validating,setValidating]= useState(false)
+  const [validating,setValidating]= useState<string | null>(null)
 
   const buscar = async (e: React.FormEvent) => {
     e.preventDefault()
-    const c = code.trim().toUpperCase()
-    if (!c) return
-    setSearching(true); setCupon(null); setFeliz(null); setMsg(null)
+    const raw = q.trim()
+    if (!raw) return
+    setSearching(true); setResults(null); setFeliz(null); setMsg(null)
     try {
       // Cupón de cumpleaños: FELIZ + número de cliente
-      if (c.startsWith('FELIZ')) {
+      if (raw.toUpperCase().startsWith('FELIZ')) {
         const res = await fetch(`${API}/clientes/cupon-feliz/consultar`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          credentials: 'omit', body: JSON.stringify({ code: c }),
+          credentials: 'omit', body: JSON.stringify({ code: raw.toUpperCase() }),
         })
         const data = await res.json()
         if (!res.ok) throw new Error(data.detail || 'No encontrado')
-        setFeliz(data)
-      } else {
-        const res = await fetch(`${API}/cupones/consultar`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          credentials: 'omit', body: JSON.stringify({ couponCode: c }),
-        })
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.detail || 'No encontrado')
-        setCupon(data.coupon ?? data)
+        setFeliz(data); return
       }
+      // Búsqueda local por código, nombre, teléfono o email
+      const qu = raw.toUpperCase(), ql = raw.toLowerCase()
+      const local = items.filter(x =>
+        x.couponCode?.toUpperCase().includes(qu) ||
+        x.fullName?.toLowerCase().includes(ql) ||
+        x.phone?.includes(raw) ||
+        x.email?.toLowerCase().includes(ql)
+      )
+      if (local.length) { setResults(local); return }
+      // Fallback: consulta por código exacto al backend
+      const res = await fetch(`${API}/cupones/consultar`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        credentials: 'omit', body: JSON.stringify({ couponCode: qu }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail || 'No encontrado')
+      setResults([data.coupon ?? data])
     } catch (err: unknown) {
-      setMsg({ text: err instanceof Error ? err.message : 'Error', ok: false })
+      setResults([]); setMsg({ text: err instanceof Error ? err.message : 'Sin resultados', ok: false })
     } finally { setSearching(false) }
   }
 
-  const darDeBaja = async () => {
-    if (!cupon?.couponCode) return
+  const darDeBaja = async (cupon: Encuesta) => {
+    if (!cupon.couponCode) return
     if (!window.confirm(`¿Dar de baja el cupón ${cupon.couponCode}?`)) return
-    setValidating(true); setMsg(null)
+    setValidating(cupon.couponCode); setMsg(null)
     try {
       const res = await fetch(`${API}/cupones/validar`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -143,18 +152,18 @@ function BusquedaRapida({ onValidar }: { onValidar: () => void }) {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.detail || 'Error')
-      setCupon(prev => prev ? { ...prev, couponUsed: true } : prev)
-      setMsg({ text: '✓ Cupón dado de baja', ok: true })
+      setResults(prev => prev ? prev.map(x => x.couponCode === cupon.couponCode ? { ...x, couponUsed: true } : x) : prev)
+      setMsg({ text: `✓ ${cupon.couponCode} dado de baja`, ok: true })
       onValidar()
     } catch (err: unknown) {
       setMsg({ text: err instanceof Error ? err.message : 'Error', ok: false })
-    } finally { setValidating(false) }
+    } finally { setValidating(null) }
   }
 
   const darDeBajaFeliz = async () => {
     if (!feliz) return
     if (!window.confirm(`¿Dar de baja el cupón de cumpleaños de ${feliz.nombre} para ${feliz.anio}? Solo se puede una vez por año.`)) return
-    setValidating(true); setMsg(null)
+    setValidating('feliz'); setMsg(null)
     try {
       const res = await fetch(`${API}/clientes/cupon-feliz/validar`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -166,22 +175,20 @@ function BusquedaRapida({ onValidar }: { onValidar: () => void }) {
       setMsg({ text: '✓ Cupón de cumpleaños dado de baja', ok: true })
     } catch (err: unknown) {
       setMsg({ text: err instanceof Error ? err.message : 'Error', ok: false })
-    } finally { setValidating(false) }
+    } finally { setValidating(null) }
   }
-
-  const est = cupon ? estadoCupon(cupon) : null
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-3">
       <div className="flex items-center gap-2">
         <Ticket size={15} style={{ color: CORAL }} />
-        <p className="font-bold text-sm text-gray-800">Validar cupón</p>
+        <p className="font-bold text-sm text-gray-800">Validar / buscar cupón</p>
       </div>
       <form onSubmit={buscar} className="flex gap-2">
-        <input value={code} onChange={e => setCode(e.target.value.toUpperCase())}
-          placeholder="Código del cupón (o FELIZ…)"
-          className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm font-mono uppercase tracking-wider focus:outline-none focus:border-gray-400" />
-        <button type="submit" disabled={searching || !code.trim()}
+        <input value={q} onChange={e => setQ(e.target.value)}
+          placeholder="Código, nombre o teléfono…"
+          className="flex-1 min-w-0 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-gray-400" />
+        <button type="submit" disabled={searching || !q.trim()}
           className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white disabled:opacity-50"
           style={{ background: NAVY }}>
           <Search size={13}/> {searching ? '…' : 'Buscar'}
@@ -212,38 +219,47 @@ function BusquedaRapida({ onValidar }: { onValidar: () => void }) {
           </div>
           {!feliz.usado_este_anio && (
             <div className="px-3 pb-3">
-              <button onClick={darDeBajaFeliz} disabled={validating}
+              <button onClick={darDeBajaFeliz} disabled={validating === 'feliz'}
                 className="w-full py-2 rounded-xl text-sm font-bold text-white disabled:opacity-50"
                 style={{ background: '#ec4899' }}>
-                {validating ? 'Procesando…' : '🎂 Dar de baja cumpleaños'}
+                {validating === 'feliz' ? 'Procesando…' : '🎂 Dar de baja cumpleaños'}
               </button>
             </div>
           )}
         </div>
       )}
 
-      {cupon && est && (
-        <div className="rounded-xl border overflow-hidden" style={{ borderColor: est.color + '40' }}>
-          <div className="flex items-center gap-2 px-3 py-2" style={{ background: est.bg }}>
-            <span style={{ color: est.color }}>{est.icon}</span>
-            <span className="text-xs font-bold" style={{ color: est.color }}>{est.label}</span>
-            <span className="ml-auto font-mono text-xs text-gray-500 font-bold">{cupon.couponCode}</span>
-          </div>
-          <div className="px-3 py-2 space-y-1">
-            {cupon.fullName && <p className="text-sm"><span className="text-gray-400">Cliente: </span><strong>{cupon.fullName}</strong></p>}
-            {cupon.phone    && <p className="text-xs text-gray-500">{cupon.phone} · {cupon.email}</p>}
-          </div>
-          {!cupon.couponUsed && (
-            <div className="px-3 pb-3">
-              <button onClick={darDeBaja} disabled={validating}
-                className="w-full py-2 rounded-xl text-sm font-bold text-white disabled:opacity-50"
-                style={{ background: CORAL }}>
-                {validating ? 'Procesando…' : '✓ Dar de baja'}
-              </button>
-            </div>
-          )}
-        </div>
+      {results && results.length === 0 && !msg && (
+        <p className="text-xs text-gray-400">Sin resultados.</p>
       )}
+      {results && results.length > 1 && (
+        <p className="text-[11px] text-gray-400">{results.length} cupones encontrados</p>
+      )}
+      {results && results.map(e => {
+        const est = estadoCupon(e)
+        return (
+          <div key={e._id || e.couponCode} className="rounded-xl border overflow-hidden" style={{ borderColor: est.color + '40' }}>
+            <div className="flex items-center gap-2 px-3 py-2" style={{ background: est.bg }}>
+              <span style={{ color: est.color }}>{est.icon}</span>
+              <span className="text-xs font-bold" style={{ color: est.color }}>{est.label}</span>
+              <span className="ml-auto font-mono text-sm text-gray-700 font-bold">{e.couponCode}</span>
+            </div>
+            <div className="px-3 py-2 space-y-1">
+              {e.fullName && <p className="text-sm"><span className="text-gray-400">Cliente: </span><strong>{e.fullName}</strong></p>}
+              {e.phone    && <p className="text-xs text-gray-500">{e.phone}{e.email ? ` · ${e.email}` : ''}</p>}
+            </div>
+            {!e.couponUsed && !isVencido(e) && (
+              <div className="px-3 pb-3">
+                <button onClick={() => darDeBaja(e)} disabled={validating === e.couponCode}
+                  className="w-full py-2 rounded-xl text-sm font-bold text-white disabled:opacity-50"
+                  style={{ background: CORAL }}>
+                  {validating === e.couponCode ? 'Procesando…' : '✓ Dar de baja'}
+                </button>
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -391,7 +407,34 @@ export default function Cupones() {
             </div>
           ) : (
             <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-              <div className="overflow-x-auto">
+              {/* Mobile / pantallas chicas: tarjetas con el cupón bien visible (sin scroll lateral) */}
+              <div className="lg:hidden divide-y divide-gray-100">
+                {filtered.map(e => {
+                  const est = estadoCupon(e)
+                  return (
+                    <div key={e._id} className="p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-gray-800 text-sm truncate">{e.fullName || '-'}</p>
+                          <p className="text-[11px] text-gray-400">{e.createdAt ? fmtDate(e.createdAt) : ''}{e.branch ? ` · ${lbl(e.branch)}` : ''}</p>
+                        </div>
+                        <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide shrink-0 px-2 py-0.5 rounded-full" style={{ color: est.color, background: est.bg }}>{est.icon}{est.label}</span>
+                      </div>
+                      <div className="mt-2 rounded-xl px-3 py-2 flex items-center justify-between gap-2" style={{ background: '#F9FAFB' }}>
+                        <span className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Cupón</span>
+                        <span className="font-mono text-base font-bold" style={{ color: NAVY }}>{e.couponCode || '-'}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-2 text-[11px] text-gray-500">
+                        {e.phone && <span>{e.phone}</span>}
+                        {e.rating ? <span>{e.rating}/5 ★</span> : null}
+                        {e.couponExpiresAt && <span>Vence {fmtDate(e.couponExpiresAt)}</span>}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              {/* Desktop: tabla completa */}
+              <div className="hidden lg:block overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr style={{ background: NAVY }}>
@@ -452,7 +495,7 @@ export default function Cupones() {
 
         {/* ── Panel validador lateral ── */}
         <div className="w-full lg:w-72 shrink-0">
-          <BusquedaRapida onValidar={load} />
+          <BusquedaRapida items={items} onValidar={load} />
         </div>
       </div>
     </div>
