@@ -1,0 +1,166 @@
+<title>Batata × Sur Maderas</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Layout: una tarjeta centrada tipo formulario público, mobile-first.
+     Paleta Batata (naranja/amarillo/rosa/verde) + identidad Sur (navy/coral). Look único (sin dark). */
+  :root{
+    --orange:#FE6700; --orange-dk:#c74f00; --yellow:#FED100; --pink:#FDE1EC;
+    --green:#56FB98; --dark:#3E3842; --navy:#070614; --coral:#C8603A; --cream:#FFF9F5;
+    --line:#ead9e0; --muted:#9a8f95;
+    --head:'Fredoka','Poppins',system-ui,sans-serif;
+    --body:'Poppins',system-ui,sans-serif;
+    color-scheme: light;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{background:var(--pink);font-family:var(--body);color:var(--dark);line-height:1.45}
+  .page{padding-block:24px;
+    padding-left:max(16px,env(safe-area-inset-left,0px));
+    padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .wrap{max-width:520px;margin:0 auto;background:var(--cream);border-radius:28px;overflow:hidden;
+    box-shadow:0 20px 60px rgba(62,56,66,.16);border:1px solid #f0e6ea}
+  .ribbon{background:var(--navy);color:#fff;text-align:center;font-size:11px;letter-spacing:1.5px;
+    text-transform:uppercase;padding:6px}
+  .ribbon b{color:var(--yellow)}
+  /* Hero */
+  .hero{position:relative;padding:26px 22px 30px;text-align:center;color:#fff;
+    background:linear-gradient(135deg,var(--orange) 0%,#ff8a2b 55%,var(--yellow) 135%)}
+  .hero:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:22px;background:var(--cream);
+    border-radius:22px 22px 0 0}
+  .lockup{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+  .batata{font-family:var(--head);font-weight:700;font-size:30px;line-height:1;letter-spacing:.5px}
+  .x{font-family:var(--head);font-weight:600;font-size:22px;opacity:.85}
+  .surlock{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.16);
+    border:1.5px solid rgba(255,255,255,.4);padding:6px 12px;border-radius:14px}
+  .surlock svg{width:30px;height:30px;display:block}
+  .surtxt{font-weight:800;font-size:15px;letter-spacing:1px;text-transform:uppercase}
+  .badge{display:inline-block;background:var(--green);color:var(--dark);font-family:var(--head);
+    font-weight:700;font-size:22px;padding:7px 18px;border-radius:999px;margin:6px 0 8px;
+    box-shadow:0 6px 0 rgba(0,0,0,.08)}
+  .herosub{font-size:13.5px;opacity:.96;max-width:420px;margin:0 auto;text-wrap:balance}
+  /* Body */
+  .body{padding:6px 20px 24px}
+  .q{margin-top:20px}
+  .qlabel{font-family:var(--head);font-weight:600;font-size:16.5px;color:var(--navy);margin:0 0 3px}
+  .qhint{font-size:12px;color:var(--muted);margin:0 0 10px}
+  .inp{width:100%;border:2px solid var(--line);border-radius:14px;padding:13px 15px;font-size:16px;
+    font-family:var(--body);outline:none;background:#fff;color:var(--dark)}
+  .inp:focus{border-color:var(--orange)}
+  .opts{display:flex;flex-wrap:wrap;gap:8px}
+  .pill{border:2px solid var(--line);background:#fff;color:var(--dark);border-radius:999px;
+    padding:9px 15px;font-size:14px;font-weight:500;cursor:pointer;transition:.12s;font-family:var(--body)}
+  .pill:hover{border-color:var(--orange)}
+  .pill:focus-visible{outline:3px solid var(--orange);outline-offset:2px}
+  .pill.on{background:var(--orange);border-color:var(--orange);color:#fff;font-weight:600}
+  .pill.on.multi{background:var(--navy);border-color:var(--navy)}
+  .cta{width:100%;margin-top:26px;background:var(--orange);color:#fff;border:none;border-radius:18px;
+    padding:18px;font-family:var(--head);font-weight:700;font-size:20px;cursor:pointer;box-shadow:0 8px 0 var(--orange-dk)}
+  .cta:active{transform:translateY(3px);box-shadow:0 5px 0 var(--orange-dk)}
+  .foot{text-align:center;font-size:11.5px;color:#a79ba1;margin-top:12px}
+  .brandfoot{text-align:center;padding:16px;background:var(--navy);color:#fff}
+  .brandfoot b{font-family:var(--head);font-weight:600}
+  .brandfoot span{display:block;font-size:11px;opacity:.5;margin-top:2px}
+  /* Resultado */
+  .done{padding:34px 24px;text-align:center}
+  .emoji{font-size:54px}
+  .donetitle{font-family:var(--head);font-weight:700;font-size:26px;color:var(--navy);margin:6px 0 2px}
+  .donesub{color:var(--coral);font-weight:700;font-size:15px;margin-bottom:16px}
+  .couponbox{border:3px dashed var(--orange);border-radius:20px;padding:20px;background:#fff;margin-bottom:14px}
+  .code{font-family:var(--head);font-weight:700;font-size:34px;letter-spacing:2px;color:var(--orange)}
+  .copy{width:100%;background:var(--navy);color:#fff;border:none;border-radius:16px;padding:15px;
+    font-family:var(--head);font-weight:600;font-size:16px;cursor:pointer}
+  @media(max-width:480px){.batata{font-size:26px}.badge{font-size:19px}}
+  @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<div class="page">
+  <div class="wrap" id="card">
+    <div class="ribbon">Vista previa · el formulario real vive en <b>surmaderas.com.ar/Batataxsur</b></div>
+    <div class="hero">
+      <div class="lockup">
+        <span class="batata">batata</span><span class="x">×</span>
+        <span class="surlock">
+          <svg viewBox="0 0 48 48" aria-label="Sur Maderas">
+            <g fill="none" stroke="#fff" stroke-width="2">
+              <rect x="19" y="2"  width="10" height="10" rx="2.5"/>
+              <rect x="8"  y="13" width="10" height="10" rx="2.5"/><rect x="19" y="13" width="10" height="10" rx="2.5"/><rect x="30" y="13" width="10" height="10" rx="2.5"/>
+              <rect x="2"  y="24" width="10" height="10" rx="2.5"/><rect x="36" y="24" width="10" height="10" rx="2.5"/>
+              <rect x="8"  y="35" width="10" height="10" rx="2.5"/><rect x="19" y="35" width="10" height="10" rx="2.5"/><rect x="30" y="35" width="10" height="10" rx="2.5"/>
+            </g>
+            <circle cx="24" cy="24" r="10" fill="none" stroke="#fff" stroke-width="2"/>
+            <text x="24" y="29.5" text-anchor="middle" font-family="Poppins,sans-serif" font-weight="800" font-size="15" fill="#fff">S</text>
+          </svg>
+          <span class="surtxt">Sur Maderas</span>
+        </span>
+      </div>
+      <div class="badge">15% OFF 🎉</div>
+      <p class="herosub">Completá el formulario y te enviamos tu beneficio por mail. Queremos conocerte un poco mejor para mostrarte ideas que realmente te sirvan.</p>
+    </div>
+    <div class="body" id="form"></div>
+    <div class="brandfoot"><b>Sur Maderas</b><span>Mar del Plata · Hacemos realidad tus ideas</span></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var form=document.getElementById("form"), card=document.getElementById("card"), state={};
+  var QS=[
+    {id:"nombre",t:"short",label:"Nombre y apellido",req:true,attr:'autocomplete="name"'},
+    {id:"telefono",t:"short",label:"Número de teléfono",req:true,hint:"Ejemplo: 223 XXXXXXX",attr:'type="tel" inputmode="tel"'},
+    {id:"email",t:"short",label:"Email",req:true,hint:"Te enviaremos tu beneficio por mail.",attr:'type="email" inputmode="email"'},
+    {id:"conocia",t:"single",label:"¿Ya conocías Sur Maderas?",opts:["Sí, ya compré alguna vez","Sí, la conocía pero nunca compré","La conocía de nombre","No, es la primera vez"]},
+    {id:"intereses",t:"multi",label:"¿Qué te interesaría encontrar en Sur Maderas?",hint:"Podés elegir más de una.",opts:["Productos y muebles infantiles","Muebles y organización para el hogar","Estantes y bibliotecas","Escritorios","Muebles a medida","Cortes de madera a medida","Decoración","Marcos a medida","Productos para mascotas","Tengo otro proyecto en mente"]},
+    {id:"infantil",t:"multi",label:"Pensando en los chicos, ¿qué productos te interesarían?",hint:"Podés elegir más de una.",opts:["Mesas y sillas infantiles","Bibliotecas","Estanterías","Jugueteros","Escritorios","Percheros","Muebles para habitación infantil","Guardado y organización","Decoración en madera","Muebles a medida","Otro"]},
+    {id:"espacio",t:"single",label:"¿Para qué espacio lo estás pensando?",opts:["Habitación infantil","Playroom","Living","Espacio de estudio","Jardín / exterior","Espacio educativo","Comercio o consultorio","Todavía no lo sé"]},
+    {id:"valora",t:"multi",max:3,label:"¿Qué valorás más al elegir muebles para chicos?",hint:"Podés elegir hasta 3.",opts:["Seguridad","Durabilidad","Diseño","Aprovechamiento del espacio","Que acompañe el crecimiento","Fácil limpieza","Precio","Personalizado / a medida"]},
+    {id:"proyecto",t:"single",label:"¿Tenés algún proyecto próximo?",opts:["Sí, durante este mes","Sí, en los próximos 3 meses","Tengo una idea, aún no decidí","No por ahora, solo me inspiro"]},
+    {id:"mdp",t:"single",label:"¿Vivís en Mar del Plata?",opts:["Sí","Vivo en la zona","Estoy de visita / vacaciones","Vivo en otra ciudad"]},
+    {id:"novedades",t:"single",label:"¿Querés recibir ideas, novedades y beneficios?",opts:["Sí, quiero recibirlos","No por ahora"]}
+  ];
+  function esc(s){var d=document.createElement("div");d.textContent=s==null?"":String(s);return d.innerHTML;}
+  var html="";
+  QS.forEach(function(q){
+    html+='<div class="q"><p class="qlabel">'+esc(q.label)+(q.req?' *':'')+'</p>';
+    if(q.hint) html+='<p class="qhint">'+esc(q.hint)+'</p>';
+    if(q.t==="short") html+='<input class="inp" data-id="'+q.id+'" '+(q.attr||"")+'>';
+    else{
+      html+='<div class="opts" data-group="'+q.id+'" data-type="'+q.t+'"'+(q.max?' data-max="'+q.max+'"':'')+'>';
+      q.opts.forEach(function(o){ html+='<button type="button" class="pill" data-val="'+esc(o)+'">'+esc(o)+'</button>'; });
+      html+='</div>';
+    }
+    html+='</div>';
+  });
+  html+='<button class="cta" id="cta">QUIERO MI 15% OFF</button><p class="foot">Al enviar, recibirás tu beneficio por email.</p>';
+  form.innerHTML=html;
+  form.querySelectorAll(".opts").forEach(function(g){
+    var id=g.getAttribute("data-group"),type=g.getAttribute("data-type"),max=parseInt(g.getAttribute("data-max")||"0");
+    g.addEventListener("click",function(e){
+      var b=e.target.closest(".pill"); if(!b)return; var val=b.getAttribute("data-val");
+      if(type==="single"){ g.querySelectorAll(".pill").forEach(function(p){p.classList.remove("on");}); b.classList.add("on"); state[id]=val; }
+      else{ var arr=state[id]||[];
+        if(b.classList.contains("on")){ b.classList.remove("on"); arr=arr.filter(function(x){return x!==val;}); }
+        else{ if(max&&arr.length>=max){ return; } b.classList.add("on"); b.classList.add("multi"); arr=arr.concat([val]); }
+        state[id]=arr; }
+    });
+  });
+  document.getElementById("cta").addEventListener("click",function(){
+    form.querySelectorAll("input[data-id]").forEach(function(el){ state[el.getAttribute("data-id")]=el.value.trim(); });
+    var btn=this; btn.textContent="Enviando…";
+    setTimeout(function(){ done({coupon_code:"SURBATATA111",discount_pct:15,scope_text:"línea infantil, todos los medios de pago"}); },700);
+  });
+  function done(d){
+    card.innerHTML='<div class="ribbon">Vista previa · así ve el cliente su cupón</div>'+
+      '<div class="hero"><div class="lockup"><span class="batata">batata</span><span class="x">×</span><span class="surtxt" style="font-size:16px">SUR MADERAS</span></div></div>'+
+      '<div class="done"><div class="emoji">🎉</div><p class="donetitle">¡Listo! Tu cupón</p>'+
+      '<p class="donesub">'+esc(d.discount_pct)+'% OFF · '+esc(d.scope_text)+'</p>'+
+      '<div class="couponbox"><div class="code">'+esc(d.coupon_code)+'</div></div>'+
+      '<button class="copy" id="copy">Copiar código</button>'+
+      '<p class="foot" style="margin-top:14px">Mostralo en la caja de Sur Maderas para usar tu 15% OFF.</p></div>'+
+      '<div class="brandfoot"><b>Sur Maderas</b><span>Mar del Plata · Hacemos realidad tus ideas</span></div>';
+    document.getElementById("copy").addEventListener("click",function(){
+      try{ navigator.clipboard.writeText(d.coupon_code); }catch(e){}
+    });
+    window.scrollTo({top:0,behavior:"smooth"});
+  }
+})();
+</script>
