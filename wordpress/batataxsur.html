@@ -1,144 +1,207 @@
-<!-- ============================================================
-     FORMULARIO CAMPAÑA — Sur Maderas x Batata
+<!-- ==================================================================
+     FORMULARIO COLABORACIÓN — SUR MADERAS × batata  (15% OFF)
      Pegá TODO este bloque en una página de WordPress:
-       · Elementor → widget "HTML"
-       · o bloque "HTML personalizado" (Gutenberg)
-     Publicá la página en: https://surmaderas.com.ar/Batataxsur/
-     No requiere login. Lee la campaña de tu ERP y envía ahí las respuestas.
-     Para otra campaña, cambiá SLUG abajo por el slug que creaste en el ERP.
-     ============================================================ -->
+       · Elementor → widget "HTML"   · o bloque "HTML personalizado"
+     Publicá la página en:  https://surmaderas.com.ar/Batataxsur/
+     No requiere login. Envía las respuestas a tu ERP, que genera el
+     cupón SURBATATA###.  (Requiere la campaña con slug "batataxsur".)
+     ================================================================== -->
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <div id="bxs-root">
   <style>
-    #bxs-root{--navy:#070614;--coral:#C8603A;font-family:'Segoe UI',system-ui,Arial,sans-serif;max-width:460px;margin:0 auto;color:#1a1a1a}
-    #bxs-root *{box-sizing:border-box}
-    .bxs-head{background:var(--navy);border-radius:18px;padding:22px;text-align:center;margin-bottom:16px}
-    .bxs-kicker{color:var(--coral);font-size:11px;font-weight:800;letter-spacing:4px;text-transform:uppercase}
-    .bxs-sub{color:rgba(255,255,255,.55);font-size:12px;margin-top:4px}
-    .bxs-card{background:#fff;border:1px solid #eee;border-radius:18px;padding:22px}
-    .bxs-title{font-size:22px;font-weight:800;color:var(--navy);text-align:center;margin:0}
-    .bxs-promo{color:var(--coral);font-weight:800;text-align:center;font-size:14px;margin:4px 0 0}
-    .bxs-intro{color:#6b7280;font-size:14px;text-align:center;margin:10px 0 0}
-    .bxs-field{margin-top:14px}
-    .bxs-label{display:block;font-size:13px;font-weight:700;color:#374151;margin-bottom:6px}
-    .bxs-input,.bxs-select,.bxs-textarea{width:100%;border:1px solid #d7d2cc;border-radius:12px;padding:12px 14px;font-size:16px;outline:none;background:#fff;font-family:inherit}
-    .bxs-input:focus,.bxs-select:focus,.bxs-textarea:focus{border-color:var(--coral)}
-    .bxs-stars{display:flex;gap:8px;justify-content:center}
-    .bxs-star{font-size:30px;cursor:pointer;opacity:.3;background:none;border:none;padding:0}
-    .bxs-star.on{opacity:1}
-    .bxs-btn{width:100%;margin-top:20px;background:var(--coral);color:#fff;border:none;border-radius:14px;padding:16px;font-size:17px;font-weight:800;cursor:pointer}
-    .bxs-btn:disabled{opacity:.5}
-    .bxs-muted{color:#9ca3af;font-size:12px;text-align:center;margin-top:12px}
-    .bxs-coupon{border:2px dashed var(--coral);border-radius:16px;padding:18px;text-align:center;margin:14px 0}
-    .bxs-code{font-size:30px;font-weight:900;letter-spacing:2px;color:var(--coral)}
-    .bxs-btn2{width:100%;margin-top:10px;background:var(--navy);color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:800;cursor:pointer}
-    .bxs-center{text-align:center}
+    #bxs-root{
+      --orange:#FE6700; --yellow:#FED100; --pink:#FDE1EC; --pinkc:#FEE0ED;
+      --green:#56FB98; --dark:#3E3842; --navy:#070614; --coral:#C8603A; --cream:#FFF9F5;
+      --head:'Fredoka',sans-serif; --body:'Poppins',sans-serif;
+      font-family:var(--body); color:var(--dark); max-width:520px; margin:0 auto; line-height:1.45;
+    }
+    #bxs-root *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    .bxs-wrap{background:var(--cream); border-radius:28px; padding:0; overflow:hidden;
+      box-shadow:0 20px 60px rgba(62,56,66,.14); border:1px solid #f0e6ea}
+    /* Header */
+    .bxs-hero{position:relative; padding:26px 22px 30px; text-align:center;
+      background:linear-gradient(135deg,var(--orange) 0%,#ff8a2b 55%,var(--yellow) 130%); color:#fff}
+    .bxs-hero:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:22px;background:var(--cream);
+      border-radius:22px 22px 0 0}
+    .bxs-lockup{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+    .bxs-batata{font-family:var(--head);font-weight:700;font-size:30px;line-height:1;color:#fff;letter-spacing:.5px}
+    .bxs-x{font-family:var(--head);font-weight:600;font-size:22px;color:#fff;opacity:.85}
+    .bxs-surlock{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.16);
+      border:1.5px solid rgba(255,255,255,.4);padding:6px 12px;border-radius:14px}
+    .bxs-surlock svg{width:30px;height:30px;display:block}
+    .bxs-surtxt{font-family:var(--body);font-weight:800;font-size:15px;letter-spacing:1px;color:#fff;text-transform:uppercase}
+    .bxs-badge{display:inline-block;background:var(--green);color:var(--dark);font-family:var(--head);
+      font-weight:700;font-size:22px;padding:7px 18px;border-radius:999px;margin:6px 0 8px;
+      box-shadow:0 6px 0 rgba(0,0,0,.08)}
+    .bxs-herosub{font-size:13.5px;opacity:.96;max-width:420px;margin:0 auto}
+    /* Body */
+    .bxs-body{padding:6px 20px 24px}
+    .bxs-q{margin-top:20px}
+    .bxs-qlabel{font-family:var(--head);font-weight:600;font-size:16.5px;color:var(--navy);margin:0 0 3px}
+    .bxs-qhint{font-size:12px;color:#9a8f95;margin:0 0 10px}
+    .bxs-input{width:100%;border:2px solid #ead9e0;border-radius:14px;padding:13px 15px;font-size:16px;
+      font-family:var(--body);outline:none;background:#fff;color:var(--dark)}
+    .bxs-input:focus{border-color:var(--orange)}
+    .bxs-opts{display:flex;flex-wrap:wrap;gap:8px}
+    .bxs-pill{border:2px solid #ead9e0;background:#fff;color:var(--dark);border-radius:999px;
+      padding:9px 15px;font-size:14px;font-weight:500;cursor:pointer;transition:.12s;font-family:var(--body)}
+    .bxs-pill:hover{border-color:var(--orange)}
+    .bxs-pill.on{background:var(--orange);border-color:var(--orange);color:#fff;font-weight:600}
+    .bxs-pill.on.multi{background:var(--navy);border-color:var(--navy)}
+    .bxs-cta{width:100%;margin-top:26px;background:var(--orange);color:#fff;border:none;border-radius:18px;
+      padding:18px;font-family:var(--head);font-weight:700;font-size:20px;cursor:pointer;
+      box-shadow:0 8px 0 #c74f00}
+    .bxs-cta:active{transform:translateY(3px);box-shadow:0 5px 0 #c74f00}
+    .bxs-cta:disabled{opacity:.6;box-shadow:0 8px 0 #c74f00}
+    .bxs-foot{text-align:center;font-size:11.5px;color:#a79ba1;margin-top:12px}
+    .bxs-brandfoot{text-align:center;padding:16px;background:var(--navy);color:#fff}
+    .bxs-brandfoot b{font-family:var(--head);font-weight:600}
+    .bxs-brandfoot span{display:block;font-size:11px;opacity:.5;margin-top:2px}
+    /* Resultado */
+    .bxs-done{padding:34px 24px;text-align:center}
+    .bxs-emoji{font-size:54px}
+    .bxs-donetitle{font-family:var(--head);font-weight:700;font-size:26px;color:var(--navy);margin:6px 0 2px}
+    .bxs-donesub{color:var(--coral);font-weight:700;font-size:15px;margin-bottom:16px}
+    .bxs-couponbox{border:3px dashed var(--orange);border-radius:20px;padding:20px;background:#fff;margin-bottom:14px}
+    .bxs-code{font-family:var(--head);font-weight:700;font-size:34px;letter-spacing:2px;color:var(--orange)}
+    .bxs-copy{width:100%;background:var(--navy);color:#fff;border:none;border-radius:16px;padding:15px;
+      font-family:var(--head);font-weight:600;font-size:16px;cursor:pointer}
+    @media(max-width:480px){.bxs-batata{font-size:26px}.bxs-badge{font-size:19px}}
   </style>
 
-  <div class="bxs-head">
-    <div class="bxs-kicker">Sur Maderas</div>
-    <div class="bxs-sub">Mar del Plata</div>
-  </div>
-  <div class="bxs-card" id="bxs-card">
-    <p class="bxs-center" style="color:#9ca3af">Cargando…</p>
+  <div class="bxs-wrap" id="bxs-card">
+    <div class="bxs-hero">
+      <div class="bxs-lockup">
+        <span class="bxs-batata">batata</span>
+        <span class="bxs-x">×</span>
+        <span class="bxs-surlock">
+          <svg viewBox="0 0 48 48" aria-label="Sur Maderas">
+            <g fill="none" stroke="#fff" stroke-width="2">
+              <rect x="19" y="2"  width="10" height="10" rx="2.5"/>
+              <rect x="8"  y="13" width="10" height="10" rx="2.5"/><rect x="19" y="13" width="10" height="10" rx="2.5"/><rect x="30" y="13" width="10" height="10" rx="2.5"/>
+              <rect x="2"  y="24" width="10" height="10" rx="2.5"/><rect x="36" y="24" width="10" height="10" rx="2.5"/>
+              <rect x="8"  y="35" width="10" height="10" rx="2.5"/><rect x="19" y="35" width="10" height="10" rx="2.5"/><rect x="30" y="35" width="10" height="10" rx="2.5"/>
+              <rect x="19" y="46" width="10" height="2"  rx="1"/>
+            </g>
+            <circle cx="24" cy="24" r="10" fill="none" stroke="#fff" stroke-width="2"/>
+            <text x="24" y="29.5" text-anchor="middle" font-family="Poppins,sans-serif" font-weight="800" font-size="15" fill="#fff">S</text>
+          </svg>
+          <span class="bxs-surtxt">Sur Maderas</span>
+        </span>
+      </div>
+      <div class="bxs-badge">15% OFF 🎉</div>
+      <p class="bxs-herosub">Completá el formulario y te enviamos tu beneficio por mail. Queremos conocerte un poco mejor para mostrarte ideas que realmente te sirvan.</p>
+    </div>
+
+    <div class="bxs-body" id="bxs-form"></div>
+
+    <div class="bxs-brandfoot"><b>Sur Maderas</b><span>Mar del Plata · Hacemos realidad tus ideas</span></div>
   </div>
 
   <script>
   (function(){
-    var API  = "https://surmaderas-api.onrender.com";
-    var SLUG = "batataxsur";                 // <-- slug de la campaña creada en el ERP
-    var card = document.getElementById("bxs-card");
-    var camp = null, answers = {};
+    var API="https://surmaderas-api.onrender.com", SLUG="batataxsur";
+    var form=document.getElementById("bxs-form"), card=document.getElementById("bxs-card");
+    var state={}; // answers por id
+
+    fetch(API+"/health").catch(function(){}); // despierta Render
+
+    var QS=[
+      {id:"nombre",  t:"short", label:"Nombre y apellido", req:true, attr:'autocomplete="name"'},
+      {id:"telefono",t:"short", label:"Número de teléfono", req:true, hint:"Ejemplo: 223 XXXXXXX", attr:'type="tel" inputmode="tel"'},
+      {id:"email",   t:"short", label:"Email", req:true, hint:"Te enviaremos tu beneficio por mail.", attr:'type="email" inputmode="email"'},
+      {id:"conocia", t:"single", label:"¿Ya conocías Sur Maderas?", opts:["Sí, ya compré alguna vez","Sí, la conocía pero nunca compré","La conocía de nombre","No, es la primera vez"]},
+      {id:"intereses", t:"multi", label:"¿Qué te interesaría encontrar en Sur Maderas?", hint:"Podés elegir más de una.", opts:["Productos y muebles infantiles","Muebles y organización para el hogar","Estantes y bibliotecas","Escritorios","Muebles a medida","Cortes de madera a medida","Decoración","Marcos a medida","Productos para mascotas","Tengo otro proyecto en mente"]},
+      {id:"infantil", t:"multi", label:"Pensando en los chicos, ¿qué productos te interesarían?", hint:"Podés elegir más de una.", opts:["Mesas y sillas infantiles","Bibliotecas","Estanterías","Jugueteros","Escritorios","Percheros","Muebles para habitación infantil","Guardado y organización","Decoración en madera","Muebles a medida","Otro"]},
+      {id:"espacio", t:"single", label:"¿Para qué espacio lo estás pensando?", opts:["Habitación infantil","Playroom","Living","Espacio de estudio","Jardín / exterior","Espacio educativo","Comercio o consultorio","Todavía no lo sé"]},
+      {id:"valora", t:"multi", max:3, label:"¿Qué valorás más al elegir muebles para chicos?", hint:"Podés elegir hasta 3.", opts:["Seguridad","Durabilidad","Diseño","Aprovechamiento del espacio","Que acompañe el crecimiento","Fácil limpieza","Precio","Personalizado / a medida"]},
+      {id:"proyecto", t:"single", label:"¿Tenés algún proyecto próximo?", opts:["Sí, durante este mes","Sí, en los próximos 3 meses","Tengo una idea, aún no decidí","No por ahora, solo me inspiro"]},
+      {id:"mdp", t:"single", label:"¿Vivís en Mar del Plata?", opts:["Sí","Vivo en la zona","Estoy de visita / vacaciones","Vivo en otra ciudad"]},
+      {id:"novedades", t:"single", label:"¿Querés recibir ideas, novedades y beneficios?", opts:["Sí, quiero recibirlos","No por ahora"]}
+    ];
 
     function esc(s){var d=document.createElement("div");d.textContent=s==null?"":String(s);return d.innerHTML;}
 
-    // Despierta el backend (Render free) y trae la campaña, con reintentos.
-    fetch(API+"/health").catch(function(){});
-    loadCampaign(6);
+    var html="";
+    QS.forEach(function(q){
+      html+='<div class="bxs-q"><p class="bxs-qlabel">'+esc(q.label)+(q.req?' *':'')+'</p>';
+      if(q.hint) html+='<p class="bxs-qhint">'+esc(q.hint)+'</p>';
+      if(q.t==="short"){
+        html+='<input class="bxs-input" data-id="'+q.id+'" '+(q.attr||"")+'>';
+      }else{
+        html+='<div class="bxs-opts" data-group="'+q.id+'" data-type="'+q.t+'"'+(q.max?' data-max="'+q.max+'"':'')+'>';
+        q.opts.forEach(function(o){ html+='<button type="button" class="bxs-pill'+(q.t==="multi"?' multi-opt':'')+'" data-val="'+esc(o)+'">'+esc(o)+'</button>'; });
+        html+='</div>';
+      }
+      html+='</div>';
+    });
+    html+='<button class="bxs-cta" id="bxs-cta">QUIERO MI 15% OFF</button>'+
+          '<p class="bxs-foot">Al enviar, recibirás tu beneficio por email.</p>';
+    form.innerHTML=html;
 
-    function loadCampaign(tries){
-      fetch(API+"/campaigns/public/"+SLUG)
-        .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
-        .then(function(d){ camp=d; renderForm(); })
-        .catch(function(){
-          if(tries>0){ setTimeout(function(){ loadCampaign(tries-1); }, 2500); }
-          else { card.innerHTML='<p class="bxs-center" style="color:#9ca3af">La promo no está disponible en este momento. Probá de nuevo en un minuto.</p>'; }
-        });
-    }
-
-    function renderForm(){
-      var qs = (camp.questions||[]).map(function(q){
-        var field;
-        if(q.type==="textarea") field='<textarea class="bxs-textarea" rows="3" data-q="'+esc(q.id)+'"></textarea>';
-        else if(q.type==="select"){ field='<select class="bxs-select" data-q="'+esc(q.id)+'"><option value="">Elegí…</option>'+(q.options||[]).map(function(o){return '<option>'+esc(o)+'</option>';}).join("")+'</select>'; }
-        else if(q.type==="rating"){ field='<div class="bxs-stars" data-rating="'+esc(q.id)+'">'+[1,2,3,4,5].map(function(n){return '<button type="button" class="bxs-star" data-n="'+n+'">★</button>';}).join("")+'</div>'; }
-        else field='<input class="bxs-input" data-q="'+esc(q.id)+'">';
-        return '<div class="bxs-field"><label class="bxs-label">'+esc(q.label)+(q.required?" *":"")+'</label>'+field+'</div>';
-      }).join("");
-
-      card.innerHTML =
-        '<h1 class="bxs-title">'+esc(camp.name)+'</h1>'+
-        (camp.discount_pct>0?'<p class="bxs-promo">'+esc(camp.discount_pct)+'% OFF'+(camp.scope_text?' · '+esc(camp.scope_text):'')+'</p>':'')+
-        (camp.intro_text?'<p class="bxs-intro">'+esc(camp.intro_text)+'</p>':'')+
-        '<div class="bxs-field"><label class="bxs-label">Nombre *</label><input class="bxs-input" id="bxs-name" autocomplete="name"></div>'+
-        '<div class="bxs-field"><label class="bxs-label">Teléfono / WhatsApp *</label><input class="bxs-input" id="bxs-phone" type="tel" inputmode="tel" placeholder="Ej: 223 15 1234567"></div>'+
-        '<div class="bxs-field"><label class="bxs-label">Email (opcional)</label><input class="bxs-input" id="bxs-email" type="email" inputmode="email"></div>'+
-        qs+
-        '<button class="bxs-btn" id="bxs-submit">Obtener mi cupón</button>'+
-        '<p class="bxs-muted">Completá para recibir tu descuento en Sur Maderas.</p>';
-
-      // ratings
-      Array.prototype.forEach.call(card.querySelectorAll(".bxs-stars"), function(box){
-        var qid = box.getAttribute("data-rating");
-        box.addEventListener("click", function(e){
-          var b=e.target.closest(".bxs-star"); if(!b) return;
-          var n=parseInt(b.getAttribute("data-n")); answers[qid]=n;
-          Array.prototype.forEach.call(box.querySelectorAll(".bxs-star"), function(s,i){ s.classList.toggle("on", i<n); });
-        });
+    // Interacción de pills
+    form.querySelectorAll(".bxs-opts").forEach(function(g){
+      var id=g.getAttribute("data-group"), type=g.getAttribute("data-type"), max=parseInt(g.getAttribute("data-max")||"0");
+      g.addEventListener("click",function(e){
+        var b=e.target.closest(".bxs-pill"); if(!b) return;
+        var val=b.getAttribute("data-val");
+        if(type==="single"){
+          g.querySelectorAll(".bxs-pill").forEach(function(p){p.classList.remove("on");});
+          b.classList.add("on"); state[id]=val;
+        }else{
+          var arr=state[id]||[];
+          if(b.classList.contains("on")){ b.classList.remove("on"); arr=arr.filter(function(x){return x!==val;}); }
+          else{
+            if(max && arr.length>=max){ alert("Podés elegir hasta "+max+" opciones."); return; }
+            b.classList.add("on"); b.classList.add("multi"); arr=arr.concat([val]);
+          }
+          state[id]=arr;
+        }
       });
+    });
 
-      document.getElementById("bxs-submit").addEventListener("click", submit);
+    document.getElementById("bxs-cta").addEventListener("click",function(){
+      form.querySelectorAll("input[data-id]").forEach(function(el){ state[el.getAttribute("data-id")]=el.value.trim(); });
+      if(!state.nombre){ alert("Ingresá tu nombre y apellido."); return; }
+      if(!state.telefono){ alert("Ingresá tu teléfono."); return; }
+      if(!state.email){ alert("Ingresá tu email."); return; }
+      var answers={
+        "¿Ya conocía Sur Maderas?":state.conocia||"",
+        "Intereses":(state.intereses||[]).join(", "),
+        "Productos infantiles":(state.infantil||[]).join(", "),
+        "Espacio":state.espacio||"",
+        "Qué valora":(state.valora||[]).join(", "),
+        "Proyecto próximo":state.proyecto||"",
+        "Vive en Mar del Plata":state.mdp||"",
+        "Quiere novedades":state.novedades||""
+      };
+      var btn=document.getElementById("bxs-cta"); btn.disabled=true; btn.textContent="Enviando…";
+      post(4,{customer_name:state.nombre,phone:state.telefono,email:state.email,answers:answers});
+    });
+
+    function post(tries,body){
+      fetch(API+"/campaigns/public/"+SLUG+"/submit",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
+        .then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d};});})
+        .then(function(res){ if(!res.ok) throw new Error((res.d&&res.d.detail)||"error"); done(res.d); })
+        .catch(function(){ if(tries>0){ setTimeout(function(){post(tries-1,body);},2500); }
+          else{ alert("No se pudo enviar. Reintentá en un momento."); var b=document.getElementById("bxs-cta"); if(b){b.disabled=false;b.textContent="QUIERO MI 15% OFF";} } });
     }
 
-    function submit(){
-      var name=(document.getElementById("bxs-name").value||"").trim();
-      var phone=(document.getElementById("bxs-phone").value||"").trim();
-      var email=(document.getElementById("bxs-email").value||"").trim();
-      if(!name){ alert("Ingresá tu nombre."); return; }
-      if(!phone){ alert("Ingresá tu teléfono."); return; }
-      Array.prototype.forEach.call(card.querySelectorAll("[data-q]"), function(el){ answers[el.getAttribute("data-q")]=el.value; });
-      for(var i=0;i<(camp.questions||[]).length;i++){ var q=camp.questions[i]; if(q.required && !answers[q.id]){ alert("Completá: "+q.label); return; } }
-
-      var btn=document.getElementById("bxs-submit"); btn.disabled=true; btn.textContent="Enviando…";
-      postWithRetry(4, {customer_name:name, phone:phone, email:email, answers:answers});
-    }
-
-    function postWithRetry(tries, body){
-      fetch(API+"/campaigns/public/"+SLUG+"/submit", {
-        method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)
-      }).then(function(r){ return r.json().then(function(d){ return {ok:r.ok, d:d}; }); })
-        .then(function(res){
-          if(!res.ok) throw new Error(res.d && res.d.detail || "error");
-          showCoupon(res.d);
-        })
-        .catch(function(err){
-          if(tries>0){ setTimeout(function(){ postWithRetry(tries-1, body); }, 2500); }
-          else { alert("No se pudo enviar. Reintentá en un momento."); var b=document.getElementById("bxs-submit"); if(b){b.disabled=false;b.textContent="Obtener mi cupón";} }
-        });
-    }
-
-    function showCoupon(d){
-      card.innerHTML =
-        '<div class="bxs-center" style="font-size:44px">🎉</div>'+
-        '<h1 class="bxs-title">¡Listo! Tu cupón</h1>'+
-        '<p class="bxs-promo">'+esc(d.discount_pct)+'% OFF'+(d.scope_text?' · '+esc(d.scope_text):'')+'</p>'+
-        '<div class="bxs-coupon"><div class="bxs-code">'+esc(d.coupon_code)+'</div></div>'+
-        '<button class="bxs-btn2" id="bxs-copy">Copiar código</button>'+
-        '<p class="bxs-muted">Mostrá este código en la caja de Sur Maderas para usar tu descuento.</p>';
-      document.getElementById("bxs-copy").addEventListener("click", function(){
-        navigator.clipboard && navigator.clipboard.writeText(d.coupon_code).then(function(){ alert("Código copiado"); });
+    function done(d){
+      card.innerHTML='<div class="bxs-hero"><div class="bxs-lockup"><span class="bxs-batata">batata</span><span class="bxs-x">×</span><span class="bxs-surtxt" style="font-size:16px">SUR MADERAS</span></div></div>'+
+        '<div class="bxs-done"><div class="bxs-emoji">🎉</div>'+
+        '<p class="bxs-donetitle">¡Listo! Tu cupón</p>'+
+        '<p class="bxs-donesub">'+esc(d.discount_pct)+'% OFF'+(d.scope_text?' · '+esc(d.scope_text):'')+'</p>'+
+        '<div class="bxs-couponbox"><div class="bxs-code">'+esc(d.coupon_code)+'</div></div>'+
+        '<button class="bxs-copy" id="bxs-copy">Copiar código</button>'+
+        '<p class="bxs-foot" style="margin-top:14px">Mostralo en la caja de Sur Maderas para usar tu 15% OFF.</p></div>'+
+        '<div class="bxs-brandfoot"><b>Sur Maderas</b><span>Mar del Plata · Hacemos realidad tus ideas</span></div>';
+      document.getElementById("bxs-copy").addEventListener("click",function(){
+        navigator.clipboard&&navigator.clipboard.writeText(d.coupon_code).then(function(){alert("Código copiado");});
       });
+      card.scrollIntoView({behavior:"smooth",block:"start"});
     }
   })();
   </script>
 </div>
-<!-- ============================================================ -->
+<!-- ================================================================== -->
