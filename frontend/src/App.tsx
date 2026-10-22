@@ -24,6 +24,8 @@ import VentaOnline      from './pages/VentaOnline'
 import Usuarios         from './pages/Usuarios'
 import MiCuenta         from './pages/MiCuenta'
 import Presupuestos     from './pages/Presupuestos'
+import CotizadorListones from './pages/CotizadorListones'
+import CotizadorMarcos   from './pages/CotizadorMarcos'
 
 const page = (module: string | undefined, el: React.ReactNode) => (
   <ProtectedRoute module={module}>
@@ -47,6 +49,8 @@ export default function App() {
         <Route path="/caja-diaria"       element={page('caja_diaria', <CajaDiaria />)} />
         <Route path="/venta-online"      element={page('venta_online', <VentaOnline />)} />
         <Route path="/presupuestos"      element={page('presupuestos', <Presupuestos />)} />
+        <Route path="/cotizador-marcos"  element={page(undefined, <CotizadorMarcos />)} />
+        <Route path="/cotizador-listones" element={page(undefined, <CotizadorListones />)} />
         <Route path="/rrhh"              element={page('rrhh', <RRHH />)} />
         <Route path="/comisiones"        element={page('rrhh', <Comisiones />)} />
         <Route path="/vencimientos"      element={page('vencimientos', <Vencimientos />)} />

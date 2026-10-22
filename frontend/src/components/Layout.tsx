@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Receipt, Menu, X, ChevronDown, Bell, Wallet, LogOut,
-  BookOpen, Ticket, Contact, CalendarRange, ImagePlay, ShoppingCart, UserCog, UserCircle, ClipboardList,
+  BookOpen, Ticket, Contact, CalendarRange, ImagePlay, ShoppingCart, UserCog, UserCircle, ClipboardList, Calculator,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { can } from '../permissions'
@@ -34,12 +34,15 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
   const isClientes = p.startsWith('/cupones') || p.startsWith('/clientes')
   const isVentaOnline = p.startsWith('/venta-online')
   const isPresupuestos = p.startsWith('/presupuestos')
+  const isCotizadores = p.startsWith('/cotizador-')
+  const canCotizar = !!user?.is_primary_admin || can(perms, 'presupuestos', 'view') || can(perms, 'venta_online', 'view')
 
   const [finanzasOpen, setFinanzasOpen] = useState(isFinanzas)
   const [rrhhOpen,     setRrhhOpen]     = useState(isRRHH)
   const [clientesOpen, setClientesOpen] = useState(isClientes)
   const [ventaOnlineOpen, setVentaOnlineOpen] = useState(isVentaOnline)
   const [presupuestosOpen, setPresupuestosOpen] = useState(isPresupuestos)
+  const [cotizadoresOpen, setCotizadoresOpen] = useState(isCotizadores)
 
   const activeTab = new URLSearchParams(location.search).get('tab') ?? 'vacaciones'
   const voTab = new URLSearchParams(location.search).get('tab') ?? 'resumen'
@@ -192,6 +195,28 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
                       style={{ borderLeftColor: active ? CORAL : 'transparent' }}><span>{label}</span></NavLink>
                   )
                 })}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── COTIZADORES (grupo) ── */}
+        {canCotizar && (
+          <>
+            <button onClick={() => setCotizadoresOpen(o => !o)} className={groupBtnClass(isCotizadores)}
+              style={{ borderLeftColor: isCotizadores ? CORAL : 'transparent' }}>
+              <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>▸</span>
+              <Calculator size={16} strokeWidth={2} />
+              <span className="tracking-[1px] uppercase text-[12px] flex-1 text-left">Cotizadores</span>
+              <ChevronDown size={14} className="shrink-0 transition-transform duration-200"
+                style={{ transform: cotizadoresOpen ? 'rotate(180deg)' : 'rotate(0deg)', opacity: 0.6 }} />
+            </button>
+            {cotizadoresOpen && (
+              <div className="pb-1" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                <NavLink to="/cotizador-marcos" onClick={onClose} className={subLinkClass(p.startsWith('/cotizador-marcos'))}
+                  style={{ borderLeftColor: p.startsWith('/cotizador-marcos') ? CORAL : 'transparent' }}><span>Marcos</span></NavLink>
+                <NavLink to="/cotizador-listones" onClick={onClose} className={subLinkClass(p.startsWith('/cotizador-listones'))}
+                  style={{ borderLeftColor: p.startsWith('/cotizador-listones') ? CORAL : 'transparent' }}><span>Listones</span></NavLink>
               </div>
             )}
           </>
