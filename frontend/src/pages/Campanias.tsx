@@ -11,7 +11,7 @@ interface Question { id: string; label: string; type: string; options?: string[]
 interface Campaign {
   id: number; slug: string; name: string; coupon_prefix: string; next_number: number
   discount_pct: number; scope_text: string; intro_text: string; questions: Question[]
-  active: boolean; created_by: string; created_at: string | null; respuestas: number; canjeados: number
+  public_url: string; active: boolean; created_by: string; created_at: string | null; respuestas: number; canjeados: number
 }
 interface Resp {
   id: number; coupon_code: string; customer_name: string; phone: string; email: string
@@ -97,6 +97,8 @@ let qseq = 0
 function Editor({ camp, onClose, onSaved, onDeleted }: { camp: Campaign | null; onClose: () => void; onSaved: () => void; onDeleted: () => void }) {
   const editando = !!camp
   const [name, setName] = useState(camp?.name || '')
+  const [slug, setSlug] = useState(camp?.slug || '')
+  const [pubUrl, setPubUrl] = useState(camp?.public_url || '')
   const [prefix, setPrefix] = useState(camp?.coupon_prefix || 'SUR')
   const [nextNumber, setNextNumber] = useState(String(camp?.next_number ?? 1))
   const [discount, setDiscount] = useState(String(camp?.discount_pct ?? 15))
@@ -115,7 +117,8 @@ function Editor({ camp, onClose, onSaved, onDeleted }: { camp: Campaign | null; 
     setSaving(true)
     try {
       const body = {
-        name: name.trim(), coupon_prefix: prefix.trim().toUpperCase().replace(/\s/g, ''),
+        name: name.trim(), slug: slug.trim() || undefined, public_url: pubUrl.trim(),
+        coupon_prefix: prefix.trim().toUpperCase().replace(/\s/g, ''),
         next_number: parseInt(nextNumber) || 1, discount_pct: parseFloat(discount) || 0,
         scope_text: scope, intro_text: intro, active,
         questions: questions.filter((q) => q.label.trim()).map((q) => ({ ...q, options: q.type === 'select' ? (q.options || []) : undefined })),
@@ -145,6 +148,12 @@ function Editor({ camp, onClose, onSaved, onDeleted }: { camp: Campaign | null; 
           <div><label className={lbl}>% descuento</label><input className={inp} type="number" value={discount} onChange={(e) => setDiscount(e.target.value)} /></div>
         </div>
         <p className="text-[11px] text-gray-400 -mt-1">Ej: con prefijo <b>SURBATATA</b> y N° inicial <b>111</b> → los cupones serán SURBATATA111, SURBATATA112…</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div><label className={lbl}>Slug (identificador)</label><input className={inp} value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="batataxsur" />
+            <p className="text-[10px] text-gray-400 mt-0.5">Se usa en el formulario público. Ej: batataxsur</p></div>
+          <div><label className={lbl}>URL pública (WordPress)</label><input className={inp} value={pubUrl} onChange={(e) => setPubUrl(e.target.value)} placeholder="https://surmaderas.com.ar/Batataxsur/" />
+            <p className="text-[10px] text-gray-400 mt-0.5">A dónde apunta el QR (tu dominio real)</p></div>
+        </div>
         <div><label className={lbl}>Alcance / condiciones (se muestra al cliente)</label><input className={inp} value={scope} onChange={(e) => setScope(e.target.value)} placeholder="Ej: línea infantil, todos los medios de pago" /></div>
         <div><label className={lbl}>Texto de bienvenida (opcional)</label><textarea className={inp} rows={2} value={intro} onChange={(e) => setIntro(e.target.value)} placeholder="Completá para recibir tu cupón…" /></div>
 
@@ -232,7 +241,7 @@ function Respuestas({ camp, onClose, onChanged }: { camp: Campaign; onClose: () 
 
 /* ── QR + link ── */
 function QrModal({ camp, onClose }: { camp: Campaign; onClose: () => void }) {
-  const url = publicUrl(camp.slug)
+  const url = (camp.public_url || '').trim() || publicUrl(camp.slug)
   const copiar = async () => { try { await navigator.clipboard.writeText(url); alert('Link copiado') } catch { /* */ } }
   return (
     <Overlay onClose={onClose} narrow>

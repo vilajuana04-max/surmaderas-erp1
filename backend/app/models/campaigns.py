@@ -22,6 +22,7 @@ class CouponCampaign(Base):
     scope_text    = Column(String(300), default="")              # ej: "línea infantil, todos los medios de pago"
     intro_text    = Column(Text, default="")                     # texto de bienvenida del formulario
     questions     = Column(Text, default="[]")                   # JSON: [{id,label,type,options,required}]
+    public_url    = Column(String(300), default="")             # dónde vive el form (ej: surmaderas.com.ar/Batataxsur/)
     active        = Column(Boolean, default=True)
     created_by    = Column(String(120), default="")
     created_at    = Column(DateTime(timezone=True), server_default=func.now())

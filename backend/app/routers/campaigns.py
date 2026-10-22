@@ -28,6 +28,7 @@ class CampaignIn(BaseModel):
     scope_text: Optional[str] = ""
     intro_text: Optional[str] = ""
     questions: Optional[List[Dict[str, Any]]] = None
+    public_url: Optional[str] = ""
     active: Optional[bool] = True
 
 
@@ -95,7 +96,7 @@ def _admin_campaign(c: CouponCampaign, db: Session) -> dict:
         "id": c.id, "slug": c.slug, "name": c.name, "coupon_prefix": c.coupon_prefix,
         "next_number": c.next_number, "discount_pct": float(c.discount_pct or 0),
         "scope_text": c.scope_text or "", "intro_text": c.intro_text or "",
-        "questions": _questions(c), "active": bool(c.active),
+        "questions": _questions(c), "public_url": c.public_url or "", "active": bool(c.active),
         "created_by": c.created_by or "", "created_at": c.created_at.isoformat() if c.created_at else None,
         "respuestas": total, "canjeados": usados,
     }
@@ -176,8 +177,8 @@ def create_campaign(data: CampaignIn, user: User = Depends(get_current_user), db
         next_number=max(1, int(data.next_number or 1)),
         discount_pct=Decimal(str(data.discount_pct or 0)),
         scope_text=data.scope_text or "", intro_text=data.intro_text or "",
-        questions=json.dumps(data.questions or []), active=bool(data.active),
-        created_by=user.username,
+        questions=json.dumps(data.questions or []), public_url=(data.public_url or ""),
+        active=bool(data.active), created_by=user.username,
     )
     db.add(c); db.commit(); db.refresh(c)
     return _admin_campaign(c, db)
@@ -197,6 +198,8 @@ def update_campaign(cid: int, data: CampaignIn, user: User = Depends(get_current
     c.discount_pct = Decimal(str(data.discount_pct or 0))
     c.scope_text = data.scope_text or ""
     c.intro_text = data.intro_text or ""
+    if data.public_url is not None:
+        c.public_url = data.public_url or ""
     if data.questions is not None:
         c.questions = json.dumps(data.questions)
     if data.active is not None:
