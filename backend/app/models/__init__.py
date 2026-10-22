@@ -18,6 +18,7 @@ from .puestos import Puesto
 from .placas import Placa, PlacaHistorial, ClienteDescuento, PlacaConfig
 from .online_sales import OnlineSale, OnlineCustomer, OnlineSaleCategory, OnlineTransfer
 from .presupuestos import QuoteRequest, QuoteAttachment, QuoteHistory
+from .cotizadores import CotizadorConfig
 
 __all__ = [
     "User", "UserPermission", "UserAudit",
@@ -40,4 +41,5 @@ __all__ = [
     "Placa", "PlacaHistorial", "ClienteDescuento", "PlacaConfig",
     "OnlineSale", "OnlineCustomer", "OnlineSaleCategory", "OnlineTransfer",
     "QuoteRequest", "QuoteAttachment", "QuoteHistory",
+    "CotizadorConfig",
 ]

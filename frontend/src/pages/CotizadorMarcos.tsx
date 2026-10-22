@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
-import { Copy, Printer, MessageCircle, Plus, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Copy, Printer, MessageCircle, Plus, Trash2, Settings2, Save, X } from 'lucide-react'
+import { api } from '../api'
 
 const NAVY  = '#070614'
 const CORAL = '#C8603A'
@@ -110,13 +111,23 @@ function normByOrient(a: any, b: any, orient: string) {
   const short = Math.min(first, second), long = Math.max(first, second)
   return orient === 'horizontal' ? { ancho: long, alto: short } : { ancho: short, alto: long }
 }
-function getArmado(anchoMm: number, altoMm: number) {
+/* Tramos de armado (precio editable desde el panel; estos son los valores por defecto) */
+type ArmadoTier = { hasta_m2: number | null; label: string; precio: number }
+const ARMADO_DEFAULT: ArmadoTier[] = [
+  { hasta_m2: 0.03, label: 'Hasta 0,03 m²', precio: 4900 },
+  { hasta_m2: 0.12, label: 'Hasta 0,12 m²', precio: 5600 },
+  { hasta_m2: 0.35, label: 'Hasta 0,35 m²', precio: 6950 },
+  { hasta_m2: null, label: 'Más de 0,35 m²', precio: 8400 },
+]
+function getArmado(anchoMm: number, altoMm: number, tiers: ArmadoTier[]) {
   const area = (clamp(anchoMm) * clamp(altoMm)) / 1000000
   const r = Math.round(area * 100) / 100
-  if (r <= 0.03) return { etiqueta: 'Hasta 0.03 m²', precio: 4900 }
-  if (r <= 0.12) return { etiqueta: 'Hasta 0.12 m²', precio: 5600 }
-  if (r <= 0.35) return { etiqueta: 'Hasta 0.35 m²', precio: 6950 }
-  return { etiqueta: 'Más de 0.35 m²', precio: 8400 }
+  for (const t of tiers) {
+    if (t.hasta_m2 == null) return { etiqueta: t.label, precio: clamp(t.precio, 0) }
+    if (r <= t.hasta_m2) return { etiqueta: t.label, precio: clamp(t.precio, 0) }
+  }
+  const last = tiers[tiers.length - 1]
+  return { etiqueta: last.label, precio: clamp(last.precio, 0) }
 }
 function calcBars(meters: number) {
   const m = clamp(meters, 0)
@@ -140,6 +151,19 @@ export default function CotizadorMarcos() {
   const [anchoDisplay, setAnchoDisplay] = useState('70')
   const [altoDisplay, setAltoDisplay] = useState('100')
   const [lista, setLista] = useState<any[]>([])
+
+  // Precios de armado (editables, compartidos vía backend; fallback a defaults)
+  const [armado, setArmado] = useState<ArmadoTier[]>(ARMADO_DEFAULT)
+  const [canEditPrices, setCanEditPrices] = useState(false)
+  const [showPrecios, setShowPrecios] = useState(false)
+  useEffect(() => {
+    api.get<{ data: any; can_edit: boolean }>('/cotizadores/config')
+      .then((r) => {
+        if (r?.data?.armado_marcos && Array.isArray(r.data.armado_marcos)) setArmado(r.data.armado_marcos)
+        setCanEditPrices(!!r.can_edit)
+      })
+      .catch(() => { /* Render dormido → se usan los valores por defecto */ })
+  }, [])
 
   const setField = (k: string, v: any) => setForm((p: any) => ({ ...p, [k]: v }))
 
@@ -180,16 +204,16 @@ export default function CotizadorMarcos() {
     const subtotalFondo = pricingEnabled ? fondoAreaM2 * cantidad * selectedFondo.precioM2 : 0
     const subtotalPaspartu = pricingEnabled ? paspartuAreaM2 * cantidad * PASPARTU_PRICE_M2 : 0
     const subtotalPintado = pricingEnabled ? selectedPintado.extra * cantidad : 0
-    const armado = getArmado(anchoMm, altoMm)
-    const subtotalArmado = pricingEnabled ? armado.precio * cantidad : 0
+    const armadoSug = getArmado(anchoMm, altoMm, armado)
+    const subtotalArmado = pricingEnabled ? armadoSug.precio * cantidad : 0
     const total = subtotalVarilla + subtotalRebaje + subtotalVidrio + subtotalFondo + subtotalPaspartu + subtotalPintado + subtotalArmado
     return {
       areaM2, metrosMarcoTotales, varillasCobradas: bars.chargedBars, metrosFacturados: bars.chargedMeters,
       metrosRebaje, subtotalVarilla, subtotalRebaje, subtotalVidrio, subtotalFondo, subtotalPaspartu,
-      subtotalPintado, armado, subtotalArmado, total, pricingEnabled, inputAnchoMm: inAncho, inputAltoMm: inAlto,
+      subtotalPintado, armado: armadoSug, subtotalArmado, total, pricingEnabled, inputAnchoMm: inAncho, inputAltoMm: inAlto,
       anchoFinalMm: anchoMm, altoFinalMm: altoMm,
     }
-  }, [effProfile, form, normDims, normFaceMm, selectedFondo, selectedPintado, selectedProfile])
+  }, [effProfile, form, normDims, normFaceMm, selectedFondo, selectedPintado, selectedProfile, armado])
 
   /* Handlers */
   const syncDisplay = (a: number, b: number, u: string) => { if (u === 'cm') { setAnchoDisplay(String(a / 10)); setAltoDisplay(String(b / 10)) } else { setAnchoDisplay(String(a)); setAltoDisplay(String(b)) } }
@@ -288,6 +312,17 @@ export default function CotizadorMarcos() {
     const w = window.open('', '_blank'); if (w) { w.document.write(html); w.document.close() }
   }
 
+  const guardarPrecios = async (tiers: ArmadoTier[]) => {
+    setArmado(tiers)
+    try {
+      await api.put('/cotizadores/config', { data: { armado_marcos: tiers } })
+      alert('Precios de armado actualizados para todos.')
+      setShowPrecios(false)
+    } catch (e: any) {
+      alert('No se pudo guardar en el servidor (¿Render despierto?). Los cambios valen solo en esta sesión. ' + (e?.message || ''))
+    }
+  }
+
   const inp = 'w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-gray-400 bg-white'
   const lbl = 'text-[11px] font-bold text-gray-500 uppercase tracking-wide block mb-1'
   const seg = (active: boolean) => `px-3 py-1.5 text-xs font-bold rounded-lg ${active ? 'text-white' : 'bg-gray-100 text-gray-500'}`
@@ -313,8 +348,15 @@ export default function CotizadorMarcos() {
         <div className="text-right">
           <p className="text-white/50 text-[11px] uppercase">Total estimado</p>
           <p className="text-3xl font-bold text-white">{quote.pricingEnabled ? fmtCur(quote.total) : 'Elegí varilla'}</p>
+          {canEditPrices && (
+            <button onClick={() => setShowPrecios(true)} className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-white/80 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg">
+              <Settings2 size={13} /> Precios de armado
+            </button>
+          )}
         </div>
       </div>
+
+      {showPrecios && <PreciosArmadoModal tiers={armado} onClose={() => setShowPrecios(false)} onSave={guardarPrecios} />}
 
       <div className="grid md:grid-cols-2 gap-4">
         {/* Config */}
@@ -437,6 +479,38 @@ export default function CotizadorMarcos() {
             </div>
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Panel editable de precios de armado ── */
+function PreciosArmadoModal({ tiers, onClose, onSave }: { tiers: ArmadoTier[]; onClose: () => void; onSave: (t: ArmadoTier[]) => void }) {
+  const [rows, setRows] = useState<ArmadoTier[]>(tiers.map((t) => ({ ...t })))
+  const setPrecio = (i: number, v: string) => setRows((p) => p.map((r, idx) => idx === i ? { ...r, precio: parseInt(v.replace(/[^\d]/g, '')) || 0 } : r))
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-bold text-lg" style={{ color: NAVY }}>Precios de armado</h3>
+          <button onClick={onClose} className="text-gray-300 hover:text-gray-600"><X size={20} /></button>
+        </div>
+        <p className="text-xs text-gray-400 mb-3">Precio del armado del cuadro según su superficie. Se aplica a todos los vendedores.</p>
+        <div className="space-y-2">
+          {rows.map((r, i) => (
+            <div key={i} className="flex items-center justify-between gap-3">
+              <span className="text-sm text-gray-600">{r.label}</span>
+              <div className="flex items-center gap-1">
+                <span className="text-gray-400 text-sm">$</span>
+                <input type="number" inputMode="numeric" className="w-28 border border-gray-200 rounded-lg px-3 py-2 text-sm text-right font-bold outline-none focus:border-gray-400"
+                  value={r.precio} onChange={(e) => setPrecio(i, e.target.value)} />
+              </div>
+            </div>
+          ))}
+        </div>
+        <button onClick={() => onSave(rows)} className="w-full mt-4 flex items-center justify-center gap-2 text-white py-2.5 rounded-xl font-bold" style={{ background: NAVY }}>
+          <Save size={16} /> Guardar precios
+        </button>
       </div>
     </div>
   )
