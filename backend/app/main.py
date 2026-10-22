@@ -202,6 +202,62 @@ def _seed_user_admin():
 
 _seed_user_admin()
 
+
+def _seed_batata_campaign():
+    """Crea la campaña de cupones 'batataxsur' si no existe. Idempotente.
+    Garantiza que el formulario público (surmaderas.com.ar/Batataxsur/) genere
+    cupones SURBATATA### aunque nadie la haya cargado a mano en el ERP."""
+    import json
+    from app.database import SessionLocal
+    from app.models.campaigns import CouponCampaign
+
+    PREGUNTAS = [
+        {"id": "q1",  "label": "¿Cómo nos conociste?", "type": "select",
+         "options": ["Instagram", "Facebook", "Batata", "Recomendación", "Pasaba por el local"], "required": True},
+        {"id": "q2",  "label": "¿Ya comprabas en Sur Maderas?", "type": "select",
+         "options": ["Sí, soy cliente", "No, es mi primera vez"], "required": True},
+        {"id": "q3",  "label": "¿Para quién es la compra?", "type": "select",
+         "options": ["Para mis hijos/as", "Para un regalo", "Para el jardín/escuela", "Para mí"], "required": False},
+        {"id": "q4",  "label": "¿Qué de la línea infantil te interesa más?", "type": "text", "required": False},
+        {"id": "q5",  "label": "¿Qué edad tienen los chicos/as?", "type": "text", "required": False},
+        {"id": "q6",  "label": "¿Cómo preferís comprar?", "type": "select",
+         "options": ["En el local", "Por WhatsApp", "Online"], "required": False},
+        {"id": "q7",  "label": "¿Seguís a Batata en redes?", "type": "select",
+         "options": ["Sí", "Todavía no"], "required": False},
+        {"id": "q8",  "label": "¿Nos recomendarías a un amigo/a?", "type": "select",
+         "options": ["Seguro", "Probablemente", "No sé"], "required": False},
+        {"id": "q9",  "label": "Tu barrio o zona", "type": "text", "required": False},
+        {"id": "q10", "label": "¿Querés recibir novedades y promos?", "type": "select",
+         "options": ["Sí", "No"], "required": False},
+        {"id": "q11", "label": "Algo que quieras contarnos", "type": "textarea", "required": False},
+    ]
+
+    db = SessionLocal()
+    try:
+        existe = db.query(CouponCampaign).filter(CouponCampaign.slug == "batataxsur").first()
+        if not existe:
+            db.add(CouponCampaign(
+                slug="batataxsur",
+                name="Batata x Sur",
+                coupon_prefix="SURBATATA",
+                next_number=111,
+                discount_pct=15,
+                scope_text="línea infantil, todos los medios de pago",
+                intro_text="Completá y ganate un 15% OFF en toda la línea infantil de Sur Maderas 💛",
+                questions=json.dumps(PREGUNTAS, ensure_ascii=False),
+                public_url="https://surmaderas.com.ar/Batataxsur/",
+                active=True,
+                created_by="seed",
+            ))
+            db.commit()
+            print("[seed] Campaña 'batataxsur' creada (SURBATATA111, 15% OFF línea infantil).")
+    except Exception as e:
+        print(f"[seed] Error campaña batata: {e}")
+    finally:
+        db.close()
+
+_seed_batata_campaign()
+
 # ── CORS ────────────────────────────────────────────────────────
 # App interna de Sur Maderas — aceptamos cualquier origen para
 # evitar conflictos de preflight con URLs de preview de Vercel.
