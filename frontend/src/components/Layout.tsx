@@ -30,7 +30,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
 
   const p = location.pathname
   const isFinanzas = ['/ventas','/compras','/gastos','/flujocaja','/punto-equilibrio','/lista-precios'].some(x => p === x || p.startsWith(x))
-  const isRRHH     = p.startsWith('/rrhh') || p.startsWith('/comisiones')
+  const isRRHH     = p.startsWith('/rrhh') || p.startsWith('/comisiones') || p.startsWith('/control-horario')
   const isClientes = p.startsWith('/cupones') || p.startsWith('/clientes')
   const isVentaOnline = p.startsWith('/venta-online')
   const isPresupuestos = p.startsWith('/presupuestos')
@@ -278,6 +278,8 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
                 })}
                 <NavLink to="/comisiones" onClick={onClose} className={subLinkClass(p.startsWith('/comisiones'))}
                   style={{ borderLeftColor: p.startsWith('/comisiones') ? CORAL : 'transparent' }}><span>Comisiones</span></NavLink>
+                <NavLink to="/control-horario" onClick={onClose} className={subLinkClass(p.startsWith('/control-horario'))}
+                  style={{ borderLeftColor: p.startsWith('/control-horario') ? CORAL : 'transparent' }}><span>Control horario</span></NavLink>
               </div>
             )}
           </>

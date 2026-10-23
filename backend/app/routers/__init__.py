@@ -22,3 +22,4 @@ from .users import router as users_router
 from .presupuestos import router as presupuestos_router
 from .cotizadores import router as cotizadores_router
 from .campaigns import router as campaigns_router
+from .fichaje import router as fichaje_router

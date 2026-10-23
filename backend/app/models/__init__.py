@@ -20,6 +20,7 @@ from .online_sales import OnlineSale, OnlineCustomer, OnlineSaleCategory, Online
 from .presupuestos import QuoteRequest, QuoteAttachment, QuoteHistory
 from .cotizadores import CotizadorConfig
 from .campaigns import CouponCampaign, CampaignResponse
+from .fichaje import FichajeEmpleado, Fichaje
 
 __all__ = [
     "User", "UserPermission", "UserAudit",
@@ -44,4 +45,5 @@ __all__ = [
     "QuoteRequest", "QuoteAttachment", "QuoteHistory",
     "CotizadorConfig",
     "CouponCampaign", "CampaignResponse",
+    "FichajeEmpleado", "Fichaje",
 ]

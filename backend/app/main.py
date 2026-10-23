@@ -14,6 +14,7 @@ from app.routers import (
     caja_diaria_router, cupones_router, clientes_router, marketing_router, contenido_router,
     puestos_router, placas_router, online_sales_router, users_router,
     presupuestos_router, cotizadores_router, campaigns_router,
+    fichaje_router,
 )
 
 Base.metadata.create_all(bind=engine)
@@ -258,6 +259,34 @@ def _seed_batata_campaign():
 
 _seed_batata_campaign()
 
+
+def _seed_fichaje_empleados():
+    """Alta de los empleados del control horario si no existen. Idempotente."""
+    from app.database import SessionLocal
+    from app.models.fichaje import FichajeEmpleado
+
+    EMP = [
+        ("Ariel Viejo", "08:00", "17:00"),
+        ("Martin Vazquez", "08:00", "17:00"),
+        ("Marcelo Viejo", "08:00", "17:00"),
+        ("Facundo Damian Lali", "08:00", "17:00"),
+        ("Patricia Scatizzi", "11:00", "17:00"),
+        ("Cecilia Vila", "08:00", "14:00"),
+    ]
+    db = SessionLocal()
+    try:
+        for i, (nombre, ent, sal) in enumerate(EMP):
+            if not db.query(FichajeEmpleado).filter(FichajeEmpleado.nombre == nombre).first():
+                db.add(FichajeEmpleado(nombre=nombre, hora_entrada=ent, hora_salida=sal, activo=True, orden=i))
+                print(f"[seed] Empleado fichaje '{nombre}' creado.")
+        db.commit()
+    except Exception as e:
+        print(f"[seed] Error fichaje: {e}")
+    finally:
+        db.close()
+
+_seed_fichaje_empleados()
+
 # ── CORS ────────────────────────────────────────────────────────
 # App interna de Sur Maderas — aceptamos cualquier origen para
 # evitar conflictos de preflight con URLs de preview de Vercel.
@@ -307,6 +336,7 @@ app.include_router(users_router,            dependencies=_dep)
 app.include_router(presupuestos_router,     dependencies=_dep)
 app.include_router(cotizadores_router,      dependencies=_dep)
 app.include_router(campaigns_router,        dependencies=_dep)
+app.include_router(fichaje_router,          dependencies=_dep)
 
 
 @app.get("/")

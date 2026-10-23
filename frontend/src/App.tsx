@@ -28,6 +28,7 @@ import CotizadorListones from './pages/CotizadorListones'
 import CotizadorMarcos   from './pages/CotizadorMarcos'
 import Campanias        from './pages/Campanias'
 import CampaignForm     from './pages/CampaignForm'
+import ControlHorario   from './pages/ControlHorario'
 
 const page = (module: string | undefined, el: React.ReactNode) => (
   <ProtectedRoute module={module}>
@@ -57,6 +58,7 @@ export default function App() {
         <Route path="/cotizador-listones" element={page(undefined, <CotizadorListones />)} />
         <Route path="/rrhh"              element={page('rrhh', <RRHH />)} />
         <Route path="/comisiones"        element={page('rrhh', <Comisiones />)} />
+        <Route path="/control-horario"   element={page('rrhh', <ControlHorario />)} />
         <Route path="/vencimientos"      element={page('vencimientos', <Vencimientos />)} />
         <Route path="/gastos-personales" element={page('gastos_personales', <GastosPersonales />)} />
         <Route path="/cupones"           element={page('clientes', <Cupones />)} />
