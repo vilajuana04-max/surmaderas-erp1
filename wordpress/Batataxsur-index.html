@@ -40,11 +40,13 @@
   .cta:active{transform:translateY(3px);box-shadow:0 5px 0 var(--dark)}
   .cta:disabled{opacity:.45;cursor:not-allowed;box-shadow:0 5px 0 var(--dark)}
   .follow{background:var(--pink);border-radius:18px;padding:16px}
-  .fitem{display:flex;align-items:center;gap:12px;background:#fff;border:2px solid var(--pink);border-radius:14px;padding:13px 14px;margin-top:10px;text-decoration:none;color:var(--dark);transition:border-color .15s,background .15s}
+  .fitem{display:flex;align-items:center;gap:10px;background:#fff;border:2px solid var(--pink);border-radius:14px;padding:12px;margin-top:10px;text-decoration:none;color:var(--dark);transition:border-color .15s,background .15s}
   .fitem .ig{width:40px;height:40px;flex:0 0 40px;border-radius:10px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--dark)}
   .fitem .ig.sur{background:var(--orange)}
   .fitem .ig img{width:100%;height:100%;object-fit:contain;padding:4px}
-  .fitem .fname{flex:1;font-weight:700;font-size:15px}
+  .fitem .fname{flex:1;min-width:0;font-weight:700;font-size:14px;line-height:1.2;word-break:break-word}
+  .fitem .ig{flex:0 0 38px;width:38px;height:38px}
+  .fitem .fstate{flex:0 0 auto}
   .fitem .fstate{font-family:var(--head);font-weight:700;font-size:13px;color:var(--dark);background:var(--yellow);border-radius:999px;padding:6px 12px;white-space:nowrap}
   .fitem.done{border-color:var(--green);background:#f4fff9}
   .fitem.done .fstate{color:var(--dark);background:var(--green)}
