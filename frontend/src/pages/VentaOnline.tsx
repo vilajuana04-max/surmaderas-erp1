@@ -21,12 +21,13 @@ interface Sale {
   id: number; sale_number: string; date: string | null
   customer_id: number | null; customer_name: string; contact: string
   category_id: number | null; category_name: string; description: string
+  comision: number
   total: number; payment_status: string; amount_paid: number; amount_pending: number
   payment_method: string; cash_amount: number; transfer_amount: number
   sena_amount: number; sena_method: string
   created_by: string; updated_by: string; transfers: Transfer[]
 }
-interface Customer { id: number; name: string; phone: string; notes: string; active: boolean; created_at: string | null }
+interface Customer { id: number; name: string; phone: string; notes: string; comision: number; active: boolean; created_at: string | null }
 interface Category { id: number; name: string; active: boolean }
 
 type Tab = 'resumen' | 'nueva' | 'ventas' | 'transferencias' | 'clientes' | 'categorias'
@@ -165,6 +166,7 @@ function SaleForm({ sale, onDone, onCancel }: { sale?: Sale; onDone: () => void;
   const [catId, setCatId] = useState<number | ''>(sale?.category_id ?? '')
   const [desc, setDesc] = useState(sale?.description || '')
   const [total, setTotal] = useState(sale?.total || 0)
+  const [comision, setComision] = useState<number>(sale?.comision ?? 10)
   const [estado, setEstado] = useState(sale?.payment_status || 'pendiente')
   const [senaAmount, setSenaAmount] = useState(sale?.sena_amount || 0)
   const [senaMethod, setSenaMethod] = useState(sale?.sena_method || 'transferencia')
@@ -181,7 +183,7 @@ function SaleForm({ sale, onDone, onCancel }: { sale?: Sale; onDone: () => void;
   const saldo = estado === 'pendiente' ? total : estado === 'senado' ? Math.max(0, total - senaAmount) : 0
   const mixtoSuma = cashAmount + transferAmount
 
-  const pickCustomer = (c: Customer) => { setCustId(c.id); setCustName(c.name); if (c.phone) setContact(c.phone); setCustOpen(false) }
+  const pickCustomer = (c: Customer) => { setCustId(c.id); setCustName(c.name); if (c.phone) setContact(c.phone); setComision(c.comision || 10); setCustOpen(false) }
 
   const validar = (): string | null => {
     if (!total || total <= 0) return 'Ingresá un monto total mayor a 0.'
@@ -213,7 +215,7 @@ function SaleForm({ sale, onDone, onCancel }: { sale?: Sale; onDone: () => void;
       }
       const payload: any = {
         date: fecha, customer_id: finalCustId, customer_name: custName.trim(), contact,
-        category_id: catId || null, description: desc, total, payment_status: estado, usuario,
+        category_id: catId || null, description: desc, comision, total, payment_status: estado, usuario,
       }
       if (estado === 'senado') { payload.sena_amount = senaAmount; payload.sena_method = senaMethod }
       if (estado === 'pagado') {
@@ -276,9 +278,12 @@ function SaleForm({ sale, onDone, onCancel }: { sale?: Sale; onDone: () => void;
             <div className="absolute z-10 left-0 right-0 bg-white border border-gray-200 rounded-lg mt-1 shadow-lg max-h-48 overflow-y-auto">
               {matches.map(c => (
                 <button key={c.id} type="button" onMouseDown={() => pickCustomer(c)}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex justify-between">
-                  <span className="font-semibold text-gray-700">{c.name}</span>
-                  <span className="text-gray-400 text-xs">{c.phone}</span>
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex justify-between items-center gap-2">
+                  <span className="font-semibold text-gray-700 flex items-center gap-1.5 min-w-0">
+                    <span className="truncate">{c.name}</span>
+                    {c.comision === 5 && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: '#eff6ff', color: '#1d4ed8' }}>5%</span>}
+                  </span>
+                  <span className="text-gray-400 text-xs shrink-0">{c.phone}</span>
                 </button>
               ))}
             </div>
@@ -297,6 +302,17 @@ function SaleForm({ sale, onDone, onCancel }: { sale?: Sale; onDone: () => void;
             <label className={lbl}>Monto total *</label>
             <MoneyInput value={total} onChange={setTotal} className={`${inp} font-bold`} />
           </div>
+        </div>
+
+        <div>
+          <label className={lbl}>Comisión</label>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setComision(10)} className="flex-1 py-2.5 rounded-xl text-sm font-bold border-2 transition-all"
+              style={comision === 10 ? { background: '#ecfdf5', borderColor: '#16a34a', color: '#166534' } : { background: '#fff', borderColor: '#eee', color: '#9ca3af' }}>10%</button>
+            <button type="button" onClick={() => setComision(5)} className="flex-1 py-2.5 rounded-xl text-sm font-bold border-2 transition-all"
+              style={comision === 5 ? { background: '#eff6ff', borderColor: '#2563eb', color: '#1d4ed8' } : { background: '#fff', borderColor: '#eee', color: '#9ca3af' }}>5% · lista especial</button>
+          </div>
+          <p className="text-[11px] text-gray-400 mt-1">Al elegir un cliente de lista especial se pone 5% automáticamente. Podés cambiarla a mano.</p>
         </div>
 
         <div>
@@ -478,10 +494,15 @@ function TabVentas() {
               {loading && <tr><td colSpan={11} className="text-center py-10 text-gray-400">Cargando…</td></tr>}
               {!loading && sales.length === 0 && <tr><td colSpan={11} className="text-center py-10 text-gray-300">Sin ventas en este filtro.</td></tr>}
               {sales.map(s => (
-                <tr key={s.id} className="hover:bg-gray-50">
+                <tr key={s.id} className="hover:bg-gray-50" style={s.comision === 5 ? { background: '#f3f8ff', boxShadow: 'inset 3px 0 0 #2563eb' } : undefined}>
                   <td className="px-3 py-2.5 font-mono text-[11px] text-gray-500">{s.sale_number}</td>
                   <td className="px-3 py-2.5 text-xs text-gray-500">{fmtFecha(s.date)}</td>
-                  <td className="px-3 py-2.5 font-semibold text-gray-700">{s.customer_name || '—'}</td>
+                  <td className="px-3 py-2.5 font-semibold text-gray-700">
+                    <span className="flex items-center gap-1.5">
+                      <span>{s.customer_name || '—'}</span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={s.comision === 5 ? { background: '#dbeafe', color: '#1d4ed8' } : { background: '#f1f5f9', color: '#64748b' }}>{s.comision}%</span>
+                    </span>
+                  </td>
                   <td className="px-3 py-2.5 text-xs text-gray-500">{s.category_name || '—'}</td>
                   <td className="px-3 py-2.5 text-xs text-gray-500 max-w-[160px] truncate">{s.description || '—'}</td>
                   <td className="px-3 py-2.5 text-right font-bold tabular-nums">{fmt$(s.total)}</td>
@@ -532,6 +553,7 @@ function SaleView({ sale, onClose }: { sale: Sale; onClose: () => void }) {
         {row('Cliente', sale.customer_name || '—')}
         {row('Contacto', sale.contact || '—')}
         {row('Categoría', sale.category_name || '—')}
+        {row('Comisión', `${sale.comision}%${sale.comision === 5 ? ' · lista especial' : ''}`)}
         {row('Descripción', sale.description || '—')}
         {row('Total', fmt$(sale.total))}
         {row('Cobrado', fmt$(sale.amount_paid))}
@@ -686,6 +708,7 @@ function TabClientes() {
   const [nombre, setNombre] = useState('')
   const [tel, setTel] = useState('')
   const [notas, setNotas] = useState('')
+  const [esp, setEsp] = useState(false)
   const [detalle, setDetalle] = useState<any>(null)
 
   const load = () => { setLoading(true); api.get<Customer[]>('/online/customers').then(setRows).catch(() => setRows([])).finally(() => setLoading(false)) }
@@ -693,10 +716,11 @@ function TabClientes() {
 
   const agregar = async () => {
     if (!nombre.trim()) { alert('Ingresá el nombre.'); return }
-    await api.post('/online/customers', { name: nombre.trim(), phone: tel, notes: notas, active: true })
-    setNombre(''); setTel(''); setNotas(''); load()
+    await api.post('/online/customers', { name: nombre.trim(), phone: tel, notes: notas, comision: esp ? 5 : 10, active: true })
+    setNombre(''); setTel(''); setNotas(''); setEsp(false); load()
   }
   const toggleActivo = async (c: Customer) => { await api.put(`/online/customers/${c.id}`, { ...c, active: !c.active }); load() }
+  const toggleEsp = async (c: Customer) => { await api.put(`/online/customers/${c.id}`, { ...c, comision: c.comision === 5 ? 10 : 5 }); load() }
   const verDetalle = async (c: Customer) => { setDetalle(await api.get(`/online/customers/${c.id}`)) }
 
   return (
@@ -705,6 +729,8 @@ function TabClientes() {
         <input className={`${inp} flex-1 min-w-[160px]`} value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Nombre / Razón social" />
         <input className={`${inp} w-40`} value={tel} onChange={e => setTel(e.target.value)} placeholder="Teléfono / WhatsApp" />
         <input className={`${inp} flex-1 min-w-[140px]`} value={notas} onChange={e => setNotas(e.target.value)} placeholder="Observaciones" />
+        <button type="button" onClick={() => setEsp(v => !v)} className="text-xs font-bold px-3 rounded-lg border-2 whitespace-nowrap"
+          style={esp ? { borderColor: '#2563eb', color: '#1d4ed8', background: '#eff6ff' } : { borderColor: '#eee', color: '#9ca3af', background: '#fff' }}>Lista especial 5%</button>
         <button onClick={agregar} className="text-white px-4 rounded-lg text-sm font-semibold" style={{ background: CORAL }}><Plus size={16} /></button>
       </div>
       <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-50">
@@ -712,13 +738,22 @@ function TabClientes() {
         {!loading && rows.length === 0 && <p className="text-center py-10 text-gray-300 text-sm">Sin clientes.</p>}
         {rows.map(c => (
           <div key={c.id} className="flex items-center justify-between px-4 py-3">
-            <button onClick={() => verDetalle(c)} className="text-left flex-1">
-              <p className="text-sm font-semibold text-gray-700">{c.name} {!c.active && <span className="text-[10px] text-gray-300">(inactivo)</span>}</p>
+            <button onClick={() => verDetalle(c)} className="text-left flex-1 min-w-0">
+              <p className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+                <span className="truncate">{c.name}</span>
+                {c.comision === 5 && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: '#dbeafe', color: '#1d4ed8' }}>5%</span>}
+                {!c.active && <span className="text-[10px] text-gray-300">(inactivo)</span>}
+              </p>
               <p className="text-xs text-gray-400">{c.phone || 'Sin teléfono'}{c.notes ? ` · ${c.notes}` : ''}</p>
             </button>
-            <button onClick={() => toggleActivo(c)} className="text-[10px] text-gray-400 hover:text-gray-700 border border-gray-200 rounded px-2 py-1">
-              {c.active ? 'Desactivar' : 'Activar'}
-            </button>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button onClick={() => toggleEsp(c)} className="text-[10px] border rounded px-2 py-1" style={c.comision === 5 ? { color: '#1d4ed8', borderColor: '#bfdbfe' } : { color: '#9ca3af', borderColor: '#e5e7eb' }}>
+                {c.comision === 5 ? '5% ✓' : 'Pasar a 5%'}
+              </button>
+              <button onClick={() => toggleActivo(c)} className="text-[10px] text-gray-400 hover:text-gray-700 border border-gray-200 rounded px-2 py-1">
+                {c.active ? 'Desactivar' : 'Activar'}
+              </button>
+            </div>
           </div>
         ))}
       </div>
@@ -850,8 +885,8 @@ function pdfStyles() {
   </style>`
 }
 function salesRows(sales: Sale[]) {
-  return sales.map(s => `<tr>
-    <td>${s.sale_number}</td><td>${s.customer_name || '—'}</td><td>${s.category_name || '—'}</td>
+  return sales.map(s => `<tr${s.comision === 5 ? ' style="background:#eaf2ff"' : ''}>
+    <td>${s.sale_number}</td><td>${s.customer_name || '—'}${s.comision === 5 ? ' <b style="color:#1d4ed8">(5%)</b>' : ''}</td><td>${s.category_name || '—'}</td>
     <td class="r">${pdfMoney(s.total)}</td><td class="r">${pdfMoney(s.amount_paid)}</td>
     <td class="r">${pdfMoney(s.amount_pending)}</td>
     <td>${ESTADOS[s.payment_status]?.label || s.payment_status}</td>

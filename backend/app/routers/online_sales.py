@@ -42,6 +42,7 @@ class CustomerIn(BaseModel):
     name: str
     phone: Optional[str] = ""
     notes: Optional[str] = ""
+    comision: Optional[int] = 10        # 10 normal · 5 lista especial
     active: Optional[bool] = True
 
 
@@ -52,6 +53,7 @@ class SaleIn(BaseModel):
     contact:        Optional[str] = ""
     category_id:    Optional[int] = None
     description:    Optional[str] = ""
+    comision:       Optional[int] = None    # 10 o 5 (si None: se toma del cliente, sino 10)
     total:          float
     payment_status: str = "pendiente"      # pendiente | senado | pagado
     # señado
@@ -76,7 +78,7 @@ def _cat(c: OnlineSaleCategory) -> dict:
 def _cust(c: OnlineCustomer) -> dict:
     return {
         "id": c.id, "name": c.name, "phone": c.phone or "",
-        "notes": c.notes or "", "active": bool(c.active),
+        "notes": c.notes or "", "comision": int(c.comision or 10), "active": bool(c.active),
         "created_at": c.created_at.isoformat() if c.created_at else None,
     }
 
@@ -91,6 +93,7 @@ def _sale(s: OnlineSale) -> dict:
         "category_id": s.category_id,
         "category_name": s.category.name if s.category else "",
         "description": s.description or "",
+        "comision": int(s.comision or 10),
         "total": float(s.total or 0),
         "payment_status": s.payment_status,
         "amount_paid": float(s.amount_paid or 0),
@@ -253,7 +256,8 @@ def list_customers(only_active: bool = False, db: Session = Depends(get_db)):
 
 @router.post("/customers", status_code=201)
 def create_customer(data: CustomerIn, db: Session = Depends(get_db)):
-    c = OnlineCustomer(name=data.name.strip(), phone=data.phone or "", notes=data.notes or "", active=data.active)
+    c = OnlineCustomer(name=data.name.strip(), phone=data.phone or "", notes=data.notes or "",
+                       comision=(data.comision if data.comision in (5, 10) else 10), active=data.active)
     db.add(c); db.commit(); db.refresh(c)
     return _cust(c)
 
@@ -265,6 +269,8 @@ def update_customer(cid: int, data: CustomerIn, db: Session = Depends(get_db)):
         raise HTTPException(404, "Cliente no encontrado")
     c.name = data.name.strip(); c.phone = data.phone or ""
     c.notes = data.notes or ""; c.active = data.active
+    if data.comision in (5, 10):
+        c.comision = data.comision
     db.commit(); db.refresh(c)
     return _cust(c)
 
@@ -322,6 +328,17 @@ def get_sale(sale_id: int, db: Session = Depends(get_db)):
     return _sale(s)
 
 
+def _resolve_comision(data: SaleIn, db: Session) -> int:
+    """10 o 5. Si viene explícita se usa; si no, se toma del cliente; por defecto 10."""
+    if data.comision in (5, 10):
+        return data.comision
+    if data.customer_id:
+        c = db.query(OnlineCustomer).filter(OnlineCustomer.id == data.customer_id).first()
+        if c and int(c.comision or 10) in (5, 10):
+            return int(c.comision)
+    return 10
+
+
 @router.post("/sales", status_code=201)
 def create_sale(data: SaleIn, db: Session = Depends(get_db)):
     sale = OnlineSale(
@@ -331,6 +348,7 @@ def create_sale(data: SaleIn, db: Session = Depends(get_db)):
         contact=data.contact or "",
         category_id=data.category_id,
         description=data.description or "",
+        comision=_resolve_comision(data, db),
         created_by=data.usuario or "",
         updated_by=data.usuario or "",
     )
@@ -354,6 +372,7 @@ def update_sale(sale_id: int, data: SaleIn, db: Session = Depends(get_db)):
     sale.contact = data.contact or ""
     sale.category_id = data.category_id
     sale.description = data.description or ""
+    sale.comision = _resolve_comision(data, db)
     if data.usuario:
         sale.updated_by = data.usuario
     _apply_logic(sale, data, db)                 # recalcula y agrega transferencias faltantes

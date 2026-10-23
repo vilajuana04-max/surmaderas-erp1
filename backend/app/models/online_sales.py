@@ -27,6 +27,7 @@ class OnlineCustomer(Base):
     name       = Column(String(160), nullable=False)
     phone      = Column(String(60), default="")
     notes      = Column(Text, default="")
+    comision   = Column(Integer, default=10)   # % comisión: 10 normal · 5 lista especial
     active     = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -42,6 +43,7 @@ class OnlineSale(Base):
     contact         = Column(String(80), default="")
     category_id     = Column(Integer, ForeignKey("online_sale_categories.id"), nullable=True)
     description     = Column(Text, default="")
+    comision        = Column(Integer, default=10)   # % comisión de la venta: 10 o 5
     total           = Column(Numeric(15, 2), nullable=False, default=0)
 
     payment_status  = Column(String(15), default="pendiente")   # pendiente | senado | pagado

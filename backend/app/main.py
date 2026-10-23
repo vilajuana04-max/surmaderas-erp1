@@ -66,6 +66,8 @@ def _run_migrations():
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS branch VARCHAR(20);",
         "ALTER TABLE coupon_campaigns ADD COLUMN IF NOT EXISTS public_url VARCHAR(300) DEFAULT '';",
         "ALTER TABLE fichaje_empleados ADD COLUMN IF NOT EXISTS pin VARCHAR(10) DEFAULT '';",
+        "ALTER TABLE online_customers ADD COLUMN IF NOT EXISTS comision INTEGER DEFAULT 10;",
+        "ALTER TABLE online_sales ADD COLUMN IF NOT EXISTS comision INTEGER DEFAULT 10;",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;",
         "ALTER TABLE users ALTER COLUMN role TYPE VARCHAR(30);",
