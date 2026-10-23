@@ -95,6 +95,15 @@
   .confetti{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:60}
   .confetti i{position:absolute;top:-14px;width:9px;height:6px;border-radius:2px;animation:cfall linear forwards}
   @keyframes cfall{0%{transform:translateY(-10px) rotate(0)}100%{transform:translateY(104vh) rotate(680deg)}}
+
+  .wbtn{flex-direction:column;gap:2px;line-height:1.15;text-align:center}
+  .wbtn .wl{font-size:15px}
+  .wbtn .waddr{font-size:12.5px;font-weight:600;opacity:.85}
+  .wbtn.main{background:var(--green);color:var(--dark);padding:16px;box-shadow:0 6px 0 rgba(0,0,0,.10)}
+  .wbtn.main .wl{font-size:16px}
+  .wbtn.alt{background:#fff;border:2px solid var(--green);color:var(--dark)}
+  .favor{margin-top:20px;background:var(--pink);border-radius:18px;padding:16px}
+  .favortxt{font-family:var(--head);font-weight:600;color:var(--dark);font-size:15px;margin:0 0 2px;text-align:center}
 </style>
 </head>
 <body>
@@ -124,38 +133,21 @@
   function esc(s){var d=document.createElement("div");d.textContent=s==null?"":String(s);return d.innerHTML;}
 
   var state={intereses:[],valora:[],espacio:"",nombre:"",telefono:"",email:""};
-  var followed={sur:false,batata:false};
-  var step=1;
 
   var INTERESES=[["Muebles infantiles","🧸"],["Estantes","📚"],["Escritorios","✏️"],["Guardado","🧺"],["Cortes a medida","🪚"],["Mascotas","🐾"],["Decoración","🎨"]];
   var ESPACIOS=[["Habitación infantil","🧸","Tenemos un montón de ideas para la pieza de los chicos 👀"],["Espacio de estudio","📚","Ideal para escritorios y estanterías a medida ✏️"],["Living","🏠","Podemos ayudarte a organizarlo con estilo ✨"],["Playroom","🎨","¡Nos encantan los playrooms! Tenemos varias ideas 🎉"],["Otro proyecto","🪵","Contanos tu idea y la hacemos realidad 🪵"]];
   var VALORA=["Seguridad","Durabilidad","Diseño","Aprovechamiento del espacio","Que acompañe el crecimiento","Que acompañe el aprendizaje","Fácil limpieza","Precio","Personalizado / a medida"];
 
   function bar(active){
-    var L=["Seguinos","Contanos","Tu 15%"],h='<div class="steps">';
-    for(var i=0;i<3;i++){ var n=i+1,cls=n<active?"st done":(n===active?"st on":"st");
+    var L=["Contanos","Tu 15%"],h='<div class="steps">';
+    for(var i=0;i<L.length;i++){ var n=i+1,cls=n<active?"st done":(n===active?"st on":"st");
       h+='<div class="'+cls+'"><span class="stn">'+(n<active?"✓":n)+'</span><span class="stl">'+L[i]+'</span></div>';
-      if(i<2) h+='<div class="stline'+(n<active?" done":"")+'"></div>';
+      if(i<L.length-1) h+='<div class="stline'+(n<active?" done":"")+'"></div>';
     }
     return h+'</div>';
   }
-  function go(n){ step=n; render(); try{card.scrollIntoView({behavior:"smooth",block:"start"});}catch(e){} }
-  function render(){ step===1?renderFollow():renderQuestions(); }
+  function render(){ renderQuestions(); }
 
-  function renderFollow(){
-    var h=bar(1);
-    h+='<div class="stephd"><h2 class="qtitle">Seguinos en Instagram</h2><p class="qhint">Tocá cada cuenta: se abre en otra pestaña y este formulario queda guardado. Seguís y volvés acá 💛</p></div>';
-    h+='<div class="follow">';
-    h+='<a class="fitem" id="ig-sur" href="'+IG_SUR+'" target="_blank" rel="noopener"><span class="ig sur"><img src="'+LS+'" alt=""></span><span class="fname">@'+esc(IG_SUR_USER)+'</span><span class="fstate">Seguir</span></a>';
-    h+='<a class="fitem" id="ig-batata" href="'+IG_BATATA+'" target="_blank" rel="noopener"><span class="ig"><img src="'+BATATA_SQ+'" alt=""></span><span class="fname">@'+esc(IG_BATATA_USER)+'</span><span class="fstate">Seguir</span></a>';
-    h+='</div>';
-    h+='<button class="cta" id="next1" disabled>SEGUÍ A LAS DOS PARA CONTINUAR</button>';
-    form.innerHTML=h;
-    function sync(){ var b=document.getElementById("next1"),ok=followed.sur&&followed.batata; b.disabled=!ok; b.textContent=ok?"CONTINUAR →":"SEGUÍ A LAS DOS PARA CONTINUAR"; }
-    function mk(k,id){ var el=document.getElementById(id); el.addEventListener("click",function(){ followed[k]=true; el.classList.add("done"); var s=el.querySelector(".fstate"); if(s)s.textContent="Siguiendo ✓"; sync(); }); }
-    mk("sur","ig-sur"); mk("batata","ig-batata"); sync();
-    document.getElementById("next1").addEventListener("click",function(){ if(followed.sur&&followed.batata) go(2); });
-  }
 
   function readFields(){
     var n=document.getElementById("f-nombre"),t=document.getElementById("f-telefono"),e=document.getElementById("f-email");
@@ -177,7 +169,7 @@
     h+='<div class="q"><p class="qlabel">¿Qué valorás más al elegir muebles para chicos?</p><p class="qhint">Hasta 3.</p><div class="opts" id="valora">';
     VALORA.forEach(function(o){ var on=state.valora.indexOf(o)>=0?" on multi":""; h+='<button type="button" class="pill'+on+'" data-v="'+esc(o)+'">'+esc(o)+'</button>'; });
     h+='</div></div>';
-    h+='<div class="stepnav"><button class="back" id="back2">← Volver</button><button class="cta grow" id="send">QUIERO MI 15% OFF</button></div>';
+    h+='<button class="cta" id="send">QUIERO MI 15% OFF</button>';
     h+='<p class="foot">Recibirás tu beneficio por email.</p>';
     form.innerHTML=h;
 
@@ -187,7 +179,6 @@
     document.getElementById("spaces").addEventListener("click",function(e){ var b=e.target.closest(".sbtn"); if(!b)return; state.espacio=b.getAttribute("data-v"); this.querySelectorAll(".sbtn").forEach(function(x){x.classList.remove("on");}); b.classList.add("on"); showMsg(); });
     showMsg();
     document.getElementById("valora").addEventListener("click",function(e){ var b=e.target.closest(".pill"); if(!b)return; var v=b.getAttribute("data-v"),i=state.valora.indexOf(v); if(i>=0){state.valora.splice(i,1);b.classList.remove("on","multi");}else{ if(state.valora.length>=3){alert("Podés elegir hasta 3 opciones.");return;} state.valora.push(v);b.classList.add("on","multi"); } });
-    document.getElementById("back2").addEventListener("click",function(){ readFields(); go(1); });
     document.getElementById("send").addEventListener("click",enviar);
   }
 
@@ -217,8 +208,8 @@
   }
 
   function done(d){
-    function waBtn(num,label){ if(!/^\d{8,15}$/.test(num)) return ""; var wa="https://wa.me/"+num+"?text="+encodeURIComponent("¡Hola! Tengo mi cupón "+d.coupon_code+" del 15% OFF de la colaboración Batata × Sur Maderas 🎉"); return '<a class="wbtn" href="'+wa+'" target="_blank" rel="noopener">💬 WhatsApp '+label+'</a>'; }
-    var waHtml=waBtn(WA_LURO,"Luro")+waBtn(WA_INDE,"Independencia");
+    function waBtn(num,addr,cls){ if(!/^\d{8,15}$/.test(num)) return ""; var wa="https://wa.me/"+num+"?text="+encodeURIComponent("¡Hola! Tengo mi cupón "+d.coupon_code+" del 15% OFF de la colaboración Batata × Sur Maderas 🎉"); return '<a class="wbtn '+cls+'" href="'+wa+'" target="_blank" rel="noopener"><span class="wl">💬 WhatsApp</span><span class="waddr">'+addr+'</span></a>'; }
+    var waHtml=waBtn(WA_INDE,"Av. Independencia y Av. Juan B. Justo","main")+waBtn(WA_LURO,"Av. Luro y Av. Jara","alt");
     card.innerHTML='<div class="hero"><div class="lockup"><img class="lbatata" src="'+LB+'" alt="Batata"><span class="x">×</span><img class="lsur" src="'+LS+'" alt="Sur Maderas"></div></div>'+
       '<div class="body">'+bar(3)+
       '<div class="done"><div class="emoji">🎉</div><p class="donetitle">¡Listo! Tu beneficio está en camino</p>'+
@@ -226,11 +217,15 @@
       '<div class="couponbox"><span class="clabel">Tu cupón</span><div class="code">'+esc(d.coupon_code)+'</div></div>'+
       '<button class="copy" id="copy">Copiar código</button>'+
       waHtml+
-      '<a class="igbtn" href="'+IG_SUR+'" target="_blank" rel="noopener">📷 Ver Instagram de Sur Maderas</a>'+
+      '<div class="favor"><p class="favortxt">¿Nos hacés un último favor? Seguinos en Instagram 💛</p>'+
+      '<a class="fitem" href="'+IG_SUR+'" target="_blank" rel="noopener"><span class="ig sur"><img src="'+LS+'" alt=""></span><span class="fname">@'+esc(IG_SUR_USER)+'</span><span class="fstate">Seguir</span></a>'+
+      '<a class="fitem" href="'+IG_BATATA+'" target="_blank" rel="noopener"><span class="ig"><img src="'+BATATA_SQ+'" alt=""></span><span class="fname">@'+esc(IG_BATATA_USER)+'</span><span class="fstate">Seguir</span></a>'+
+      '</div>'+
       '<p class="foot" style="margin-top:14px">Mostrá el código en la caja de Sur Maderas para usar tu 15% OFF.</p></div>'+
       '</div>'+
       '<div class="brandfoot"><b>Sur Maderas</b><span>Mar del Plata · Hacemos realidad tus ideas</span></div>';
     var cp=document.getElementById("copy"); if(cp) cp.addEventListener("click",function(){ try{navigator.clipboard.writeText(d.coupon_code); cp.textContent="¡Copiado! ✓";}catch(e){} });
+    card.querySelectorAll(".favor .fitem").forEach(function(el){ el.addEventListener("click",function(){ el.classList.add("done"); var st=el.querySelector(".fstate"); if(st)st.textContent="Siguiendo ✓"; }); });
     try{window.scrollTo({top:0,behavior:"smooth"});}catch(e){}
     confetti();
   }
