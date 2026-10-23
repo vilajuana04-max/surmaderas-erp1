@@ -3,7 +3,7 @@
 Simple: sin login individual. El empleado elige su nombre y toca Entrar/Salir.
 Las horas se suman por mes. Pensado para el mostrador de Sur Maderas.
 """
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -15,6 +15,7 @@ class FichajeEmpleado(Base):
 
     id           = Column(Integer, primary_key=True, index=True)
     nombre       = Column(String(120), unique=True, nullable=False)
+    pin          = Column(String(10), default="")       # clave personal para fichar
     hora_entrada = Column(String(5), default="08:00")   # horario esperado (referencia)
     hora_salida  = Column(String(5), default="17:00")
     activo       = Column(Boolean, default=True)
@@ -22,6 +23,15 @@ class FichajeEmpleado(Base):
     created_at   = Column(DateTime(timezone=True), server_default=func.now())
 
     fichajes = relationship("Fichaje", back_populates="empleado", cascade="all, delete-orphan")
+
+
+class FichajeFeriado(Base):
+    __tablename__ = "fichaje_feriados"
+
+    id         = Column(Integer, primary_key=True, index=True)
+    fecha      = Column(Date, unique=True, nullable=False, index=True)   # fecha local AR
+    nombre     = Column(String(120), default="")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class Fichaje(Base):

@@ -65,6 +65,7 @@ def _run_migrations():
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_primary_admin BOOLEAN DEFAULT FALSE;",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS branch VARCHAR(20);",
         "ALTER TABLE coupon_campaigns ADD COLUMN IF NOT EXISTS public_url VARCHAR(300) DEFAULT '';",
+        "ALTER TABLE fichaje_empleados ADD COLUMN IF NOT EXISTS pin VARCHAR(10) DEFAULT '';",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;",
         "ALTER TABLE users ALTER COLUMN role TYPE VARCHAR(30);",
@@ -266,19 +267,22 @@ def _seed_fichaje_empleados():
     from app.models.fichaje import FichajeEmpleado
 
     EMP = [
-        ("Ariel Viejo", "08:00", "17:00"),
-        ("Martin Vazquez", "08:00", "17:00"),
-        ("Marcelo Viejo", "08:00", "17:00"),
-        ("Facundo Damian Lali", "08:00", "17:00"),
-        ("Patricia Scatizzi", "11:00", "17:00"),
-        ("Cecilia Vila", "08:00", "14:00"),
+        ("Ariel Viejo", "08:00", "17:00", "2468"),
+        ("Martin Vazquez", "08:00", "17:00", "1357"),
+        ("Marcelo Viejo", "08:00", "17:00", "3690"),
+        ("Facundo Damian Lali", "08:00", "17:00", "1590"),
+        ("Patricia Scatizzi", "11:00", "17:00", "7531"),
+        ("Cecilia Vila", "08:00", "14:00", "8642"),
     ]
     db = SessionLocal()
     try:
-        for i, (nombre, ent, sal) in enumerate(EMP):
-            if not db.query(FichajeEmpleado).filter(FichajeEmpleado.nombre == nombre).first():
-                db.add(FichajeEmpleado(nombre=nombre, hora_entrada=ent, hora_salida=sal, activo=True, orden=i))
+        for i, (nombre, ent, sal, pin) in enumerate(EMP):
+            e = db.query(FichajeEmpleado).filter(FichajeEmpleado.nombre == nombre).first()
+            if not e:
+                db.add(FichajeEmpleado(nombre=nombre, hora_entrada=ent, hora_salida=sal, activo=True, orden=i, pin=pin))
                 print(f"[seed] Empleado fichaje '{nombre}' creado.")
+            elif not (e.pin or "").strip():
+                e.pin = pin   # asigna PIN por defecto si quedó vacío (migración)
         db.commit()
     except Exception as e:
         print(f"[seed] Error fichaje: {e}")
