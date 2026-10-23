@@ -40,7 +40,14 @@
   .pill.on.multi{background:var(--navy);border-color:var(--navy)}
   .cta{width:100%;margin-top:26px;background:var(--orange);color:#fff;border:none;border-radius:18px;padding:18px;font-family:var(--head);font-weight:700;font-size:20px;cursor:pointer;box-shadow:0 8px 0 var(--orange-dk)}
   .cta:active{transform:translateY(3px);box-shadow:0 5px 0 var(--orange-dk)}
-  .cta:disabled{opacity:.6}
+  .cta:disabled{opacity:.45;cursor:not-allowed;box-shadow:0 5px 0 var(--orange-dk)}
+  .follow{background:var(--pink);border-radius:18px;padding:16px}
+  .fitem{display:flex;align-items:center;gap:12px;background:#fff;border:2px solid #f0d9e4;border-radius:14px;padding:13px 14px;margin-top:10px;text-decoration:none;color:var(--navy);transition:border-color .15s,background .15s}
+  .fitem .ig{width:34px;height:34px;flex:0 0 34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;background:linear-gradient(45deg,#feda75,#d62976,#962fbf);color:#fff}
+  .fitem .fname{flex:1;font-weight:700;font-size:15px}
+  .fitem .fstate{font-family:var(--head);font-weight:700;font-size:13px;color:var(--orange-dk);background:#fff4ec;border-radius:999px;padding:6px 12px;white-space:nowrap}
+  .fitem.done{border-color:var(--green);background:#f1fff7}
+  .fitem.done .fstate{color:#0a7b43;background:#dcfce7}
   .foot{text-align:center;font-size:11.5px;color:#a79ba1;margin-top:12px}
   .brandfoot{text-align:center;padding:16px;background:var(--navy);color:#fff}
   .brandfoot b{font-family:var(--head);font-weight:600}
@@ -83,6 +90,9 @@
 <script>
 (function(){
   var API="https://surmaderas-erp1.onrender.com", SLUG="batataxsur";
+  /* ↓↓↓ CONFIRMÁ los usuarios de Instagram (sin @) ↓↓↓ */
+  var IG_SUR_USER="surmaderas.mdp", IG_BATATA_USER="batata.contextosludicos";
+  var IG_SUR="https://www.instagram.com/"+IG_SUR_USER, IG_BATATA="https://www.instagram.com/"+IG_BATATA_USER;
   var form=document.getElementById("form"), card=document.getElementById("card"), state={};
   fetch(API+"/health").catch(function(){});
   var QS=[
@@ -108,7 +118,12 @@
       q.opts.forEach(function(o){ html+='<button type="button" class="pill" data-val="'+esc(o)+'">'+esc(o)+'</button>'; }); html+='</div>'; }
     html+='</div>';
   });
-  html+='<button class="cta" id="cta">QUIERO MI 15% OFF</button><p class="foot">Al enviar, recibirás tu beneficio por email.</p>';
+  html+='<div class="q follow"><p class="qlabel">Seguinos en Instagram para activar tu cupón *</p>'
+    +'<p class="qhint">Tocá cada uno: se abre Instagram en otra pestaña y este formulario queda guardado. Seguís y volvés acá.</p>'
+    +'<a class="fitem" id="ig-sur" href="'+IG_SUR+'" target="_blank" rel="noopener"><span class="ig">◉</span><span class="fname">@'+esc(IG_SUR_USER)+'</span><span class="fstate">Seguir</span></a>'
+    +'<a class="fitem" id="ig-batata" href="'+IG_BATATA+'" target="_blank" rel="noopener"><span class="ig">◉</span><span class="fname">@'+esc(IG_BATATA_USER)+'</span><span class="fstate">Seguir</span></a>'
+    +'</div>';
+  html+='<button class="cta" id="cta" disabled>SEGUÍ A LOS DOS PARA CONTINUAR</button><p class="foot">Al enviar, recibirás tu beneficio por email.</p>';
   form.innerHTML=html;
   form.querySelectorAll(".opts").forEach(function(g){
     var id=g.getAttribute("data-group"),type=g.getAttribute("data-type"),max=parseInt(g.getAttribute("data-max")||"0");
@@ -119,12 +134,17 @@
         else{ if(max&&arr.length>=max){ alert("Podés elegir hasta "+max+" opciones."); return; } b.classList.add("on"); b.classList.add("multi"); arr=arr.concat([val]); }
         state[id]=arr; } });
   });
+  var followed={sur:false,batata:false};
+  function syncCta(){ var b=document.getElementById("cta"); var ok=followed.sur&&followed.batata; b.disabled=!ok; b.textContent=ok?"QUIERO MI 15% OFF":"SEGUÍ A LOS DOS PARA CONTINUAR"; }
+  function markFollow(key,id){ var el=document.getElementById(id); if(!el)return; el.addEventListener("click",function(){ followed[key]=true; el.classList.add("done"); var s=el.querySelector(".fstate"); if(s)s.textContent="Siguiendo ✓"; syncCta(); }); }
+  markFollow("sur","ig-sur"); markFollow("batata","ig-batata");
   document.getElementById("cta").addEventListener("click",function(){
+    if(!(followed.sur&&followed.batata)){ alert("Seguí a los dos Instagram (Sur Maderas y Batata) para activar tu cupón."); return; }
     form.querySelectorAll("input[data-id]").forEach(function(el){ state[el.getAttribute("data-id")]=el.value.trim(); });
     if(!state.nombre){ alert("Ingresá tu nombre y apellido."); return; }
     if(!state.telefono){ alert("Ingresá tu teléfono."); return; }
     if(!state.email){ alert("Ingresá tu email."); return; }
-    var answers={"¿Ya conocía Sur Maderas?":state.conocia||"","Intereses":(state.intereses||[]).join(", "),"Productos infantiles":(state.infantil||[]).join(", "),"Espacio":state.espacio||"","Qué valora":(state.valora||[]).join(", "),"Proyecto próximo":state.proyecto||"","Vive en Mar del Plata":state.mdp||"","Quiere novedades":state.novedades||""};
+    var answers={"¿Ya conocía Sur Maderas?":state.conocia||"","Intereses":(state.intereses||[]).join(", "),"Productos infantiles":(state.infantil||[]).join(", "),"Espacio":state.espacio||"","Qué valora":(state.valora||[]).join(", "),"Proyecto próximo":state.proyecto||"","Vive en Mar del Plata":state.mdp||"","Quiere novedades":state.novedades||"","Sigue Instagram":"Sí (@"+IG_SUR_USER+" + @"+IG_BATATA_USER+")"};
     var btn=this; btn.disabled=true; btn.textContent="Enviando…";
     post(4,{customer_name:state.nombre,phone:state.telefono,email:state.email,answers:answers});
   });
