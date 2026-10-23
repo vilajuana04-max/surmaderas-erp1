@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Receipt, Menu, X, ChevronDown, Bell, Wallet, LogOut,
-  BookOpen, Ticket, Contact, CalendarRange, ImagePlay, ShoppingCart, UserCog, UserCircle, ClipboardList, Calculator, Megaphone,
+  BookOpen, Ticket, Contact, CalendarRange, ImagePlay, ShoppingCart, UserCog, UserCircle, ClipboardList, Calculator, Megaphone, Clock,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { can } from '../permissions'
@@ -30,12 +30,12 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
 
   const p = location.pathname
   const isFinanzas = ['/ventas','/compras','/gastos','/flujocaja','/punto-equilibrio','/lista-precios'].some(x => p === x || p.startsWith(x))
-  const isRRHH     = p.startsWith('/rrhh') || p.startsWith('/comisiones') || p.startsWith('/control-horario')
+  const isRRHH     = p.startsWith('/rrhh') || p.startsWith('/comisiones')
   const isClientes = p.startsWith('/cupones') || p.startsWith('/clientes')
   const isVentaOnline = p.startsWith('/venta-online')
   const isPresupuestos = p.startsWith('/presupuestos')
   const isCotizadores = p.startsWith('/cotizador-')
-  const canCotizar = !!user?.is_primary_admin || can(perms, 'presupuestos', 'view') || can(perms, 'venta_online', 'view')
+  const canCotizar = !!user?.is_primary_admin || can(perms, 'cotizadores', 'view')
 
   const [finanzasOpen, setFinanzasOpen] = useState(isFinanzas)
   const [rrhhOpen,     setRrhhOpen]     = useState(isRRHH)
@@ -278,11 +278,19 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
                 })}
                 <NavLink to="/comisiones" onClick={onClose} className={subLinkClass(p.startsWith('/comisiones'))}
                   style={{ borderLeftColor: p.startsWith('/comisiones') ? CORAL : 'transparent' }}><span>Comisiones</span></NavLink>
-                <NavLink to="/control-horario" onClick={onClose} className={subLinkClass(p.startsWith('/control-horario'))}
-                  style={{ borderLeftColor: p.startsWith('/control-horario') ? CORAL : 'transparent' }}><span>Control horario</span></NavLink>
               </div>
             )}
           </>
+        )}
+
+        {/* ── CONTROL HORARIO (módulo propio) ── */}
+        {show('control_horario') && (
+          <NavLink to="/control-horario" onClick={onClose} className={({ isActive }) => navLinkClass(isActive)}
+            style={({ isActive }) => ({ borderLeftColor: isActive ? CORAL : 'transparent' })}>
+            <span className="font-body text-[10px] font-bold tracking-[1.5px]" style={{ color: CORAL }}>▸</span>
+            <Clock size={16} strokeWidth={2} />
+            <span className="tracking-[1px] uppercase text-[12px]">Control horario</span>
+          </NavLink>
         )}
 
         {/* ── Vencimientos ── */}

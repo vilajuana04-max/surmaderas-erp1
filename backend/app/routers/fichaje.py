@@ -31,9 +31,9 @@ def _admin(user: User, db: Session) -> User:
     if user.is_primary_admin:
         return user
     perms = effective_permissions(user, db)
-    if LEVEL_RANK.get(perms.get("rrhh", "none"), 0) >= LEVEL_RANK["edit"]:
+    if LEVEL_RANK.get(perms.get("control_horario", "none"), 0) >= LEVEL_RANK["edit"]:
         return user
-    raise HTTPException(403, "Necesitás permiso de RRHH.")
+    raise HTTPException(403, "Necesitás permiso de Control Horario.")
 
 
 # ── Helpers de tiempo ─────────────────────────────────────────────

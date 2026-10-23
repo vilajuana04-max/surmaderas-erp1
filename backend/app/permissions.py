@@ -20,21 +20,23 @@ from app.models.users import User, UserPermission
 
 # ── Módulos canónicos del ERP ─────────────────────────────────────
 MODULES = [
-    "dashboard", "caja_diaria", "finanzas", "rrhh", "vencimientos",
+    "dashboard", "caja_diaria", "finanzas", "rrhh", "control_horario", "vencimientos",
     "gastos_personales", "clientes", "marketing", "contenido",
-    "venta_online", "presupuestos", "usuarios",
+    "venta_online", "cotizadores", "presupuestos", "usuarios",
 ]
 MODULE_LABELS = {
     "dashboard": "Dashboard",
     "caja_diaria": "Caja Diaria",
     "finanzas": "Finanzas",
     "rrhh": "Recursos Humanos",
+    "control_horario": "Control Horario",
     "vencimientos": "Vencimientos",
     "gastos_personales": "Gastos Personales",
     "clientes": "Clientes",
     "marketing": "Marketing",
     "contenido": "Contenido",
     "venta_online": "Venta Online",
+    "cotizadores": "Cotizadores",
     "presupuestos": "Presupuestos (Ver=Cargar · Editar=Gestionar)",
     "usuarios": "Usuarios (Configuración)",
 }
@@ -73,12 +75,14 @@ PATH_MODULE = [
     ("/cashflow", "finanzas"), ("/placas", "finanzas"),
     ("/payroll", "rrhh"), ("/vacations", "rrhh"), ("/employees", "rrhh"),
     ("/receipts", "rrhh"), ("/puestos", "rrhh"),
+    ("/fichaje", "control_horario"),
     ("/vencimientos", "vencimientos"),
     ("/gastos-personales", "gastos_personales"),
     ("/clientes", "clientes"), ("/cupones", "clientes"),
     ("/marketing", "marketing"),
     ("/contenido", "contenido"),
     ("/online", "venta_online"),
+    ("/cotizadores", "cotizadores"),
     ("/presupuestos", "presupuestos"),
     ("/users", "usuarios"),
 ]

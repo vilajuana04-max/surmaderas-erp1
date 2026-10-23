@@ -55,7 +55,7 @@ def _can_edit(user: User, db: Session) -> bool:
     if user.is_primary_admin:
         return True
     perms = effective_permissions(user, db)
-    for m in ("presupuestos", "venta_online"):
+    for m in ("cotizadores", "presupuestos", "venta_online"):
         if LEVEL_RANK.get(perms.get(m, "none"), 0) >= LEVEL_RANK["edit"]:
             return True
     return False

@@ -54,11 +54,11 @@ export default function App() {
         <Route path="/caja-diaria"       element={page('caja_diaria', <CajaDiaria />)} />
         <Route path="/venta-online"      element={page('venta_online', <VentaOnline />)} />
         <Route path="/presupuestos"      element={page('presupuestos', <Presupuestos />)} />
-        <Route path="/cotizador-marcos"  element={page(undefined, <CotizadorMarcos />)} />
-        <Route path="/cotizador-listones" element={page(undefined, <CotizadorListones />)} />
+        <Route path="/cotizador-marcos"  element={page('cotizadores', <CotizadorMarcos />)} />
+        <Route path="/cotizador-listones" element={page('cotizadores', <CotizadorListones />)} />
         <Route path="/rrhh"              element={page('rrhh', <RRHH />)} />
         <Route path="/comisiones"        element={page('rrhh', <Comisiones />)} />
-        <Route path="/control-horario"   element={page('rrhh', <ControlHorario />)} />
+        <Route path="/control-horario"   element={page('control_horario', <ControlHorario />)} />
         <Route path="/vencimientos"      element={page('vencimientos', <Vencimientos />)} />
         <Route path="/gastos-personales" element={page('gastos_personales', <GastosPersonales />)} />
         <Route path="/cupones"           element={page('clientes', <Cupones />)} />

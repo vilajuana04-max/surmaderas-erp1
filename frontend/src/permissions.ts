@@ -5,9 +5,9 @@ export type Permissions = Record<string, Level>
 export const LEVEL_RANK: Record<Level, number> = { none: 0, view: 1, edit: 2, admin: 3 }
 
 export const MODULES = [
-  'dashboard', 'caja_diaria', 'finanzas', 'rrhh', 'vencimientos',
+  'dashboard', 'caja_diaria', 'finanzas', 'rrhh', 'control_horario', 'vencimientos',
   'gastos_personales', 'clientes', 'marketing', 'contenido',
-  'venta_online', 'presupuestos', 'usuarios',
+  'venta_online', 'cotizadores', 'presupuestos', 'usuarios',
 ] as const
 
 export const MODULE_LABELS: Record<string, string> = {
@@ -15,12 +15,14 @@ export const MODULE_LABELS: Record<string, string> = {
   caja_diaria: 'Caja Diaria',
   finanzas: 'Finanzas',
   rrhh: 'Recursos Humanos',
+  control_horario: 'Control Horario',
   vencimientos: 'Vencimientos',
   gastos_personales: 'Gastos Personales',
   clientes: 'Clientes',
   marketing: 'Marketing',
   contenido: 'Contenido',
   venta_online: 'Venta Online',
+  cotizadores: 'Cotizadores',
   presupuestos: 'Presupuestos (Ver=Cargar · Editar=Gestionar)',
   usuarios: 'Usuarios (Configuración)',
 }
@@ -30,12 +32,14 @@ export const MODULE_HOME: Record<string, string> = {
   caja_diaria: '/caja-diaria',
   finanzas: '/ventas',
   rrhh: '/rrhh',
+  control_horario: '/control-horario',
   vencimientos: '/vencimientos',
   gastos_personales: '/gastos-personales',
   clientes: '/clientes',
   marketing: '/marketing',
   contenido: '/contenido',
   venta_online: '/venta-online',
+  cotizadores: '/cotizador-marcos',
   presupuestos: '/presupuestos',
   usuarios: '/usuarios',
 }
