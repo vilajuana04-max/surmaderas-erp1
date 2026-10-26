@@ -192,7 +192,7 @@ function SaleForm({ sale, onDone, onCancel }: { sale?: Sale; onDone: () => void;
       if (senaAmount > total) return 'La seña no puede superar el total.'
     }
     if (estado === 'pagado') {
-      if (payMethod === 'transferencia' && (transferAmount <= 0 || transferAmount > total)) return 'El monto transferido no puede superar el total.'
+      if (payMethod === 'transferencia') { const eff = transferAmount || total; if (eff <= 0 || eff > total) return 'El monto transferido no puede superar el total.' }
       if (payMethod === 'mixto' && mixtoSuma !== total) return 'Efectivo + transferencia debe ser igual al total.'
     }
     return null
