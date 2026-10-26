@@ -64,14 +64,14 @@
   @media(max-width:480px){.batata{font-size:26px}.badge{font-size:19px}}
 
   /* ── Wizard ── */
-  .steps{display:flex;align-items:center;gap:6px;margin:14px 2px 20px}
-  .st{display:flex;flex-direction:column;align-items:center;gap:4px}
-  .stn{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--head);font-weight:700;font-size:14px;background:var(--pink);color:var(--muted)}
+  .steps{display:flex;align-items:flex-start;gap:8px;margin:14px 2px 22px}
+  .st{display:flex;flex-direction:column;align-items:center;gap:5px;flex:0 0 auto}
+  .stn{width:26px;height:26px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-family:var(--head);font-weight:700;font-size:13px;background:var(--pink);color:var(--muted)}
   .st.on .stn{background:var(--orange);color:#fff}
   .st.done .stn{background:var(--green);color:var(--dark)}
   .stl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
   .st.on .stl{color:var(--orange)} .st.done .stl{color:var(--dark)}
-  .stline{flex:1;height:3px;border-radius:3px;background:var(--pink);margin-top:-16px}
+  .stline{flex:1;height:4px;border-radius:999px;background:var(--pink);margin-top:11px}
   .stline.done{background:var(--green)}
   .stephd{margin-bottom:8px}
   .qtitle{font-family:var(--head);font-weight:700;font-size:24px;color:var(--dark);margin:0 0 4px;line-height:1.12}
@@ -157,7 +157,7 @@
   }
 
   function renderQuestions(){
-    var h=bar(2);
+    var h=bar(1);
     h+='<div class="stephd"><h2 class="qtitle">Contanos qué te interesa</h2><p class="qhint">Así te mostramos ideas que de verdad te sirvan.</p></div>';
     h+='<div class="q"><p class="qlabel">Nombre y apellido *</p><input class="inp" id="f-nombre" autocomplete="name" value="'+esc(state.nombre)+'"></div>';
     h+='<div class="q"><p class="qlabel">Teléfono *</p><input class="inp" id="f-telefono" type="tel" inputmode="tel" placeholder="Ej: 223 XXXXXXX" value="'+esc(state.telefono)+'"></div>';
